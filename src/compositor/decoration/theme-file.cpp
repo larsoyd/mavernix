@@ -108,6 +108,8 @@ const toml::table& require_table(const toml::table& parent, std::string_view nam
     return *table;
 }
 
+const int64_t MAX_SHADOW_FADE_MS = 10000;
+
 double require_number(const toml::table& table, const std::string& name,
     const std::string& table_name)
 {
@@ -547,7 +549,7 @@ window_theme_t load_window_theme(const std::string& theme_directory)
     {
         reject_unknown_keys(*shadow, "window.shadow",
             {"color", "blur_radius", "offset", "color_inactive", "blur_radius_inactive",
-                "offset_inactive"});
+                "offset_inactive", "fade_ms"});
         theme.has_shadow = true;
         theme.shadow.color = require_color(*shadow, "color", "window.shadow");
         theme.shadow.blur_radius = require_number(*shadow, "blur_radius", "window.shadow");
@@ -564,6 +566,18 @@ window_theme_t load_window_theme(const std::string& theme_directory)
                 require_number(*shadow, "blur_radius_inactive", "window.shadow");
         }
         read_offset(*shadow, "offset_inactive", theme.shadow_inactive);
+
+        if (shadow->contains("fade_ms"))
+        {
+            const auto fade = (*shadow)["fade_ms"].value_exact<int64_t>();
+            if (!fade || (*fade < 0) || (*fade > MAX_SHADOW_FADE_MS))
+            {
+                throw problem("window.shadow.fade_ms",
+                    "must be a whole number from 0 to " + std::to_string(MAX_SHADOW_FADE_MS));
+            }
+
+            theme.shadow_fade_ms = (int)*fade;
+        }
     }
 
     return theme;

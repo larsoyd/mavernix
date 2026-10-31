@@ -24,6 +24,8 @@
 #include <wayfire/window-manager.hpp>
 
 #include <wayfire/plugins/common/cairo-util.hpp>
+#include <wayfire/util.hpp>
+#include <wayfire/util/duration.hpp>
 
 #include <cairo.h>
 
@@ -114,14 +116,24 @@ class simple_decoration_node_t : public wf::scene::node_t, public wf::pointer_in
         wf::geometry_t box;
     };
 
-    struct
+    struct shadow_pictures_t
     {
         std::vector<shadow_piece_t> pieces;
         wf::dimensions_t laid_out_size = {-1, -1};
         // Whether the pictures were drawn to stretch to any size (see update_shadow).
-        bool drawn_active     = false;
         bool drawn_stretching = false;
-    } shadow_textures;
+    };
+
+    // one set per state, indexed by active, a fade draws both
+    shadow_pictures_t shadow_textures[2];
+
+    static double fast_then_settling(double progress)
+    {
+        const double left = 1.0 - progress;
+        return 1.0 - left * left * left;
+    }
+
+    wf::wl_idle_call shadow_fade_frame;
 
     struct shadow_cut_t
     {
@@ -226,12 +238,9 @@ class simple_decoration_node_t : public wf::scene::node_t, public wf::pointer_in
         return cuts;
     }
 
-    /**
-     * Drawing the shadow takes 5 to 9 ms per window, too slow for every
-     * resize. So for all but small frames the pictures are drawn once per
-     * state and only moved and stretched when the size changes.
-     */
-    void update_shadow(bool active)
+    // drawing takes 5 to 9 ms per window, too slow for a resize or a fade frame
+    // so pictures are made once per state and only moved and stretched after that
+    void update_shadow(shadow_pictures_t& pictures, bool active)
     {
         const double reach    = theme.get_shadow_reach();
         const double corner   = theme.get_rim_corner_height();
@@ -240,10 +249,9 @@ class simple_decoration_node_t : public wf::scene::node_t, public wf::pointer_in
         const bool stretching =
             (size.width >= stand_in) && (size.height >= stand_in) && (corner < reach);
 
-        const bool laid_out = (shadow_textures.laid_out_size == size);
-        const bool pictures_fit = !shadow_textures.pieces.empty() &&
-            (shadow_textures.drawn_active == active) &&
-            (shadow_textures.drawn_stretching == stretching) &&
+        const bool laid_out = (pictures.laid_out_size == size);
+        const bool pictures_fit = !pictures.pieces.empty() &&
+            (pictures.drawn_stretching == stretching) &&
             (stretching || laid_out);
         if (pictures_fit && laid_out)
         {
@@ -258,33 +266,52 @@ class simple_decoration_node_t : public wf::scene::node_t, public wf::pointer_in
         {
             for (size_t piece = 0; piece < cuts.size(); piece++)
             {
-                shadow_textures.pieces[piece].box = cuts[piece].box;
+                pictures.pieces[piece].box = cuts[piece].box;
             }
         } else
         {
             const double drawn_for_width  = stretching ? stand_in : size.width;
             const double drawn_for_height = stretching ? stand_in : size.height;
-            shadow_textures.pieces.clear();
+            pictures.pieces.clear();
             for (const shadow_cut_t& cut : cuts)
             {
                 auto surface = theme.render_shadow_piece(cut.drawn_box, drawn_for_width,
                     drawn_for_height, active);
-                shadow_textures.pieces.push_back({wf::owned_texture_t{surface}, cut.box});
+                pictures.pieces.push_back({wf::owned_texture_t{surface}, cut.box});
                 cairo_surface_destroy(surface);
             }
         }
 
-        shadow_textures.laid_out_size    = size;
-        shadow_textures.drawn_active     = active;
-        shadow_textures.drawn_stretching = stretching;
+        pictures.laid_out_size    = size;
+        pictures.drawn_stretching = stretching;
     }
 
-    void render_shadow(const wf::scene::render_instruction_t& data, wf::pointf_t origin, bool activated)
+    void render_shadow(const wf::scene::render_instruction_t& data, wf::pointf_t origin)
     {
-        update_shadow(activated);
-        for (const shadow_piece_t& piece : shadow_textures.pieces)
+        const double active_share = shadow_fade;
+        for (const bool active : {false, true})
         {
-            data.pass->add_texture(piece.tex.get_texture(), data.target, piece.box + origin, data.damage);
+            const double share = active ? active_share : 1.0 - active_share;
+            if (share <= 0.0)
+            {
+                continue;
+            }
+
+            shadow_pictures_t& pictures = shadow_textures[active];
+            update_shadow(pictures, active);
+            for (const shadow_piece_t& piece : pictures.pieces)
+            {
+                data.pass->add_texture(piece.tex.get_texture(), data.target, piece.box + origin,
+                    data.damage, share);
+            }
+        }
+
+        if (shadow_fade.running())
+        {
+            shadow_fade_frame.run_once([this] ()
+            {
+                wf::scene::damage_node(shared_from_this(), get_bounding_box());
+            });
         }
     }
 
@@ -367,15 +394,20 @@ class simple_decoration_node_t : public wf::scene::node_t, public wf::pointer_in
     int current_thickness;
     int current_titlebar;
 
+    // 0 is the inactive shadow, 1 the active one
+    wf::animation::simple_animation_t shadow_fade;
+
     simple_decoration_node_t(wayfire_toplevel_view view) :
         node_t(false),
         theme{},
         layout{theme, [=] (wf::geometry_t box)
         {
             wf::scene::damage_node(shared_from_this(), box + get_offset());
-        }}
+        }},
+        shadow_fade{wf::create_option<int>(theme.values().shadow_fade_ms), fast_then_settling}
     {
         this->_view = view->weak_from_this();
+        shadow_fade.set(view->activated, view->activated);
         view->connect(&title_set);
         if (view->parent)
         {
@@ -410,7 +442,7 @@ class simple_decoration_node_t : public wf::scene::node_t, public wf::pointer_in
         /* The shadow first: everything else lies on top of it. */
         if ((current_titlebar > 0) && theme.has_shadow())
         {
-            render_shadow(data, origin, activated);
+            render_shadow(data, origin);
         }
 
         if (current_titlebar > 0)
@@ -722,6 +754,7 @@ wf::simple_decorator_t::simple_decorator_t(wayfire_toplevel_view view, bool tool
 
     on_view_activated = [this] (auto)
     {
+        deco->shadow_fade.animate(this->view->activated);
         wf::scene::damage_node(deco, deco->get_bounding_box());
     };
 

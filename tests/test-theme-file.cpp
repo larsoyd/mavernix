@@ -71,6 +71,56 @@ class TestThemeFile : public QObject
         }
     }
 
+    void a_shadow_fades_for_200_ms_unless_the_theme_says_otherwise()
+    {
+        const themed::window_theme_t read =
+            themed::load_window_theme(QStringLiteral(THEMES_DIR "/plain").toStdString());
+        QCOMPARE(read.shadow_fade_ms, 200);
+    }
+
+    void a_shadow_fade_comes_from_the_theme_data()
+    {
+        QTest::addColumn<QString>("value");
+        QTest::addColumn<int>("expected");
+        QTest::newRow("longer") << QStringLiteral("350") << 350;
+        QTest::newRow("off") << QStringLiteral("0") << 0;
+    }
+
+    void a_shadow_fade_comes_from_the_theme()
+    {
+        QFETCH(QString, value);
+        QFETCH(int, expected);
+        QTemporaryDir folder;
+        const QString theme = changed_plain_theme(folder, QStringLiteral("[window.shadow]\n"),
+            QStringLiteral("[window.shadow]\nfade_ms = ") + value + QStringLiteral("\n"));
+        QCOMPARE(themed::load_window_theme(theme.toStdString()).shadow_fade_ms, expected);
+    }
+
+    void a_bad_shadow_fade_is_refused_by_name_data()
+    {
+        QTest::addColumn<QString>("value");
+        QTest::newRow("below zero") << QStringLiteral("-1");
+        QTest::newRow("fraction") << QStringLiteral("1.5");
+        QTest::newRow("text") << QStringLiteral("\"slow\"");
+    }
+
+    void a_bad_shadow_fade_is_refused_by_name()
+    {
+        QFETCH(QString, value);
+        QTemporaryDir folder;
+        const QString theme = changed_plain_theme(folder, QStringLiteral("[window.shadow]\n"),
+            QStringLiteral("[window.shadow]\nfade_ms = ") + value + QStringLiteral("\n"));
+        try
+        {
+            themed::load_window_theme(theme.toStdString());
+            QFAIL("a theme with a bad fade_ms was accepted");
+        }
+        catch (const std::exception& error)
+        {
+            QVERIFY2(QString::fromUtf8(error.what()).contains(QStringLiteral("fade_ms")), error.what());
+        }
+    }
+
     void a_missing_theme_is_refused()
     {
         QVERIFY_THROWS_EXCEPTION(std::exception, themed::load_window_theme("/nonexistent"));

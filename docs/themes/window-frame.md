@@ -73,6 +73,8 @@ border_width = 2
 color = "#00000080"               # its opacity is how dark the shadow gets at its darkest
 blur_radius = 20                  # softness, as in CSS: twice the blur's standard deviation
 offset = [0, 10]                  # moved right and down by this much
+fade_ms = 200                     # optional: how long the shadow takes to change when a window gains
+                                  # or loses focus. 200 if left out, 0 changes it at once
 # For inactive windows. Each one defaults to the value above.
 color_inactive = "#00000040"
 blur_radius_inactive = 12
