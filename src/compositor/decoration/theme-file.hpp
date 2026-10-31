@@ -172,6 +172,7 @@ struct window_theme_t
     bool has_shadow = false;
     shadow_t shadow;
     shadow_t shadow_inactive;
+    int shadow_fade_ms = 200;
 
     /**
      * A one-pixel hairline just outside the frame (top, sides, bottom), drawn
