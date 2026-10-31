@@ -9,6 +9,8 @@ theme = "Adwaita"         # the name of an icon theme
 
 Applications and the desktop's own parts (the dock) take their icons by name from this icon theme. It can be one that's installed on the system, or one your desktop theme brings along. A theme's `share/` folder is added to the folders where programs look these things up, so `share/icons/NAME/` gets found. If your theme leaves this table out, you get the system's icons. Users can pick other icon themes in Settings, App Style, for programs and for the desktop's own parts, which then take this one's place (see [configuration](../configuration.md#the-icon-theme)).
 
+The choice is locked for KDE programs while the desktop runs, so a theme chosen in Plasma's settings doesn't show here. It stays Plasma's own.
+
 ## Mouse pointers
 
 ```toml

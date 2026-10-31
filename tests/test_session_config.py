@@ -735,6 +735,84 @@ class TestSeaLionIcons(unittest.TestCase):
                     resources = f"{source}/Contents/Resources/"
                     self.assertTrue(any(path.startswith(resources) and path.endswith(".icns") for path in self.taken))
 
+    def file_type_icons(self, types, subclasses="", generic_icons="", icons="", program_icons=()):
+        database = Path(tempfile.mkdtemp())
+        self.addCleanup(shutil.rmtree, database)
+        (database / "types").write_text("".join(f"{name}\n" for name in types))
+        (database / "subclasses").write_text(subclasses)
+        (database / "generic-icons").write_text(generic_icons)
+        (database / "icons").write_text(icons)
+        return self.make_icons.file_type_icons(database, set(program_icons))
+
+    def test_a_type_mavericks_never_drew_gets_the_plain_document(self):
+        word = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+        found = self.file_type_icons(
+            [word, "application/x-unheard-of", "text/csv"],
+            subclasses=f"{word} application/zip\ntext/csv text/plain\n",
+            generic_icons=f"{word}:x-office-document\ntext/csv:x-office-spreadsheet\n")
+        # being a zip file inside must not make it look like an archive
+        self.assertEqual(found, {
+            "application-vnd.openxmlformats-officedocument.wordprocessingml.document": "text-x-generic",
+            "application-x-unheard-of": "text-x-generic",
+            "text-csv": "text-x-generic",
+        })
+
+    def test_text_gets_textedits_document_however_it_is_reached(self):
+        found = self.file_type_icons(
+            ["text/x-python", "text/x-cython", "application/toml", "application/json", "application/x-subtitle"],
+            subclasses="text/x-python application/x-executable\ntext/x-python text/x-cython\n"
+                       "application/toml text/plain\napplication/x-subtitle text/plain\n",
+            generic_icons="application/toml:text-x-generic\napplication/json:text-x-script\n")
+        self.assertEqual(found, {name: "text-plain" for name in (
+            "text-x-python", "text-x-cython", "application-toml", "application-json", "application-x-subtitle")})
+
+    def test_a_family_takes_its_generic_icon(self):
+        found = self.file_type_icons(
+            ["application/vnd.efi.iso", "application/vnd.appimage", "application/x-zstd-compressed-tar",
+             "font/ttf2", "image/webp", "audio/flac", "video/matroska"],
+            generic_icons="application/vnd.efi.iso:media-optical\napplication/vnd.appimage:application-x-executable\n"
+                          "application/x-zstd-compressed-tar:package-x-generic\nfont/ttf2:font-x-generic\n")
+        self.assertEqual(found, {
+            "application-vnd.efi.iso": "application-x-cd-image",
+            "application-vnd.appimage": "application-x-executable",
+            "application-x-zstd-compressed-tar": "package-x-generic",
+            "font-ttf2": "font-x-generic",
+            "image-webp": "image-x-generic",
+            "audio-flac": "audio-x-generic",
+            "video-matroska": "video-x-generic",
+        })
+
+    def test_every_target_is_an_icon_of_the_theme(self):
+        targets = {*self.make_icons.GENERIC_FILE_ICONS.values(), *self.make_icons.MEDIA_FILE_ICONS.values(),
+                   self.make_icons.TEXT_FILE_ICON, self.make_icons.ANY_FILE_ICON}
+        for target in targets:
+            with self.subTest(target=target):
+                self.assertEqual(self.make_icons.ICONS[target][0], "mimetypes")
+
+    def test_an_icon_the_theme_or_a_program_has_stays(self):
+        found = self.file_type_icons(
+            ["application/pdf", "application/vnd.oasis.opendocument.text", "application/x-lutris",
+             "application/x-vectorcraft", "inode/mount-point", "x-content/video-dvd"],
+            icons="application/x-vectorcraft:ai.storyteller.vectorcraft\n",
+            program_icons=["application-x-lutris"])
+        self.assertEqual(found, {"application-vnd.oasis.opendocument.text": "text-x-generic"})
+
+    def test_the_links_stand_beside_their_target_in_every_size(self):
+        theme = Path(tempfile.mkdtemp())
+        self.addCleanup(shutil.rmtree, theme)
+        for folder in ("16x16", "64x64"):
+            (theme / folder / "mimetypes").mkdir(parents=True)
+            (theme / folder / "mimetypes" / "text-plain.png").write_bytes(b"picture")
+        (theme / "32x32" / "mimetypes").mkdir(parents=True)
+
+        self.make_icons.write_file_type_links(theme, {"text-x-python": "text-plain"})
+
+        for folder in ("16x16", "64x64"):
+            link = theme / folder / "mimetypes" / "text-x-python.png"
+            self.assertEqual(os.readlink(link), "text-plain.png")
+            self.assertEqual(link.read_bytes(), b"picture")
+        self.assertFalse(os.path.lexists(theme / "32x32" / "mimetypes" / "text-x-python.png"))
+
 
 class TestThemeUpdates(unittest.TestCase):
     """The Theme Installer's updates.py: what imported themes get at login,
@@ -1062,6 +1140,17 @@ class TestShellBlur(SessionTestCase):
 
 
 class TestKdeColours(SessionTestCase):
+    def test_the_desktops_icon_theme_beats_the_users_kde_settings(self):
+        # Without the lock, a theme chosen under Plasma in ~/.config wins here.
+        output = self.home / "app-theme"
+        self.run_script("make_app_theme.py", THEMES_DIR / "plain", output)
+        lines = (output / "xdg" / "kdeglobals").read_text().split("\n")
+        # the key, not the group: kconfig copies a group's lock into the user's file on the next write
+        self.assertEqual(lines[:2], ["[Icons]", "Theme[$i]=Adwaita"])
+        scheme = (output / "share" / "color-schemes" / "DesktopTheme.colors").read_text()
+        self.assertNotIn("Icons", scheme)
+        self.assertNotIn("Theme[", scheme)
+
     def test_default_scheme_is_the_themes(self):
         # A KDE program set to "Default" takes Breeze's scheme by its file
         # name; the session's own copy of that name must hold the theme's.
