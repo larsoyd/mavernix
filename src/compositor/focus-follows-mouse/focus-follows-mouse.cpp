@@ -105,8 +105,9 @@ class plugin_t : public wf::plugin_interface_t, public wf::per_output_tracker_mi
     void init() override
     {
         auto& core = wf::get_core();
-        // loaded into a running session, the compositor has not read our xml
-        if (!core.config->get_option("focus-follows-mouse/delay_ms"))
+        // the file reload made untyped options if our xml came after the compositor started
+        if (!std::dynamic_pointer_cast<wf::config::option_t<int>>(
+                core.config->get_option("focus-follows-mouse/delay_ms")))
         {
             core.config_backend->reload_config_metadata(*core.config);
         }
