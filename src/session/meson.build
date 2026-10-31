@@ -24,6 +24,7 @@ install_data(
 install_data(
     'at_login.py',
     'check_theme.py',
+    'extensions.py',
     'log_guard.py',
     'make_app_theme.py',
     'make_default_programs.py',

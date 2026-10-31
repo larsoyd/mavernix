@@ -2,7 +2,7 @@
 
 Extensions add things to the desktop that aren't part of it: features only some people want. Each one is a folder in `~/.config/mavernix/extensions/`, or in `/usr/share/mavernix/extensions/` if it's installed for everyone. If you have a folder with the same name as an installed one, yours takes its place. A folder whose name starts with a dot is skipped (the App Store keeps one while it installs or updates). The desktop config decides which extensions are switched on (`[extensions] enabled`). You can also change that while the desktop runs, in the Extensions pane of the settings window. The desktop looks for extensions when you log in, and again whenever the App Store installs or removes one (`mavernix-extensions-changed`); a folder you add by hand shows at the next login, or after you run that command.
 
-An extension is QML plus whatever small programs it brings. Nothing gets compiled. The shell keeps the code of a file it has read for as long as it runs, so after you change something, run `mavernix-extensions-changed` in a terminal on the desktop: the extension starts again with your changes. Switching it off and on again isn't enough.
+An extension is QML plus whatever small programs it brings, and it can switch on a compositor plugin that's already installed. Nothing gets compiled. The shell keeps the code of a file it has read for as long as it runs, so after you change something, run `mavernix-extensions-changed` in a terminal on the desktop: the extension starts again with your changes. Switching it off and on again isn't enough.
 
 ## What a folder holds
 
@@ -25,6 +25,7 @@ icon = "images/icon.png"          # optional: its picture in the settings window
                                   # without one, the theme's plug-in icon is used
 
 background = "Background.qml"     # optional
+compositor_plugin = "NAME"        # optional: a plugin to load while it is switched on (below)
 
 [panel_items]                     # optional: items it wants on the panel, by file name in status/
 right = ["clipboard"]             # shown before the desktop's own items at that end;
@@ -89,6 +90,12 @@ StatusItem {
 ```
 
 Older desktops don't have `popover`, and an item that sets it fails to load there. An item that should work on both can check for it (`"popover" in item`) and set it from `Component.onCompleted`.
+
+## A compositor plugin
+
+An extension can't see the pointer over other programs' windows or move the keyboard between them. That takes a plugin in the compositor. `compositor_plugin` names one, installed in the desktop's plugin folder or in Wayfire's, and the session loads it while the extension is switched on. The extension's settings become the plugin's options, in a section named after the plugin. A change takes hold at once, with no need to log out.
+
+`focus-follows-mouse` ships with the desktop and works this way. The window the pointer enters takes the keyboard after `delay_ms`, without coming to the front unless `raise` is on. The focus stays put on an empty desktop or screen, and moving inside a window never takes it from one you picked with the keyboard.
 
 ## Trying one
 

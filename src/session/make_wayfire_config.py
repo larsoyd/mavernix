@@ -24,6 +24,7 @@ import tomllib
 from itertools import takewhile
 from pathlib import Path
 
+from extensions import found_extensions
 from paths import SESSION_DIR, SHELL_DIR
 from themes import find_theme
 from user_choices import load_desktop_config, settings_home, with_user_choices
@@ -1227,6 +1228,23 @@ def take_out_plugins(text):
     return "".join(kept), names
 
 
+def extension_plugin_sections(config, theme_name):
+    """The compositor plugins switched-on extensions name, each with the
+    extension's settings as the plugin's options."""
+    found = found_extensions(config, theme_name)
+    sections = []
+    plugins = []
+    for name in config.get("extensions", {}).get("enabled", []):
+        extension = found.get(name, {})
+        plugin = extension.get("manifest", {}).get("compositor_plugin")
+        if plugin:
+            plugins.append(plugin)
+            options = [f"{key} = {yes_or_no(value) if isinstance(value, bool) else value}"
+                       for key, value in extension["settings"].items()]
+            sections.append([f"[{plugin}]"] + options)
+    return sections, plugins
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("config", type=Path, help="desktop config, e.g. data/config/plain.toml")
@@ -1302,6 +1320,11 @@ def main():
     # with a window loses its connection (the closed-programs plugin).
     if config.get("session", {}).get("note_closed_programs", True):
         plugins.append("closed-programs")
+
+    extension_sections, extension_plugins = extension_plugin_sections(config, theme_dir.name)
+    sections += extension_sections
+    plugins += extension_plugins
+
     plugins += arguments.extra_plugins.split()
 
     own = settings_home() / "wayfire.ini"

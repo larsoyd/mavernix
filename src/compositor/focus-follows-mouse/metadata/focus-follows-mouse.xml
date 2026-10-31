@@ -1,0 +1,16 @@
+<?xml version="1.0"?>
+<wayfire>
+	<plugin name="focus-follows-mouse">
+		<_short>Focus follows mouse</_short>
+		<category>Desktop</category>
+		<option name="delay_ms" type="int">
+			<_short>Delay after the pointer enters a window</_short>
+			<default>100</default>
+			<min>0</min>
+		</option>
+		<option name="raise" type="bool">
+			<_short>Bring the focused window to the front</_short>
+			<default>false</default>
+		</option>
+	</plugin>
+</wayfire>

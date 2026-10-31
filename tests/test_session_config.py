@@ -25,6 +25,7 @@ from pathlib import Path
 SESSION_SOURCE_DIR = Path(os.environ["SESSION_SOURCE_DIR"])
 CONFIG_DIR = Path(os.environ["CONFIG_SOURCE_DIR"])
 THEMES_DIR = Path(os.environ["THEMES_SOURCE_DIR"])
+EXTENSIONS_DIR = Path(os.environ["EXTENSIONS_SOURCE_DIR"])
 THEME_DOCS_DIR = Path(os.environ["THEME_DOCS_DIR"])
 LOOKS_DIR = Path(os.environ["LOOKS_SOURCE_DIR"])
 
@@ -51,6 +52,7 @@ class SessionTestCase(unittest.TestCase):
         data.mkdir(parents=True)
         (data / "config").symlink_to(CONFIG_DIR)
         (data / "themes").symlink_to(THEMES_DIR)
+        (data / "extensions").symlink_to(EXTENSIONS_DIR)
         subprocess.run([sys.executable, str(SESSION_SOURCE_DIR / "check_theme.py"), "--collect",
                         str(THEME_DOCS_DIR), str(data / "theme-keys.json")], check=True)
         paths = (SESSION_SOURCE_DIR / "paths.py.in").read_text()
@@ -161,6 +163,10 @@ class TestRefreshedExtensions(SessionTestCase):
 
     def setUp(self):
         super().setUp()
+        # only what a test adds, the shipped extensions would be listed too
+        shipped = Path(self.folder.name) / "share" / "mavernix" / "extensions"
+        shipped.unlink()
+        shipped.mkdir()
         self.settings_file = self.home / "state" / "shell.json"
         self.run_script("make_shell_config.py", CONFIG_DIR / "plain.toml", self.settings_file)
         self.settings = json.loads(self.settings_file.read_text())
@@ -255,6 +261,38 @@ echo "$* (list written: $listed)" >> {self.asked_shell}
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("no shell running", result.stderr)
         self.assertEqual(self.found(), ["echo"])
+
+
+class TestExtensionPlugins(SessionTestCase):
+    def wayfire_settings(self, choices):
+        (self.home / ".config" / "mavernix").mkdir(parents=True, exist_ok=True)
+        (self.home / ".config" / "mavernix" / "plain.json").write_text(json.dumps(choices))
+        written = self.home / "session.ini"
+        self.run_script("make_wayfire_config.py", str(CONFIG_DIR / "plain.toml"), str(written))
+        settings = configparser.ConfigParser(interpolation=None, strict=False)
+        settings.read(written)
+        return settings
+
+    def test_off_loads_no_plugin(self):
+        settings = self.wayfire_settings({})
+        self.assertNotIn("focus-follows-mouse", settings["core"]["plugins"].split())
+        self.assertNotIn("focus-follows-mouse", settings)
+
+    def test_on_loads_its_plugin_with_the_default_settings(self):
+        settings = self.wayfire_settings({"extensions": {"enabled": ["focus-follows-mouse"]}})
+        self.assertIn("focus-follows-mouse", settings["core"]["plugins"].split())
+        self.assertEqual(dict(settings["focus-follows-mouse"]), {"delay_ms": "100", "raise": "false"})
+
+    def test_the_users_settings_reach_the_plugin(self):
+        settings = self.wayfire_settings({"extensions": {
+            "enabled": ["focus-follows-mouse"],
+            "focus-follows-mouse": {"delay_ms": 250, "raise": True},
+        }})
+        self.assertEqual(dict(settings["focus-follows-mouse"]), {"delay_ms": "250", "raise": "true"})
+
+    def test_an_extension_that_is_gone_loads_nothing(self):
+        settings = self.wayfire_settings({"extensions": {"enabled": ["not-here"]}})
+        self.assertNotIn("not-here", settings["core"]["plugins"].split())
 
 
 class TestPickedDesktop(SessionTestCase):
