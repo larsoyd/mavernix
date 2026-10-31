@@ -8,6 +8,7 @@ wayfire_metadata_dir = mavernix_datadir / 'wayfire'
 subdir('decoration')
 subdir('desktop-aside')
 subdir('desktop-focus')
+subdir('focus-follows-mouse')
 subdir('game-keys')
 subdir('game-vrr')
 subdir('held-modifiers')

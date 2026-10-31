@@ -72,6 +72,7 @@ test(
         'SESSION_SOURCE_DIR': meson.project_source_root() / 'src' / 'session',
         'CONFIG_SOURCE_DIR': meson.project_source_root() / 'data' / 'config',
         'THEMES_SOURCE_DIR': meson.project_source_root() / 'data' / 'themes',
+        'EXTENSIONS_SOURCE_DIR': meson.project_source_root() / 'data' / 'extensions',
         'THEME_DOCS_DIR': meson.project_source_root() / 'docs' / 'themes',
         'LOOKS_SOURCE_DIR': meson.project_source_root() / 'src' / 'apps' / 'theme-installer' / 'backend' / 'looks',
     },

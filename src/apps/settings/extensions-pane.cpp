@@ -12,6 +12,7 @@
 #include <QLabel>
 #include <QLineEdit>
 #include <QListWidget>
+#include <QProcess>
 #include <QPushButton>
 #include <QSpinBox>
 #include <QStandardPaths>
@@ -400,6 +401,7 @@ void ExtensionsPane::changeSetting(const QString& name, const QString& key, cons
     QVariantMap chosen = choices.value(QStringLiteral("extensions"), name).toMap();
     chosen.insert(key, value);
     choices.set(QStringLiteral("extensions"), name, chosen);
+    applyToCompositor(name);
 }
 
 void ExtensionsPane::change(const QString& name, bool on)
@@ -412,6 +414,16 @@ void ExtensionsPane::change(const QString& name, bool on)
         enabled.append(name);
     }
     choices.set(QStringLiteral("extensions"), QStringLiteral("enabled"), enabled);
+    applyToCompositor(name);
+}
+
+void ExtensionsPane::applyToCompositor(const QString& name) const
+{
+    const QVariantMap manifest = found.value(name).toMap().value(QStringLiteral("manifest")).toMap();
+    if (manifest.contains(QStringLiteral("compositor_plugin")))
+    {
+        QProcess::startDetached(QStringLiteral("mavernix-reconfigure"), {});
+    }
 }
 
 void ExtensionsPane::openOwnFolder() const

@@ -1,0 +1,12 @@
+title = "Focus follows mouse"
+description = "The window the pointer enters takes the keyboard, without a click."
+version = "0.1.0"
+compositor_plugin = "focus-follows-mouse"
+
+[settings]
+delay_ms = 100
+raise = false
+
+[settings_labels]
+delay_ms = "Delay after the pointer enters a window (ms)"
+raise = "Bring the focused window to the front"

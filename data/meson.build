@@ -1,7 +1,8 @@
-# What the desktop reads rather than runs: the desktop configs, the themes
-# and the keys of the theme format. Installed into PREFIX/share/mavernix.
+# What the desktop reads rather than runs: the desktop configs, the themes,
+# the bundled extensions and the keys of the theme format. Installed into PREFIX/share/mavernix.
 
 install_subdir('config', install_dir: mavernix_datadir)
+install_subdir('extensions', install_dir: mavernix_datadir)
 install_subdir('themes', install_dir: mavernix_datadir)
 subdir('icons')
 

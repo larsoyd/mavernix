@@ -43,6 +43,7 @@ class ExtensionsPane : public QWidget
 
     void change(const QString& name, bool on);
     void changeSetting(const QString& name, const QString& key, const QVariant& value);
+    void applyToCompositor(const QString& name) const;
     void openOwnFolder() const;
 
     Choices& choices;
