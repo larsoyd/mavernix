@@ -7,8 +7,9 @@ Run it after make_theme.py:
 WORK is the folder holding the unpacked installer under root/. The icons
 that have a freedesktop.org name, and every program's and System Preferences
 pane's under its bundle identifier, are converted from .icns and written as
-an icon theme into OUTPUT/share/icons/SeaLion/; other names fall back to
-INHERITS.
+an icon theme into OUTPUT/share/icons/SeaLion/. So are links giving every
+other file type of shared-mime-info the nearest of those; other names fall
+back to INHERITS.
 """
 
 import argparse
@@ -128,6 +129,10 @@ ICONS = {
     "text-html": ("mimetypes", "Applications/TextEdit.app/Contents/Resources/html.icns"),
     "text-vcard": ("mimetypes", "VCard.icns"),
     "unknown": ("mimetypes", "UnknownFSObjectIcon.icns"),
+    "application-x-desktop": ("mimetypes", "GenericApplicationIcon.icns"),
+    "application-x-sharedlib": ("mimetypes", "ExecutableBinaryIcon.icns"),
+    "application-vnd.debian.binary-package": ("mimetypes", "System/Library/CoreServices/Installer.app/Contents/Resources/package.icns"),
+    "application-x-rpm": ("mimetypes", "System/Library/CoreServices/Installer.app/Contents/Resources/package.icns"),
 
     "dialog-warning": ("status", "AlertCautionIcon.icns"),
     "dialog-information": ("status", "AlertNoteIcon.icns"),
@@ -436,6 +441,38 @@ SIDE_BAR_ICONS = {
     "computer": ("devices", "SidebarLaptop.icns"),
 }
 
+# mavericks draws few file types: text is TextEdit's, the rest the plain document
+MIME_DATABASE = Path("/usr/share/mime")
+PROGRAM_ICONS = Path("/usr/share/icons/hicolor")
+ANY_FILE_ICON = "text-x-generic"
+TEXT_FILE_ICON = "text-plain"
+
+# a type's generic icon in shared-mime-info -> the theme's icon
+GENERIC_FILE_ICONS = {
+    "text-x-generic": TEXT_FILE_ICON,
+    "text-plain": TEXT_FILE_ICON,
+    "text-x-script": TEXT_FILE_ICON,
+    "text-html": "text-html",
+    "image-x-generic": "image-x-generic",
+    "audio-x-generic": "audio-x-generic",
+    "video-x-generic": "video-x-generic",
+    "font-x-generic": "font-x-generic",
+    "package-x-generic": "package-x-generic",
+    "application-x-executable": "application-x-executable",
+    "media-optical": "application-x-cd-image",
+    "x-office-calendar": "text-calendar",
+    "x-office-address-book": "text-vcard",
+}
+
+MEDIA_FILE_ICONS = {
+    "image": "image-x-generic",
+    "audio": "audio-x-generic",
+    "video": "video-x-generic",
+    "font": "font-x-generic",
+}
+
+NOT_FILE_TYPES = {"inode", "x-content"}
+
 # The 16-pixel drawing is centred, unscaled, in KDE's 22-pixel square.
 SIDE_BAR_SIZE = 22
 SIDE_BAR_DRAWING_SIZE = 16
@@ -556,6 +593,54 @@ def extract_sizes(icns_file, work_directory):
     return by_size
 
 
+def icon_name_of(mime_type):
+    return mime_type.replace("/", "-")
+
+
+def is_text(mime_type, parents):
+    """Whether a type is text, by its name or by what it is a kind of."""
+    if mime_type.startswith("text/"):
+        return True
+    return any(is_text(parent, parents) for parent in parents.get(mime_type, []))
+
+
+def file_type_icons(database, program_icons):
+    """{icon name: the theme's icon}, for each file type the inherited themes
+    would draw. A type whose program brought an icon keeps it, as on OS X."""
+    def lines(name):
+        return (database / name).read_text().split("\n")
+
+    parents = {}
+    for line in filter(None, lines("subclasses")):
+        child, parent = line.split(" ")
+        parents.setdefault(child, []).append(parent)
+    generic = dict(line.split(":", 1) for line in lines("generic-icons") if line)
+    own_icons = {line.split(":", 1)[0] for line in lines("icons") if line}
+
+    icons = {}
+    for mime_type in filter(None, lines("types")):
+        name = icon_name_of(mime_type)
+        family = mime_type.split("/")[0]
+        if name in ICONS or name in program_icons or mime_type in own_icons or family in NOT_FILE_TYPES:
+            continue
+        target = GENERIC_FILE_ICONS.get(generic.get(mime_type))
+        if target is None:
+            target = MEDIA_FILE_ICONS.get(family)
+        if target is None:
+            office = generic.get(mime_type, "").startswith("x-office-")
+            target = TEXT_FILE_ICON if is_text(mime_type, parents) and not office else ANY_FILE_ICON
+        icons[name] = target
+    return icons
+
+
+def write_file_type_links(theme_directory, icons):
+    """Links each name to its icon, in every size that icon has."""
+    for folder in theme_directory.glob("*/mimetypes"):
+        for name, target in icons.items():
+            if (folder / f"{target}.png").is_file():
+                (folder / f"{name}.png").symlink_to(f"{target}.png")
+
+
 def write_centred(picture, square_size, target):
     """Writes a picture into the middle of a transparent square."""
     drawing = Image.open(picture).convert("RGBA")
@@ -656,6 +741,11 @@ def main():
                           / f"{icon_name}.png")
                 write_centred(picture, SIDE_BAR_SIZE * scale, target)
                 contexts_by_size.setdefault((SIDE_BAR_SIZE, scale), set()).add(context)
+
+    if not MIME_DATABASE.is_dir():
+        fail(f"{MIME_DATABASE} is missing; install shared-mime-info")
+    program_icons = {picture.stem for picture in PROGRAM_ICONS.glob("*/mimetypes/*")}
+    write_file_type_links(theme_directory, file_type_icons(MIME_DATABASE, program_icons))
 
     (theme_directory / "index.theme").write_text(index_text(contexts_by_size))
     print(f"wrote {len(ICONS) + len(BUNDLES) + len(SIDE_BAR_ICONS)} icons from {len(converted)} of the installer's "

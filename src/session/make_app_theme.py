@@ -826,7 +826,8 @@ def write_kde_settings(theme, output_directory):
     lines = []
     icon_theme = theme.get("icons", {}).get("theme")
     if icon_theme is not None:
-        lines += ["[Icons]", f"Theme={icon_theme}", ""]
+        # the lock beats a theme chosen under plasma, a group's lock would spread to the user's file
+        lines += ["[Icons]", f"Theme[$i]={icon_theme}", ""]
 
     text = controls.get("text_color")
     # KDE colour set, background, foreground.
@@ -855,7 +856,7 @@ def write_kde_settings(theme, output_directory):
 
     # KDE programs also build their palette from a named colour scheme,
     # light without Plasma, so write the colours as a scheme too.
-    color_lines = [line for line in lines if not line.startswith(("[Icons]", "Theme="))]
+    color_lines = [line for line in lines if not line.startswith(("[Icons]", "Theme["))]
     if any(line.startswith("[Colors:") for line in color_lines):
         schemes_directory = output_directory / "share" / "color-schemes"
         schemes_directory.mkdir(parents=True, exist_ok=True)

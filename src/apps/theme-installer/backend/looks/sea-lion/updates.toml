@@ -287,7 +287,7 @@ was = ["#00000000"]
 now = ["#000000"]
 
 [[update]]
-revision = 9
+revision = 15
 themes = ["sea-lion", "sea-lion-dark"]
 
 [[update.corrections]]
@@ -308,11 +308,8 @@ key = "surface"
 was = ["#4a4a4aba", "#333333a6", "#2a2a2a8f"]
 now = ["#4a4a4ad5", "#333333c7", "#2a2a2ab6"]
 
-# 10 and 11 gave the opaque menu bar a gradient of its own; withdrawn before
-# 0.5.8, as the menu bar's own picture is Mavericks'. Kept, empty, so the
-# revisions still count up.
 [[update]]
-revision = 10
-
-[[update]]
-revision = 11
+revision = 9
+import_brings = [
+    "Every kind of file gets a Mavericks icon in file managers: text TextEdit's document, anything Mavericks never drew the plain document, packages Installer's, instead of the fallback theme's.",
+]

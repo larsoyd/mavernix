@@ -312,6 +312,7 @@ Some settings are stored per user rather than per desktop. Without some care, an
 
 - **GTK's settings store** (dconf): the session has its own database, `~/.config/dconf/mavernix`, next to the usual `user` one. The theme's light or dark mode, icon theme and font are written into it every time the desktop starts.
 - **A settings folder for the session**, listed in `XDG_CONFIG_DIRS` after your own. It holds the desktop portal's choice of helpers, and a `kded6rc` that switches off Plasma's own modules in KDE's background service while you're here. Your own settings for a module still win.
+- **KDE's icon theme**: the session's `kdeglobals` locks the one key that names it, so KDE programs follow the desktop. Your own `~/.config/kdeglobals` keeps its value for Plasma.
 - **KDE's wallet**: when the login screen started the wallet, the session hands it your login, so it doesn't ask for your password.
 
 Services that start on demand learn about all of this at login. When the session ends, a small service takes it all back out, so a Plasma session you start next doesn't inherit any of it.
