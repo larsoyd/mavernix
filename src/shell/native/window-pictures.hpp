@@ -78,6 +78,7 @@ class WindowPictures : public QObject
         Picture picture = Picture::None;
         // Empty until the tile is composed.
         QString tileBadge;
+        int tileNumber = 0;
     };
 
     void startWatching();
@@ -108,4 +109,5 @@ class WindowPictures : public QObject
     qreal badgeSideShare = 0;
     int delayAfterMinimizing = 0;
     int currentRevision = 0;
+    int tilesComposed = 0;
 };
