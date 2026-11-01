@@ -155,7 +155,7 @@ class TestWrittenSettings(SessionTestCase):
             (folder / name / "extension.toml").write_text('title = "Echo"\n')
         written = self.home / "plain.json"
         self.run_script("make_shell_config.py", CONFIG_DIR / "plain.toml", written)
-        self.assertEqual(list(json.loads(written.read_text())["extensions"]), ["echo"])
+        self.assertEqual(sorted(json.loads(written.read_text())["extensions"]), ["echo", "focus-follows-mouse"])
 
 
 class TestRefreshedExtensions(SessionTestCase):

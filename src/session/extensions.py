@@ -10,7 +10,7 @@ from paths import EXTENSIONS_DIR
 
 def extension_folders():
     """Where extensions are looked for: the user's own first, then bundled ones."""
-    own = Path(os.environ.get("XDG_CONFIG_HOME", Path.home() / ".config")) / "mavernix" / "extensions"
+    own = Path(os.environ.get("XDG_CONFIG_HOME") or Path.home() / ".config") / "mavernix" / "extensions"
     return [own, EXTENSIONS_DIR]
 
 
@@ -27,8 +27,8 @@ def found_extensions(config, theme_name):
             continue
         for directory in sorted(folder.iterdir()):
             manifest_file = directory / "extension.toml"
-            # the user's own wins over a bundled one of the same name
-            if not manifest_file.is_file() or directory.name in found:
+            # the user's own wins over a bundled one, a dot folder is an install left half-done
+            if directory.name.startswith(".") or not manifest_file.is_file() or directory.name in found:
                 continue
             # not load_toml, which exits on an unreadable file
             try:
