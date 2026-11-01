@@ -41,8 +41,6 @@ except ImportError:
 # Fixed, so the session's environment never has to change.
 APP_THEME_NAME = "DesktopTheme"
 POINTS_PER_PIXEL = 72 / 96
-# toolbars and fine print, the size Mavericks keeps for them
-SMALL_TEXT_PIXELS = 11
 # The schemes a KDE program set to "Default" takes outside Plasma, light or
 # dark as Qt reports the desktop (KColorSchemeManager). Qt cannot tell here,
 # so it is always the light one; both are covered.
@@ -880,22 +878,24 @@ def mixed(first, second):
     return "#" + "".join(f"{(one[part] + two[part]) // 2:02x}" for part in range(3))
 
 
-def kde_font(family, pixels):
-    """A font as KConfig stores it, in QFont's own string form."""
-    return f"{family},{round(pixels * POINTS_PER_PIXEL, 2):g},-1,5,400,0,0,0,0,0,0,0,0,0,0,1"
+def write_qt6ct_settings(theme, output_directory):
+    """Writes the theme's font for Qt, which reads none of its own without a platform theme.
 
-
-def kde_font_lines(theme):
-    fonts = theme.get("fonts", {})
-    interface = fonts.get("interface", {})
-    family, size = interface.get("family"), interface.get("size")
-    if not family or not size:
-        return []
-    menu = fonts.get("menu", {})
-    menu_font = kde_font(menu.get("family", family), menu.get("size", size))
-    small = kde_font(family, min(size, SMALL_TEXT_PIXELS))
-    return ["[General]", f"font[$i]={kde_font(family, size)}", f"menuFont[$i]={menu_font}",
-            f"toolBarFont[$i]={small}", f"smallestReadableFont[$i]={small}", ""]
+    qt6ct is that platform theme. The kde one would also bring its own colour
+    scheme, dialogs and icon lookup into every program.
+    """
+    font = theme.get("fonts", {}).get("interface", {})
+    if not font.get("family") or not font.get("size"):
+        return
+    points = round(font["size"] * POINTS_PER_PIXEL, 2)
+    lines = ["[Appearance]", "custom_palette=false", "standard_dialogs=default"]
+    icon_theme = theme.get("icons", {}).get("theme")
+    if icon_theme is not None:
+        lines.append(f"icon_theme={icon_theme}")
+    lines += ["", "[Fonts]", f'general="{font["family"]},{points:g},-1,5,400,0,0,0,0,0,0,0,0,0,0,1"', ""]
+    settings_directory = output_directory / "xdg" / "qt6ct"
+    settings_directory.mkdir(parents=True, exist_ok=True)
+    (settings_directory / "qt6ct.conf").write_text("\n".join(lines))
 
 
 def write_kde_settings(theme, output_directory):
@@ -933,8 +933,7 @@ def write_kde_settings(theme, output_directory):
             f"ForegroundInactive={kde_color(mixed(foreground, background))}",
             "",
         ]
-    font_lines = kde_font_lines(theme)
-    if not lines and not font_lines:
+    if not lines:
         return
 
     # KDE programs also build their palette from a named colour scheme,
@@ -956,7 +955,7 @@ def write_kde_settings(theme, output_directory):
 
     settings_directory = output_directory / "xdg"
     settings_directory.mkdir(parents=True, exist_ok=True)
-    (settings_directory / "kdeglobals").write_text("\n".join(lines + font_lines))
+    (settings_directory / "kdeglobals").write_text("\n".join(lines))
 
 
 def write_gtk_settings(theme, output_directory):
@@ -1026,6 +1025,7 @@ def main():
     write_gtk_themes(theme, arguments.theme, arguments.output)
     write_gtk_settings(theme, arguments.output)
     write_kde_settings(theme, arguments.output)
+    write_qt6ct_settings(theme, arguments.output)
     toolkits = "Qt and GTK" if wrote_qt else "GTK only"
     print(f"wrote toolkit themes named {APP_THEME_NAME} into {arguments.output} ({toolkits})")
 

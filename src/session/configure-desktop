@@ -107,6 +107,7 @@ write_application_themes() {
         return 0
     fi
     link_kvantum_theme
+    link_qt6ct_settings
 }
 
 # The theme's values into the session's dconf database; open GTK programs
@@ -257,9 +258,9 @@ write_environment() {
             gtk_theme=DesktopTheme
         fi
     fi
-    # Without a platform theme Qt never reads the fonts in kdeglobals.
-    if [[ $(config_flag qt use_theme yes) == yes ]] && grep -qs '^font\[\$i\]=' "$app_theme/xdg/kdeglobals"; then
-        qt_platform_theme=kde
+    # Without a platform theme Qt keeps its own default font.
+    if [[ $(config_flag qt use_theme yes) == yes && -f "$app_theme/xdg/qt6ct/qt6ct.conf" ]]; then
+        qt_platform_theme=qt6ct
     fi
     {
         echo "# Written by configure-desktop; the environment that depends on the desktop."
@@ -297,6 +298,25 @@ link_kvantum_theme() {
     fi
     mkdir -p "$(dirname "$link")"
     ln -sfn "$kvantum_theme" "$link"
+}
+
+# qt6ct reads only the user's config folder, so the settings get a link there too.
+link_qt6ct_settings() {
+    local settings="$app_theme/xdg/qt6ct/qt6ct.conf"
+    local link="${XDG_CONFIG_HOME:-$HOME/.config}/qt6ct/qt6ct.conf"
+    if [[ -n "${DESKTOP_NESTED:-}" ]]; then
+        return 0
+    fi
+    if [[ -e "$link" && ! -L "$link" ]]; then
+        echo "configure-desktop: $link is a file of the user's own, so Qt programs take its font and not the desktop's; move it away to get the desktop's." >&2
+        return 0
+    fi
+    if [[ ! -f "$settings" ]]; then
+        rm -f "$link"
+        return 0
+    fi
+    mkdir -p "$(dirname "$link")"
+    ln -sfn "$settings" "$link"
 }
 
 # After a switch: services started on demand from now on (a file manager

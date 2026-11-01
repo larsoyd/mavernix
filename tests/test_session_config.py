@@ -1137,64 +1137,98 @@ class TestKdeColours(SessionTestCase):
         self.assertNotIn("Icons", scheme)
         self.assertNotIn("Theme[", scheme)
 
-    def test_the_themes_fonts_beat_the_users_kde_settings(self):
+    def test_qt6ct_gets_the_themes_font_and_nothing_else_it_could_change(self):
+        output = self.home / "app-theme"
+        self.run_script("make_app_theme.py", THEMES_DIR / "plain", output)
+        settings = configparser.ConfigParser(interpolation=None)
+        settings.read(output / "xdg" / "qt6ct" / "qt6ct.conf")
+        self.assertEqual(settings["Fonts"]["general"], '"DejaVu Sans,9.75,-1,5,400,0,0,0,0,0,0,0,0,0,0,1"')
+        self.assertEqual(settings["Appearance"]["custom_palette"], "false")
+        self.assertEqual(settings["Appearance"]["standard_dialogs"], "default")
+        self.assertEqual(settings["Appearance"]["icon_theme"], "Adwaita")
+
+    def test_kdeglobals_carries_no_fonts(self):
+        # nothing reads them without the kde platform theme, which recolours and rewires every program
         output = self.home / "app-theme"
         self.run_script("make_app_theme.py", THEMES_DIR / "plain", output)
         text = (output / "xdg" / "kdeglobals").read_text()
-        lines = text.split("\n")
-        self.assertIn("[General]", lines)
-        self.assertNotIn("[General][$i]", lines)
-        self.assertIn("font[$i]=DejaVu Sans,9.75,-1,5,400,0,0,0,0,0,0,0,0,0,0,1", lines)
-        self.assertIn("menuFont[$i]=DejaVu Sans,9.75,-1,5,400,0,0,0,0,0,0,0,0,0,0,1", lines)
-        self.assertIn("toolBarFont[$i]=DejaVu Sans,8.25,-1,5,400,0,0,0,0,0,0,0,0,0,0,1", lines)
-        self.assertIn("smallestReadableFont[$i]=DejaVu Sans,8.25,-1,5,400,0,0,0,0,0,0,0,0,0,0,1", lines)
-        self.assertLess(lines.index("[General]"), lines.index("font[$i]=DejaVu Sans,9.75,-1,5,400,0,0,0,0,0,0,0,0,0,0,1"))
-        scheme = (output / "share" / "color-schemes" / "DesktopTheme.colors").read_text()
-        self.assertNotIn("font[", scheme)
+        self.assertNotIn("[General]", text)
+        self.assertNotIn("font[", text.lower())
 
-    def test_a_menu_font_of_its_own_sets_the_menu_size(self):
-        theme = self.home / "themed"
-        shutil.copytree(THEMES_DIR / "plain", theme)
-        toml = theme / "theme.toml"
-        toml.write_text(re.sub(r"^menu .*$", 'menu = { family = "DejaVu Serif", size = 14 }', toml.read_text(), count=1, flags=re.M))
-        output = self.home / "app-theme"
-        self.run_script("make_app_theme.py", theme, output)
-        lines = (output / "xdg" / "kdeglobals").read_text().split("\n")
-        self.assertIn("menuFont[$i]=DejaVu Serif,10.5,-1,5,400,0,0,0,0,0,0,0,0,0,0,1", lines)
-
-    def test_a_theme_without_an_interface_font_leaves_kde_fonts_alone(self):
+    def test_a_theme_without_an_interface_font_writes_no_qt6ct_settings(self):
         theme = self.home / "themed"
         shutil.copytree(THEMES_DIR / "plain", theme)
         toml = theme / "theme.toml"
         toml.write_text(re.sub(r"^interface .*\n", "", toml.read_text(), count=1, flags=re.M))
         output = self.home / "app-theme"
         self.run_script("make_app_theme.py", theme, output)
-        self.assertNotIn("[General]", (output / "xdg" / "kdeglobals").read_text())
+        self.assertFalse((output / "xdg" / "qt6ct").exists())
 
-    def environment_for(self, app_theme):
-        """write_environment from configure-desktop, on its own, with the settings stubbed."""
+    def session_functions(self, *names, setup="", qt_theme="yes", environment=None):
+        """Functions of configure-desktop on their own, with the settings stubbed."""
         source = (SESSION_SOURCE_DIR / "configure-desktop").read_text()
-        functions = "".join(re.findall(r"^(?:environment_line|write_environment)\(\) \{.*?^\}\n", source, re.M | re.S))
+        pattern = "|".join(names)
+        functions = "".join(re.findall(rf"^(?:{pattern})\(\) \{{.*?^\}}\n", source, re.M | re.S))
         state = self.home / "state"
         state.mkdir(exist_ok=True)
-        script = (f"setting() {{ echo; }}\nconfig_flag() {{ echo yes; }}\n{functions}"
-                  f"app_theme={shlex.quote(str(app_theme))}\nstate_dir={shlex.quote(str(state))}\nwrite_environment\n")
-        environment = {key: value for key, value in os.environ.items() if not key.startswith("DESKTOP_BEFORE")}
-        subprocess.run(["bash", "-c", script], check=True, env=environment, timeout=10)
-        return (state / "desktop.env").read_text()
-
-    def test_qt_reads_the_themes_fonts_through_the_kde_platform_theme(self):
-        # without a platform theme nothing reads kdeglobals fonts and Qt falls back to its own default
         output = self.home / "app-theme"
-        self.run_script("make_app_theme.py", THEMES_DIR / "plain", output)
-        self.assertIn("export QT_QPA_PLATFORMTHEME=kde\n", self.environment_for(output))
+        script = (f"setting() {{ echo; }}\nconfig_flag() {{ echo {qt_theme}; }}\n{functions}"
+                  f"app_theme={shlex.quote(str(output))}\nstate_dir={shlex.quote(str(state))}\n{setup}\n")
+        runs = {key: value for key, value in os.environ.items() if not key.startswith("DESKTOP_")}
+        runs.update(self.environment_for_link(), **(environment or {}))
+        return subprocess.run(["bash", "-c", script], check=True, env=runs, timeout=10, capture_output=True, text=True)
 
-    def test_no_font_to_read_means_no_platform_theme(self):
-        output = self.home / "app-theme"
-        self.run_script("make_app_theme.py", THEMES_DIR / "plain", output)
-        settings = output / "xdg" / "kdeglobals"
-        settings.write_text(re.sub(r"^\w+\[\$i\]=.*Sans.*\n", "", settings.read_text(), flags=re.M))
-        self.assertIn("unset QT_QPA_PLATFORMTHEME\n", self.environment_for(output))
+    def environment_for_link(self):
+        return {"HOME": str(self.home), "XDG_CONFIG_HOME": str(self.home / ".config")}
+
+    def desktop_environment(self, **options):
+        self.session_functions("environment_line", "write_environment", setup="write_environment", **options)
+        return (self.home / "state" / "desktop.env").read_text()
+
+    def test_qt_takes_the_themes_font_through_qt6ct(self):
+        self.run_script("make_app_theme.py", THEMES_DIR / "plain", self.home / "app-theme")
+        self.assertIn("export QT_QPA_PLATFORMTHEME=qt6ct\n", self.desktop_environment())
+
+    def test_no_qt6ct_settings_means_no_platform_theme(self):
+        self.run_script("make_app_theme.py", THEMES_DIR / "plain", self.home / "app-theme")
+        (self.home / "app-theme" / "xdg" / "qt6ct" / "qt6ct.conf").unlink()
+        self.assertIn("unset QT_QPA_PLATFORMTHEME\n", self.desktop_environment())
+
+    def test_a_user_who_turned_the_qt_theme_off_gets_no_platform_theme(self):
+        self.run_script("make_app_theme.py", THEMES_DIR / "plain", self.home / "app-theme")
+        self.assertIn("unset QT_QPA_PLATFORMTHEME\n", self.desktop_environment(qt_theme="no"))
+
+    def link_settings(self, **options):
+        return self.session_functions("link_qt6ct_settings", setup="link_qt6ct_settings", **options)
+
+    def test_the_users_config_links_to_the_sessions_qt6ct_settings(self):
+        self.run_script("make_app_theme.py", THEMES_DIR / "plain", self.home / "app-theme")
+        self.link_settings()
+        link = self.home / ".config" / "qt6ct" / "qt6ct.conf"
+        self.assertTrue(link.is_symlink())
+        self.assertEqual(link.resolve(), (self.home / "app-theme" / "xdg" / "qt6ct" / "qt6ct.conf").resolve())
+
+    def test_a_qt6ct_file_of_the_users_own_stays_and_is_named(self):
+        self.run_script("make_app_theme.py", THEMES_DIR / "plain", self.home / "app-theme")
+        own = self.home / ".config" / "qt6ct" / "qt6ct.conf"
+        own.parent.mkdir(parents=True)
+        own.write_text("mine")
+        done = self.link_settings()
+        self.assertEqual(own.read_text(), "mine")
+        self.assertFalse(own.is_symlink())
+        self.assertIn(str(own), done.stderr)
+
+    def test_a_nested_desktop_leaves_the_real_sessions_link_alone(self):
+        self.run_script("make_app_theme.py", THEMES_DIR / "plain", self.home / "app-theme")
+        self.link_settings(environment={"DESKTOP_NESTED": "1"})
+        self.assertFalse((self.home / ".config" / "qt6ct" / "qt6ct.conf").exists())
+
+    def test_a_link_left_by_an_earlier_theme_goes_when_there_is_no_font(self):
+        self.run_script("make_app_theme.py", THEMES_DIR / "plain", self.home / "app-theme")
+        self.link_settings()
+        (self.home / "app-theme" / "xdg" / "qt6ct" / "qt6ct.conf").unlink()
+        self.link_settings()
+        self.assertFalse((self.home / ".config" / "qt6ct" / "qt6ct.conf").is_symlink())
 
     def test_services_and_logins_carry_the_platform_theme(self):
         for script in ("configure-desktop", "start-desktop", "at_login.py"):
