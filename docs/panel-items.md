@@ -9,7 +9,7 @@ right = ["tray", "bluetooth", "volume", "network", "battery", "clock"]
 
 | Name | Shows | Needs |
 |---|---|---|
-| `tray` | the icons other programs put on the panel | nothing; programs announce their icons themselves |
+| `tray` | the icons other programs put on the panel, in their own colours. Programs listed in `one_colour` under `[status.tray]` are drawn in the panel's colour instead, for an icon that is a plain light shape (Steam's, by default) | nothing; programs announce their icons themselves |
 | `bluetooth` | whether Bluetooth is on or off. The menu switches it, and lists the paired devices, each with a submenu that shows its charge and connects or disconnects it. While the menu is open, it looks for devices nearby and pairs the one you choose | BlueZ |
 | `volume` | how loud the sound output is. The scroll wheel changes it. The menu has a slider for it, the output and input devices to choose from, Mute, and the sound settings | PipeWire |
 | `network` | a cable, or the strength of the wireless signal. The menu turns Wi-Fi on and off and lists the networks in reach, with a lock on those that need a password and their signal strength; choosing one joins it, asking for the password if needed. A network program's tray icon (`tray_program` under `[status.network]`, NetworkManager's applet by default) is left out; with `menu = "program"` the menu is that program's whole menu instead | NetworkManager |

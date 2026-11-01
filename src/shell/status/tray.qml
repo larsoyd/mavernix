@@ -28,6 +28,8 @@ Row {
         }
         return programs
     }
+    // plain light icons, drawn in the panel's ink instead
+    readonly property var oneColour: (panel.settings.config.status?.tray ?? ({})).one_colour ?? []
     readonly property bool shown:
         SystemTray.items.values.some(program => !tray.takenOver.includes(program.id))
 
@@ -46,7 +48,7 @@ Row {
             itemRow: tray.itemRow
             visible: !tray.takenOver.includes(modelData.id)
 
-            pictureTinted: false
+            pictureTinted: tray.oneColour.includes(modelData.id)
             pictureSource: modelData.icon
             pictureHeight: tray.statusLooks.icon_size ?? 16
 
