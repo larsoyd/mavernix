@@ -373,6 +373,28 @@ class TestInstalling(AppStoreTestCase):
         self.assertFalse(any(path.name.startswith("icon") for path in self.app_folder().iterdir()))
         self.assertEqual(bundles.installed_icon(bundles.installed_apps()["tuner"]["listing"]), "")
 
+    def test_open_starts_the_program_of_an_entry_the_user_made(self):
+        self.publish()
+        self.install()
+        self.entry().write_text(
+            '[Desktop Entry]\nName=Tuner\nExec="/opt/my tuner/bin/tuner" --quiet %U\n'
+            "[Desktop Action other]\nExec=/wrong\n")
+        self.assertEqual(bundles.installed_command("tuner"), "/opt/my tuner/bin/tuner")
+
+    def test_open_starts_the_bundle_when_the_users_entry_has_no_program(self):
+        self.publish()
+        self.install()
+        self.entry().write_text("[Desktop Entry]\nName=Tuner\n[Desktop Action other]\nExec=/wrong\n")
+        program = self.app_folder() / "bundle" / "bin" / "tuner"
+        self.assertEqual(bundles.installed_command("tuner"), str(program))
+
+    def test_open_starts_the_bundle_when_the_entry_is_gone(self):
+        self.publish()
+        self.install()
+        self.entry().unlink()
+        program = self.app_folder() / "bundle" / "bin" / "tuner"
+        self.assertEqual(bundles.installed_command("tuner"), str(program))
+
 
 class TestExtensions(AppStoreTestCase):
     def install_extension(self, name="echo"):
