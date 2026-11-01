@@ -25,12 +25,13 @@ window_picture_height = 120         # Down on a program: its windows' pictures t
 
 ## Notifications
 
-When a program sends a notification, it shows up in a banner for a few seconds, in the screen's top corner on the end side. The banner's fonts are `[fonts].banner_title` and `[fonts].banner_text`. `[animation.banner]` sets how it comes and goes.
+When a program sends a notification, it shows up in a banner for a few seconds, in the screen's bottom right corner. The banner's fonts are `[fonts].banner_title` and `[fonts].banner_text`. `[animation.banner]` sets how it comes and goes.
 
 ```toml
 [notifications.banner]
 width = 340
-top_gap = 10                   # below the panel (or the screen's top, if the panel is elsewhere)
+bottom_gap = 10                # above the panel (or the screen's bottom, if the panel is elsewhere)
+top_gap = 10                   # legacy fallback when bottom_gap is absent
 edge_gap = 10                  # from the screen's side
 gap = 8                        # between two banners
 # One background for each number of text lines under the title (none, one,
