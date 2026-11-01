@@ -52,7 +52,8 @@ TRAY_HOST_QUESTION = ["busctl", "--user", "get-property", "org.kde.StatusNotifie
 TRAY_HOST_SECONDS = 10
 
 PORTAL_SERVICE = "xdg-desktop-portal.service"
-PORTAL_HELPERS = ["xdg-desktop-portal-gtk.service", "xdg-desktop-portal-wlr.service"]
+PORTAL_HELPERS = ["xdg-desktop-portal-gtk.service", "xdg-desktop-portal-wlr.service",
+                  "plasma-xdg-desktop-portal-kde.service"]
 
 def say(message):
     print(f"at_login: {message}", file=sys.stderr)

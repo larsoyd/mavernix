@@ -1551,6 +1551,16 @@ class TestAutostartWaitsForTray(unittest.TestCase):
     def tray_is_up():
         return subprocess.CompletedProcess([], 0, stdout="b true\n", stderr="")
 
+    def test_file_dialog_portal_restarts_with_the_session_look(self):
+        calls = []
+        def record(command, **kwargs):
+            calls.append(command)
+            return subprocess.CompletedProcess(command, 0, stdout="", stderr="")
+        with unittest.mock.patch("at_login.subprocess.run", record):
+            self.at_login.restart_early_portals()
+        restart = next(command for command in calls if "try-restart" in command)
+        self.assertIn("plasma-xdg-desktop-portal-kde.service", restart)
+
 
 class TestGtkWindowButtons(SessionTestCase):
     def test_session_theme_name_is_published_to_x11_and_wayland(self):
