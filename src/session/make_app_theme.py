@@ -10,6 +10,7 @@ gtk.css for GTK 3 and 4, plus KDE and GTK settings, written to:
     OUTPUT/share/themes/DesktopTheme/Kvantum/DesktopTheme.svg, .kvconfig
     OUTPUT/share/themes/DesktopTheme/gtk-3.0/gtk.css
     OUTPUT/share/themes/DesktopTheme/gtk-4.0/gtk.css
+    OUTPUT/share/themes/DesktopTheme/mozilla/titlebar.css
     OUTPUT/xdg/Kvantum/kvantum.kvconfig      (names the Kvantum theme)
     OUTPUT/xdg/gtk-3.0/settings.ini          (names the icon theme, if any)
     OUTPUT/xdg/kdeglobals                    (the same, and the colours, for KDE's programs)
@@ -591,6 +592,31 @@ def cut_middles(assets_directory, middles):
             image.crop(box).save(assets_directory / f"{middle_stem}{suffix}.{extension}")
 
 
+def button_look(fill, picture, width, height):
+    """What draws one state of a window button; `picture` names its image in CSS."""
+    declarations = ["background-image: none; background-color: transparent;",
+                    f"border-radius: {fill.get('radius', 0)}px;"]
+    if "image" in fill:
+        declarations += [f"background-image: {picture};",
+                         "background-repeat: no-repeat; background-position: center;",
+                         f"background-size: {width}px {height}px;"]
+    elif "color" in fill:
+        declarations.append(f"background-color: {fill['color']};")
+    elif "gradient" in fill:
+        colors = fill["gradient"]
+        positions = fill.get("positions", [i / (len(colors) - 1) for i in range(len(colors))])
+        stops = ", ".join(f"{color} {position * 100:g}%" for color, position in zip(colors, positions))
+        declarations.append(f"background-image: linear-gradient(to bottom, {stops});")
+    return declarations
+
+
+def button_picture_name(looks, name, state):
+    """The file a state's picture is copied to; a state the theme leaves out shows normal."""
+    actual_state = state if state in looks else "normal"
+    extension = Path(looks[actual_state]["image"]).suffix
+    return f"window-{name}-{actual_state}{extension}"
+
+
 def gtk_window_buttons(theme, version):
     buttons = theme.get("window", {}).get("buttons")
     if not buttons:
@@ -617,22 +643,10 @@ def gtk_window_buttons(theme, version):
                   ("inactive", ":backdrop:disabled"))
         for state, suffix in states:
             fill = looks.get(state, looks["normal"])
-            declarations = ["background-image: none; background-color: transparent;",
-                            f"border-radius: {fill.get('radius', 0)}px;"]
+            picture = None
             if "image" in fill:
-                actual_state = state if state in looks else "normal"
-                extension = Path(fill["image"]).suffix
-                image = gtk_picture(version, f"window-{name}-{actual_state}{extension}")
-                declarations += [f"background-image: {image};",
-                                 "background-repeat: no-repeat; background-position: center;",
-                                 f"background-size: {width}px {height}px;"]
-            elif "color" in fill:
-                declarations.append(f"background-color: {fill['color']};")
-            elif "gradient" in fill:
-                colors = fill["gradient"]
-                positions = fill.get("positions", [i / (len(colors) - 1) for i in range(len(colors))])
-                stops = ", ".join(f"{color} {position * 100:g}%" for color, position in zip(colors, positions))
-                declarations.append(f"background-image: linear-gradient(to bottom, {stops});")
+                picture = gtk_picture(version, button_picture_name(looks, name, state))
+            declarations = button_look(fill, picture, width, height)
             lines += rule(suffix, declarations)
             if state in ("hover", "pressed", "disabled"):
                 lines += rule(":backdrop" + suffix, declarations)
@@ -868,6 +882,66 @@ def gtk_css(theme, theme_directory, version):
     return "\n".join(lines) + "\n", middles
 
 
+# which of mozilla's title bar buttons shows each of the theme's
+MOZILLA_BUTTONS = {"close": ["titlebar-close"], "minimize": ["titlebar-min"],
+                   "maximize": ["titlebar-max", "titlebar-restore"]}
+
+
+def mozilla_picture(file_name):
+    stem, dot, extension = file_name.rpartition(".")
+    folder = "../gtk-3.0/assets"
+    return f'image-set(url("{folder}/{file_name}") 1x, url("{folder}/{stem}@2x.{extension}") 2x)'
+
+
+def mozilla_titlebar_css(theme):
+    """Firefox and Thunderbird draw their own buttons from icon names and read no GTK style for them."""
+    buttons = theme["window"]["buttons"]
+    width, height = buttons["size"]
+    spacing, inset = buttons["spacing"], buttons["edge_inset"]
+    icon = "> .toolbarbutton-icon"
+    lines = [
+        "/* Written by make_app_theme.py from the desktop theme. Do not edit. */",
+        ".titlebar-buttonbox {",
+        f"  --titlebar-button-size: {width}px !important;",
+        f"  --titlebar-button-spacing: {spacing / 2:g}px !important;",
+        f"  --titlebar-button-end-spacing: {inset}px !important;",
+        "}",
+        "",
+        "@media (-moz-gtk-csd-reversed-placement) {",
+        "  .titlebar-buttonbox {",
+        f"    padding-inline-start: {inset - spacing / 2:g}px !important;",
+        "  }",
+        "}",
+        "",
+        f".titlebar-button {icon} {{",
+        "  appearance: none !important;",
+        f"  width: {width}px !important;",
+        f"  height: {height}px !important;",
+        "  transition: none !important;",
+        "}",
+        "",
+    ]
+    for name, classes in MOZILLA_BUTTONS.items():
+        looks = buttons[name]
+        for state, selector in (("normal", ".{0} {1}"), ("inactive", ".{0} {1}:-moz-window-inactive"),
+                                ("hover", ".titlebar-buttonbox:hover .{0} {1}" if buttons.get("hover_together") else ".{0}:hover {1}"),
+                                ("pressed", ".{0}:hover:active {1}")):
+            fill = looks.get(state, looks["normal"])
+            picture = mozilla_picture(button_picture_name(looks, name, state)) if "image" in fill else None
+            declarations = " ".join(button_look(fill, picture, width, height)).replace(";", " !important;")
+            lines += [", ".join(selector.format(button, icon) for button in classes) + " {",
+                      f"  {declarations}", "}", ""]
+    return "\n".join(lines)
+
+
+def write_mozilla_style(theme, output_directory):
+    if not theme.get("window", {}).get("buttons"):
+        return
+    folder = output_directory / "share" / "themes" / APP_THEME_NAME / "mozilla"
+    folder.mkdir(parents=True, exist_ok=True)
+    (folder / "titlebar.css").write_text(mozilla_titlebar_css(theme))
+
+
 def kde_color(text):
     """ "#rrggbb" as KDE's settings write a colour: "red,green,blue"."""
     red, green, blue, alpha = color_tuple(text)
@@ -1027,6 +1101,7 @@ def main():
     wrote_qt = write_kvantum_theme(theme, arguments.theme, arguments.output)
     write_gtk_themes(theme, arguments.theme, arguments.output)
     write_gtk_settings(theme, arguments.output)
+    write_mozilla_style(theme, arguments.output)
     write_kde_settings(theme, arguments.output)
     write_qt6ct_settings(theme, arguments.output)
     toolkits = "Qt and GTK" if wrote_qt else "GTK only"

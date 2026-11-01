@@ -1331,6 +1331,28 @@ class TestKdeColours(SessionTestCase):
         self.link_settings(environment={"DESKTOP_NESTED": "1"})
         self.assertFalse((self.home / ".config" / "qt6ct" / "qt6ct.conf").exists())
 
+    def linked_mozilla_profile(self, **options):
+        self.run_script("make_app_theme.py", THEMES_DIR / "plain", self.home / "app-theme")
+        profile = self.home / ".config/thunderbird/abc"
+        profile.mkdir(parents=True, exist_ok=True)
+        (profile.parent / "profiles.ini").write_text("[Profile0]\nIsRelative=1\nPath=abc\n")
+        setup = f"session_dir={shlex.quote(str(SESSION_SOURCE_DIR))}\nlink_mozilla_style"
+        self.session_functions("link_mozilla_style", setup=setup, **options)
+        return profile / "chrome/mavernix"
+
+    def test_mozilla_profiles_link_the_written_theme(self):
+        link = self.linked_mozilla_profile()
+        self.assertTrue((link / "mozilla/titlebar.css").is_file())
+
+    def test_mozilla_profiles_lose_the_link_when_gtk_is_left_alone(self):
+        link = self.linked_mozilla_profile()
+        self.linked_mozilla_profile(qt_theme="no")
+        self.assertFalse(link.is_symlink())
+
+    def test_a_nested_desktop_leaves_mozilla_profiles_alone(self):
+        link = self.linked_mozilla_profile(environment={"DESKTOP_NESTED": "1"})
+        self.assertFalse(link.exists())
+
     def test_a_link_left_by_an_earlier_theme_goes_when_there_is_no_font(self):
         self.run_script("make_app_theme.py", THEMES_DIR / "plain", self.home / "app-theme")
         self.link_settings()
@@ -1617,6 +1639,195 @@ class TestGtkWindowButtons(SessionTestCase):
                 self.assertEqual((gtk / f"assets/window-close-normal{suffix}.png").read_bytes(),
                                  (theme / f"close{suffix}.png").read_bytes())
             self.assertIn("assets/window-close-normal.png", (gtk / "gtk.css").read_text())
+
+
+class TestMozillaTitlebar(SessionTestCase):
+    STYLE = "share/themes/DesktopTheme/mozilla/titlebar.css"
+
+    def picture_theme(self, buttons_table):
+        from PIL import Image
+
+        theme = self.home / "theme"
+        theme.mkdir(parents=True)
+        text = re.sub(r"\[window\.buttons\].*?(?=\[window\.frame\])", buttons_table, (THEMES_DIR / "plain/theme.toml").read_text(), flags=re.S)
+        (theme / "theme.toml").write_text(text)
+        for suffix, size in (("", 16), ("@2x", 32)):
+            Image.new("RGBA", (size, size), "red").save(theme / f"dot{suffix}.png")
+        output = self.home / "app-theme"
+        self.run_script("make_app_theme.py", theme, output)
+        return output
+
+    def rule(self, css, selector):
+        for selectors, body in re.findall(r"([^{}]+)\{([^{}]*)\}", re.sub(r"/\*.*?\*/", "", css)):
+            if selector in [part.strip() for part in selectors.split(",")]:
+                return body
+        self.fail(f"no rule for {selector}:\n{css}")
+
+    PICTURE_BUTTONS = """[window.buttons]
+size = [16, 14]
+spacing = 4
+edge_inset = 9
+hover_together = true
+
+[window.buttons.close]
+normal   = { image = "dot.png" }
+hover    = { image = "dot.png" }
+pressed  = { image = "dot.png" }
+inactive = { image = "dot.png" }
+
+[window.buttons.minimize]
+normal   = { image = "dot.png" }
+
+[window.buttons.maximize]
+normal   = { image = "dot.png" }
+
+"""
+
+    def test_colours_of_every_state_reach_every_button(self):
+        output = self.home / "app-theme"
+        self.run_script("make_app_theme.py", THEMES_DIR / "plain", output)
+        css = (output / self.STYLE).read_text()
+        icon = "> .toolbarbutton-icon"
+        self.assertIn("background-color: #d0d0d0 !important;", self.rule(css, f".titlebar-close {icon}"))
+        self.assertIn("background-color: #e0e0e0 !important;", self.rule(css, f".titlebar-close {icon}:-moz-window-inactive"))
+        self.assertIn("background-color: #e06060 !important;", self.rule(css, f".titlebar-close:hover {icon}"))
+        self.assertIn("background-color: #b04040 !important;", self.rule(css, f".titlebar-close:hover:active {icon}"))
+        self.assertIn("background-color: #b8b8b8 !important;", self.rule(css, f".titlebar-min:hover {icon}"))
+        for button in (".titlebar-max", ".titlebar-restore"):
+            self.assertIn("background-color: #a0a0a0 !important;", self.rule(css, f"{button}:hover:active {icon}"))
+        self.assertIn("border-radius: 3px !important;", self.rule(css, f".titlebar-close {icon}"))
+
+    def test_buttons_take_the_frames_size_and_spacing(self):
+        css = (self.picture_theme(self.PICTURE_BUTTONS) / self.STYLE).read_text()
+        box = self.rule(css, ".titlebar-buttonbox")
+        self.assertIn("--titlebar-button-size: 16px !important;", box)
+        self.assertIn("--titlebar-button-spacing: 2px !important;", box)
+        self.assertIn("--titlebar-button-end-spacing: 9px !important;", box)
+        icon = self.rule(css, ".titlebar-button > .toolbarbutton-icon")
+        self.assertIn("width: 16px !important;", icon)
+        self.assertIn("height: 14px !important;", icon)
+        self.assertIn("appearance: none !important;", icon)
+        self.assertIn("transition: none !important;", icon)
+        self.assertRegex(css, r"@media \(-moz-gtk-csd-reversed-placement\) \{\s*\.titlebar-buttonbox \{\s*padding-inline-start: 7px !important;")
+
+    def test_pictures_come_from_the_gtk_assets_at_both_densities(self):
+        output = self.picture_theme(self.PICTURE_BUTTONS)
+        css = (output / self.STYLE).read_text()
+        body = self.rule(css, ".titlebar-close > .toolbarbutton-icon")
+        self.assertIn('image-set(url("../gtk-3.0/assets/window-close-normal.png") 1x, '
+                      'url("../gtk-3.0/assets/window-close-normal@2x.png") 2x)', body)
+        self.assertIn("background-size: 16px 14px !important;", body)
+        for name in re.findall(r'url\("\.\./(gtk-3\.0/assets/[^"]+)"\)', css):
+            self.assertTrue((output / "share/themes/DesktopTheme" / name).is_file(), name)
+
+    def test_hover_together_lights_all_buttons_from_the_box(self):
+        css = (self.picture_theme(self.PICTURE_BUTTONS) / self.STYLE).read_text()
+        self.rule(css, ".titlebar-buttonbox:hover .titlebar-close > .toolbarbutton-icon")
+        self.assertNotIn(".titlebar-close:hover >", css)
+        self.rule(css, ".titlebar-close:hover:active > .toolbarbutton-icon")
+
+    def test_a_state_the_theme_leaves_out_shows_its_normal_picture(self):
+        css = (self.picture_theme(self.PICTURE_BUTTONS) / self.STYLE).read_text()
+        body = self.rule(css, ".titlebar-min > .toolbarbutton-icon:-moz-window-inactive")
+        self.assertIn("window-minimize-normal.png", body)
+
+    def test_no_buttons_in_the_theme_writes_no_style(self):
+        output = self.picture_theme("")
+        self.assertFalse((output / self.STYLE).exists())
+
+
+class TestMozillaProfiles(SessionTestCase):
+    def profile(self, root, name="abc.default", user_chrome=None, user_js=None):
+        profile = self.home / root / name
+        (profile).mkdir(parents=True)
+        (self.home / root / "profiles.ini").write_text(f"[General]\nVersion=2\n\n[Profile0]\nName=d\nIsRelative=1\nPath={name}\n")
+        if user_chrome is not None:
+            (profile / "chrome").mkdir()
+            (profile / "chrome/userChrome.css").write_text(user_chrome)
+        if user_js is not None:
+            (profile / "user.js").write_text(user_js)
+        return profile
+
+    def link(self, theme="/run/theme"):
+        return self.run_script("link_mozilla_style.py", theme)
+
+    IMPORT = '@import url("mavernix/mozilla/titlebar.css");\n'
+    PREF = 'user_pref("toolkit.legacyUserProfileCustomizations.stylesheets", true);\n'
+
+    def test_every_program_folder_gets_the_style(self):
+        profiles = [self.profile(root) for root in (".config/mozilla/firefox", ".mozilla/firefox", ".config/thunderbird", ".thunderbird")]
+        self.link()
+        for profile in profiles:
+            self.assertEqual(os.readlink(profile / "chrome/mavernix"), "/run/theme")
+            self.assertEqual((profile / "chrome/userChrome.css").read_text(), self.IMPORT)
+            self.assertEqual((profile / "user.js").read_text(), self.PREF)
+
+    def test_the_users_own_rules_stay_behind_the_import(self):
+        profile = self.profile(".config/thunderbird", user_chrome="#a { color: red; }\n", user_js='user_pref("a", 1);\n')
+        self.link()
+        self.assertEqual((profile / "chrome/userChrome.css").read_text(), self.IMPORT + "#a { color: red; }\n")
+        self.assertEqual((profile / "user.js").read_text(), 'user_pref("a", 1);\n' + self.PREF)
+
+    def test_a_linked_style_file_stays_a_link(self):
+        profile = self.profile(".config/thunderbird")
+        dotfiles = self.home / "dotfiles"
+        dotfiles.mkdir()
+        (dotfiles / "style.css").write_text("#a { color: red; }\n")
+        (profile / "chrome").mkdir()
+        (profile / "chrome/userChrome.css").symlink_to(dotfiles / "style.css")
+        self.link()
+        self.assertTrue((profile / "chrome/userChrome.css").is_symlink())
+        self.assertEqual((dotfiles / "style.css").read_text(), self.IMPORT + "#a { color: red; }\n")
+
+    def test_a_second_run_changes_nothing(self):
+        profile = self.profile(".config/thunderbird", user_chrome="#a { color: red; }\n")
+        self.link()
+        first = ((profile / "chrome/userChrome.css").read_text(), (profile / "user.js").read_text())
+        self.link("/run/other")
+        self.assertEqual(first, ((profile / "chrome/userChrome.css").read_text(), (profile / "user.js").read_text()))
+        self.assertEqual(os.readlink(profile / "chrome/mavernix"), "/run/other")
+
+    def test_a_setting_the_user_chose_is_left_alone(self):
+        chosen = 'user_pref("toolkit.legacyUserProfileCustomizations.stylesheets", false);\n'
+        profile = self.profile(".config/thunderbird", user_js=chosen)
+        self.link()
+        self.assertEqual((profile / "user.js").read_text(), chosen)
+
+    def test_a_profile_outside_the_folder_is_found(self):
+        elsewhere = self.home / "mail/profile"
+        elsewhere.mkdir(parents=True)
+        root = self.home / ".thunderbird"
+        root.mkdir()
+        (root / "profiles.ini").write_text(f"[Profile0]\nIsRelative=0\nPath={elsewhere}\n")
+        self.link()
+        self.assertTrue((elsewhere / "chrome/mavernix").is_symlink())
+
+    def test_a_profile_that_is_gone_is_skipped(self):
+        root = self.home / ".thunderbird"
+        root.mkdir(parents=True)
+        (root / "profiles.ini").write_text("[Profile0]\nIsRelative=1\nPath=gone\n")
+        self.link()
+        self.assertFalse((root / "gone").exists())
+
+    def test_a_folder_of_the_users_own_is_not_replaced(self):
+        profile = self.profile(".config/thunderbird")
+        (profile / "chrome/mavernix").mkdir(parents=True)
+        result = self.run_script("link_mozilla_style.py", "/run/theme", may_fail=True)
+        self.assertEqual(result.returncode, 0)
+        self.assertIn("chrome/mavernix", result.stderr)
+        self.assertFalse((profile / "chrome/mavernix").is_symlink())
+        self.assertFalse((profile / "chrome/userChrome.css").exists())
+
+    def test_no_theme_takes_the_link_away_and_nothing_else(self):
+        profile = self.profile(".config/thunderbird", user_chrome="#a { color: red; }\n")
+        self.link()
+        self.run_script("link_mozilla_style.py")
+        self.assertFalse((profile / "chrome/mavernix").is_symlink())
+        self.assertIn("#a { color: red; }", (profile / "chrome/userChrome.css").read_text())
+
+    def test_no_programs_at_all_is_fine(self):
+        self.home.mkdir(parents=True)
+        self.link()
 
 
 if __name__ == "__main__":
