@@ -276,9 +276,20 @@ PanelWindow {
         pointY: dock.dragScreenY
     }
 
-    readonly property var places: {
-        const installed = DesktopEntries.applications.values
+    // a rescan swaps an overridden entry's object out row by row, following
+    // the rows would drop its tile and grow a new one
+    property var installed: []
+    function readInstalled() {
+        installed = DesktopEntries.applications.values
+    }
+    Connections {
+        target: DesktopEntries
+        function onApplicationsChanged() {
+            dock.readInstalled()
+        }
+    }
 
+    readonly property var places: {
         // `kept` tells a place kept in the dock from one there only while its
         // program runs; `listedAs` is how the groups name it.
         const groups = []
@@ -395,7 +406,10 @@ PanelWindow {
         minimizeOrder.splice(0, minimizeOrder.length, ...minimizedWindows)
     }
     onMinimizedWindowsChanged: keepMinimizeOrder()
-    Component.onCompleted: keepMinimizeOrder()
+    Component.onCompleted: {
+        readInstalled()
+        keepMinimizeOrder()
+    }
 
     // --- Minimised windows' pictures ---------------------------------------------
     // With dock.minimized.shows = "picture", a minimised window's tile shows a
