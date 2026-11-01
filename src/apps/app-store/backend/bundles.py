@@ -94,9 +94,10 @@ def installed_extensions():
 
 def installed_command(name, record=None):
     """The installed program of the app `name`, as a full path; `record` is
-    its installed.json, if already read."""
+    its installed.json, if already read. A desktop entry of the user's own
+    wins, so Open starts what the rest of the desktop starts."""
     record = record or installed_apps()[name]
-    return str(apps_folder() / name / "bundle" / record["listing"]["command"])
+    return _entry_program(record["listing"]) or str(apps_folder() / name / "bundle" / record["listing"]["command"])
 
 
 def icon_file_name(app):
@@ -280,6 +281,20 @@ def _swap_in(new_folder, folder):
 def _entry_path(app):
     # Named like the bundle's own entry: the dock matches windows to entries by that name.
     return data_folder() / "applications" / Path(app["desktop_entry"]).name
+
+
+def _entry_program(app):
+    """The program in the desktop entry for `app`, or "". A store-written entry names the bundle's."""
+    entry = _entry_path(app)
+    if not entry.is_file():
+        return ""
+    in_main_group = False
+    for line in entry.read_text().splitlines():
+        if line.startswith("["):
+            in_main_group = line.strip() == "[Desktop Entry]"
+        elif in_main_group and line.startswith("Exec="):
+            return shlex.split(line.removeprefix("Exec="))[0]
+    return ""
 
 
 def _write_desktop_entry(app):
