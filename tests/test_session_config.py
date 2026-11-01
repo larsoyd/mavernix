@@ -1117,6 +1117,93 @@ class TestLogGuard(unittest.TestCase):
         self.assertIsNone(other.poll())
 
 
+class TestAutostartWaitsForTray(unittest.TestCase):
+    def setUp(self):
+        folder = tempfile.TemporaryDirectory()
+        self.addCleanup(folder.cleanup)
+        (Path(folder.name) / "paths.py").write_text("from pathlib import Path\nLIBRARY_DIR = Path('/nowhere')\n")
+        sys.path[:0] = [folder.name, str(SESSION_SOURCE_DIR)]
+        sys.modules.pop("paths", None)
+        try:
+            import at_login
+        finally:
+            del sys.path[:2]
+            sys.modules.pop("paths", None)
+        self.addCleanup(sys.modules.pop, "at_login", None)
+        self.at_login = at_login
+        self.answers = []
+        self.clock = [0.0]
+
+        def answer(command, **_):
+            self.assertEqual(command[:2], ["busctl", "--user"])
+            reply = self.answers.pop(0) if self.answers else "b false\n"
+            return subprocess.CompletedProcess(command, 0, stdout=reply, stderr="")
+
+        def sleep(seconds):
+            self.clock[0] += seconds
+
+        for name, stand_in in (("subprocess.run", answer), ("time.sleep", sleep),
+                               ("time.monotonic", lambda: self.clock[0]),
+                               ("shutil.which", lambda name: "/usr/bin/" + name)):
+            patcher = unittest.mock.patch(f"at_login.{name}", stand_in)
+            patcher.start()
+            self.addCleanup(patcher.stop)
+
+    def test_waits_until_a_host_is_there(self):
+        self.answers = ["b false\n", "b false\n", "b true\n"]
+        self.at_login.wait_for_tray({"panel": {"right": ["tray", "clock"]}})
+        self.assertEqual(self.answers, [])
+        self.assertGreater(self.clock[0], 0)
+
+    def test_gives_up_at_the_deadline(self):
+        self.at_login.wait_for_tray({"panel": {"right": ["tray"]}})
+        self.assertAlmostEqual(self.clock[0], self.at_login.TRAY_HOST_SECONDS, delta=0.5)
+
+    def test_a_watcher_that_is_not_there_yet_is_waited_for(self):
+        missing = subprocess.CompletedProcess([], 1, stdout="", stderr="no watcher")
+        with unittest.mock.patch("at_login.subprocess.run", side_effect=[missing, missing, self.tray_is_up()]) as run:
+            self.at_login.wait_for_tray({"panel": {"left": ["tray"]}})
+        self.assertEqual(run.call_count, 3)
+
+    def test_a_hanging_question_counts_as_no_answer(self):
+        hung = subprocess.TimeoutExpired("busctl", 1)
+        with unittest.mock.patch("at_login.subprocess.run", side_effect=[hung, self.tray_is_up()]) as run:
+            self.at_login.wait_for_tray({"panel": {"right": ["tray"]}})
+        self.assertEqual(run.call_count, 2)
+
+    def test_no_wait_without_a_tray_in_the_panel(self):
+        self.at_login.wait_for_tray({"panel": {"right": ["clock"]}})
+        self.assertEqual(self.clock[0], 0)
+
+    def test_no_wait_without_busctl(self):
+        with unittest.mock.patch("at_login.shutil.which", lambda name: None):
+            self.at_login.wait_for_tray({"panel": {"right": ["tray"]}})
+        self.assertEqual(self.clock[0], 0)
+
+    def test_users_programs_start_after_the_wait(self):
+        calls = unittest.mock.Mock()
+        settings = Path(tempfile.mkdtemp()) / "shell.json"
+        self.addCleanup(shutil.rmtree, settings.parent)
+        settings.write_text(json.dumps({"config": {"panel": {"right": ["tray"]}}}))
+        for name in ("wait_for_tray", "start_users_programs"):
+            patcher = unittest.mock.patch(f"at_login.{name}", getattr(calls, name))
+            patcher.start()
+            self.addCleanup(patcher.stop)
+        for name in ("hand_login_to_wallet", "tell_services", "start_xsettings",
+                     "start_listed_programs", "offer_new_theme_imports"):
+            patcher = unittest.mock.patch(f"at_login.{name}")
+            patcher.start()
+            self.addCleanup(patcher.stop)
+        with unittest.mock.patch.object(sys, "argv", ["at_login.py", str(settings)]), \
+             unittest.mock.patch.dict(os.environ, {"DESKTOP_NESTED": ""}):
+            self.at_login.main()
+        self.assertEqual([call[0] for call in calls.mock_calls], ["wait_for_tray", "start_users_programs"])
+
+    @staticmethod
+    def tray_is_up():
+        return subprocess.CompletedProcess([], 0, stdout="b true\n", stderr="")
+
+
 class TestGtkWindowButtons(SessionTestCase):
     def test_session_theme_name_is_published_to_x11_and_wayland(self):
         settings = self.home / "shell.json"

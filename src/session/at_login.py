@@ -5,7 +5,7 @@
 Run by the compositor once it is up. Opens KDE's wallet with the login,
 tells on-demand services (D-Bus, systemd) about the session's display and
 settings (after-session takes them back later), starts the config's and the
-user's autostart programs, places [desktop_files] place_once launchers once
+user's autostart programs once the tray is up, places [desktop_files] place_once launchers once
 per user, and lets the Theme Installer offer a new import of a look when this
 version brings it something. Does nothing when nested in another desktop.
 """
@@ -15,6 +15,7 @@ import os
 import shutil
 import subprocess
 import sys
+import time
 
 from paths import LIBRARY_DIR
 
@@ -44,6 +45,11 @@ DEX_NAMES = ["dex", "dex-autostart"]
 
 # Says which imported looks a new import would bring something to.
 THEME_IMPORT_BACKEND = LIBRARY_DIR / "theme-installer" / "import_theme.py"
+
+TRAY_HOST_QUESTION = ["busctl", "--user", "get-property", "org.kde.StatusNotifierWatcher",
+                      "/StatusNotifierWatcher", "org.kde.StatusNotifierWatcher",
+                      "IsStatusNotifierHostRegistered"]
+TRAY_HOST_SECONDS = 10
 
 PORTAL_SERVICE = "xdg-desktop-portal.service"
 PORTAL_HELPERS = ["xdg-desktop-portal-gtk.service", "xdg-desktop-portal-wlr.service"]
@@ -182,6 +188,30 @@ def start_xsettings(settings_path):
             start([sys.executable, script, config])
 
 
+def tray_host_is_up():
+    try:
+        result = subprocess.run(TRAY_HOST_QUESTION, capture_output=True, text=True, timeout=1)
+    except subprocess.TimeoutExpired:
+        return False
+    return result.stdout.strip() == "b true"
+
+
+def wait_for_tray(config):
+    # electron asks for a tray once, a program started first has no icon all session
+    wanted = any("tray" in places for places in config.get("panel", {}).values()
+                 if isinstance(places, list))
+    if not wanted or shutil.which("busctl") is None:
+        return
+    start_time = time.monotonic()
+    while not tray_host_is_up():
+        waited = time.monotonic() - start_time
+        if waited >= TRAY_HOST_SECONDS:
+            say(f"tray_host result=timeout waited_s={waited:.1f}, starting the user's programs anyway")
+            return
+        time.sleep(0.05)
+    say(f"tray_host result=up waited_s={time.monotonic() - start_time:.2f}")
+
+
 def start_users_programs():
     dex = next((name for name in DEX_NAMES if shutil.which(name)), None)
     if dex is None:
@@ -280,6 +310,7 @@ def main():
     start_xsettings(sys.argv[1])
     start_listed_programs(config)
     if config.get("session", {}).get("users_autostart", True):
+        wait_for_tray(config)
         start_users_programs()
     offer_new_theme_imports()
 
