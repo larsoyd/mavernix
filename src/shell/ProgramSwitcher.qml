@@ -12,7 +12,6 @@ import QtQuick
 import Quickshell
 import Quickshell.Wayland
 import Shell.Native
-import "ApplicationEntry.js" as ApplicationEntry
 import "ApplicationName.js" as ApplicationName
 import "ThemeValues.js" as ThemeValues
 
@@ -295,8 +294,9 @@ PanelWindow {
     }
 
     // Falls back to the generic program icon.
-    function iconFor(entry) {
-        return themeIcons.forEntry(entry, "application-x-executable")
+    function iconFor(entry, appId) {
+        const name = entry !== null ? themeIcons.nameFor(entry) : WindowPrograms.icon(appId)
+        return themeIcons.path(name, "application-x-executable")
     }
     // Only shown once the key is held this long, so a quick tap never flashes it.
     Timer {
@@ -398,7 +398,7 @@ PanelWindow {
                 id: programItem
                 required property string appId
                 required property int index
-                readonly property var entry: ApplicationEntry.of(DesktopEntries, appId)
+                readonly property var entry: WindowPrograms.entry(appId)
                 readonly property bool isMarked: index === switcher.marked
 
                 x: switcher.padding[3] + (switcher.plateContentWidth - switcher.iconRowWidth) / 2
@@ -420,7 +420,7 @@ PanelWindow {
                     sourceSize: Qt.size(width * Screen.devicePixelRatio, height * Screen.devicePixelRatio)
                     // Loaded once per program, as the icons are kept.
                     asynchronous: true
-                    source: switcher.iconFor(programItem.entry)
+                    source: switcher.iconFor(programItem.entry, programItem.appId)
                 }
                 // The marked program's name, on a plate of its own if the theme gives one.
                 Item {
@@ -440,7 +440,7 @@ PanelWindow {
                     Text {
                         id: label
                         anchors.centerIn: parent
-                        text: ApplicationName.of(programItem.entry, switcher.choices) ?? programItem.appId
+                        text: ApplicationName.of(programItem.entry, switcher.choices) ?? WindowPrograms.name(programItem.appId)
                         color: ThemeValues.color(parent.name.color ?? "#ffffff")
                         readonly property var face: switcher.fonts.program_switcher ?? switcher.fonts.interface
                         font.family: face.family
@@ -515,7 +515,7 @@ PanelWindow {
                         height: width
                         opacity: 0.6
                         sourceSize: Qt.size(width * Screen.devicePixelRatio, height * Screen.devicePixelRatio)
-                        source: switcher.iconFor(ApplicationEntry.of(DesktopEntries, switcher.windowsAskedFor))
+                        source: switcher.iconFor(WindowPrograms.entry(switcher.windowsAskedFor), switcher.windowsAskedFor)
                     }
 
                     MouseArea {

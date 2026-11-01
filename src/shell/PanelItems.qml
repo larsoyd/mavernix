@@ -51,7 +51,7 @@ Row {
         if (window === null) {
             return ""
         }
-        return ApplicationName.of(activeEntry, panel.choices) ?? window.appId
+        return ApplicationName.of(WindowPrograms.entry(window.appId), panel.choices) ?? WindowPrograms.name(window.appId)
     }
 
     // While no window is active, the panel shows the desktop's own menus, from

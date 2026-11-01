@@ -16,7 +16,6 @@ import QtQuick.Effects
 import Quickshell
 import Quickshell.Wayland
 import Shell.Native
-import "ApplicationEntry.js" as ApplicationEntry
 import "ApplicationName.js" as ApplicationName
 import "ThemeValues.js" as ThemeValues
 import "WindowOverviewLayout.js" as Layout
@@ -101,8 +100,9 @@ PanelWindow {
         * (looks.most_window_scale ?? 0.85) * (screen?.devicePixelRatio ?? 1))
 
     // Falls back to the generic program icon.
-    function iconFor(entry) {
-        return themeIcons.forEntry(entry, "application-x-executable")
+    function iconFor(entry, appId) {
+        const name = entry !== null ? themeIcons.nameFor(entry) : WindowPrograms.icon(appId)
+        return themeIcons.path(name, "application-x-executable")
     }
 
     WindowPictures {
@@ -665,7 +665,7 @@ PanelWindow {
         Item {
             id: groupItem
             required property var modelData
-            readonly property var entry: ApplicationEntry.of(DesktopEntries, modelData.appId)
+            readonly property var entry: WindowPrograms.entry(modelData.appId)
             readonly property real iconSize: overview.looks.group_icon_size ?? 32
 
             opacity: overview.shown
@@ -692,12 +692,12 @@ PanelWindow {
                 width: groupItem.iconSize
                 height: groupItem.iconSize
                 sourceSize: Qt.size(width * Screen.devicePixelRatio, height * Screen.devicePixelRatio)
-                source: overview.iconFor(groupItem.entry)
+                source: overview.iconFor(groupItem.entry, groupItem.modelData.appId)
             }
             OverviewLabel {
                 anchors.horizontalCenter: parent.horizontalCenter
                 y: groupIcon.y + groupIcon.height + (overview.looks.group_name_gap ?? 4)
-                text: ApplicationName.of(groupItem.entry, overview.userChoices) ?? groupItem.modelData.appId
+                text: ApplicationName.of(groupItem.entry, overview.userChoices) ?? WindowPrograms.name(groupItem.modelData.appId)
             }
         }
     }

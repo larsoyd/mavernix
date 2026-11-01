@@ -22,6 +22,7 @@
 #include "shortcut-pause.hpp"
 #include "sound-pack.hpp"
 #include "window-attention.hpp"
+#include "window-games.hpp"
 #include "window-picture-provider.hpp"
 #include "window-pictures.hpp"
 
@@ -47,6 +48,7 @@ void ShellNativePlugin::registerTypes(const char* uri)
     qmlRegisterType<ShortcutPause>(uri, major_version, minor_version, "ShortcutPause");
     qmlRegisterType<SoundPack>(uri, major_version, minor_version, "SoundPack");
     qmlRegisterType<WindowAttention>(uri, major_version, minor_version, "WindowAttention");
+    qmlRegisterType<WindowGames>(uri, major_version, minor_version, "WindowGames");
     qmlRegisterType<WindowPictures>(uri, major_version, minor_version, "WindowPictures");
 }
 

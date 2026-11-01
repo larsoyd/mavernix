@@ -43,6 +43,11 @@ tests = {
         'include': test_sources / 'apps/settings',
         'dependencies': [qt_widgets],
     },
+    'game-facts': {
+        'sources': [test_sources / 'shell/native/game-facts.cpp'],
+        'include': test_sources / 'shell/native',
+        'dependencies': [],
+    },
     'screen-layout': {
         'sources': [test_sources / 'apps/settings/screen-layout.cpp'],
         'include': test_sources / 'apps/settings',

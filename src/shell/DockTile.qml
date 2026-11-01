@@ -6,7 +6,6 @@ import QtQuick
 import QtQuick.Effects
 import Quickshell
 import Quickshell.Wayland
-import "ApplicationEntry.js" as ApplicationEntry
 import "ApplicationName.js" as ApplicationName
 
 Item {
@@ -70,7 +69,7 @@ Item {
         if (picture !== "") {
             return picture
         }
-        const name = entry !== null ? themeIcons.nameFor(entry) : appId
+        const name = entry !== null ? themeIcons.nameFor(entry) : WindowPrograms.icon(appId)
         if (entry === null && appId === "") {
             return ""
         }
@@ -82,7 +81,7 @@ Item {
     readonly property var windows: {
         if (entry !== null) {
             return ToplevelManager.toplevels.values.filter(
-                window => ApplicationEntry.of(DesktopEntries, window.appId) === tile.entry)
+                window => WindowPrograms.entry(window.appId) === tile.entry)
         }
         if (appId !== "") {
             return ToplevelManager.toplevels.values.filter(window => window.appId === tile.appId)
@@ -192,7 +191,7 @@ Item {
         if (minimizedWindow !== null) {
             return minimizedWindow.title
         }
-        return ApplicationName.of(entry, choices) ?? appId
+        return ApplicationName.of(entry, choices) ?? WindowPrograms.name(appId)
     }
     // Set by the dock, which tracks the pointer across all tiles for
     // magnification; a hover handler here would hide it from the dock.
