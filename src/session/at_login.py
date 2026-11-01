@@ -26,7 +26,7 @@ ENVIRONMENT_FOR_SERVICES = ["WAYLAND_DISPLAY", "DISPLAY", "XDG_CURRENT_DESKTOP",
 # program started on demand, such as the file manager, gets the stock look.
 # configure-desktop updates the look's names on a switch.
 SESSION_SETTINGS_FOR_SERVICES = ["XDG_CONFIG_DIRS", "XDG_DATA_DIRS", "DCONF_PROFILE", "XCURSOR_PATH",
-                                 "GTK_THEME", "QT_STYLE_OVERRIDE", "QT_QPA_SYSTEM_ICON_THEME",
+                                 "GTK_THEME", "QT_STYLE_OVERRIDE", "QT_QPA_PLATFORMTHEME", "QT_QPA_SYSTEM_ICON_THEME",
                                  "XCURSOR_THEME", "XCURSOR_SIZE"]
 
 # File managers that stay running as services between windows (Thunar's

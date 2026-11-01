@@ -248,7 +248,7 @@ environment_line() {
 # The desktop-dependent environment, read by start-desktop and run-shell.
 # Programs the compositor starts by shortcut keep the login's environment.
 write_environment() {
-    local gtk_theme="" qt_style=""
+    local gtk_theme="" qt_style="" qt_platform_theme=""
     if [[ -d "$app_theme/share" ]]; then
         # Only if a Kvantum theme was written: naming a missing style makes
         # Qt complain.
@@ -259,10 +259,15 @@ write_environment() {
             gtk_theme=DesktopTheme
         fi
     fi
+    # Without a platform theme Qt never reads the fonts in kdeglobals.
+    if [[ $(config_flag qt use_theme yes) == yes ]] && grep -qs '^font\[\$i\]=' "$app_theme/xdg/kdeglobals"; then
+        qt_platform_theme=kde
+    fi
     {
         echo "# Written by configure-desktop; the environment that depends on the desktop."
         environment_line GTK_THEME "$gtk_theme"
         environment_line QT_STYLE_OVERRIDE "$qt_style"
+        environment_line QT_QPA_PLATFORMTHEME "$qt_platform_theme"
         # For Qt programs; GTK reads the icon theme from dconf.
         environment_line QT_QPA_SYSTEM_ICON_THEME "$(setting theme icons theme "")"
         # The mouse pointers, for programs that draw their own (the
@@ -274,7 +279,7 @@ write_environment() {
 
 # The names in desktop.env, which the session hands on to services started
 # on demand (at_login.py at login, tell_services after a switch).
-desktop_environment_names=(GTK_THEME QT_STYLE_OVERRIDE QT_QPA_SYSTEM_ICON_THEME XCURSOR_THEME XCURSOR_SIZE)
+desktop_environment_names=(GTK_THEME QT_STYLE_OVERRIDE QT_QPA_PLATFORMTHEME QT_QPA_SYSTEM_ICON_THEME XCURSOR_THEME XCURSOR_SIZE)
 
 # Kvantum finds a theme only in its own folders (~/.config/Kvantum, ~/.themes,
 # ~/.local/share/themes, /usr/share/themes), not through XDG_DATA_DIRS, and

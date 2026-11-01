@@ -41,6 +41,7 @@ Requires:       qt6-qtimageformats
 Requires:       python3
 Requires:       python3-pillow
 Requires:       kvantum
+Requires:       plasma-integration
 Requires:       gsettings-desktop-schemas
 Requires:       gvfs
 Requires:       adwaita-icon-theme

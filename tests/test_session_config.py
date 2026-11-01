@@ -13,6 +13,8 @@ import importlib.util
 import io
 import json
 import os
+import re
+import shlex
 import shutil
 import struct
 import subprocess
@@ -1241,6 +1243,70 @@ class TestKdeColours(SessionTestCase):
         scheme = (output / "share" / "color-schemes" / "DesktopTheme.colors").read_text()
         self.assertNotIn("Icons", scheme)
         self.assertNotIn("Theme[", scheme)
+
+    def test_the_themes_fonts_beat_the_users_kde_settings(self):
+        output = self.home / "app-theme"
+        self.run_script("make_app_theme.py", THEMES_DIR / "plain", output)
+        text = (output / "xdg" / "kdeglobals").read_text()
+        lines = text.split("\n")
+        self.assertIn("[General]", lines)
+        self.assertNotIn("[General][$i]", lines)
+        self.assertIn("font[$i]=DejaVu Sans,9.75,-1,5,400,0,0,0,0,0,0,0,0,0,0,1", lines)
+        self.assertIn("menuFont[$i]=DejaVu Sans,9.75,-1,5,400,0,0,0,0,0,0,0,0,0,0,1", lines)
+        self.assertIn("toolBarFont[$i]=DejaVu Sans,8.25,-1,5,400,0,0,0,0,0,0,0,0,0,0,1", lines)
+        self.assertIn("smallestReadableFont[$i]=DejaVu Sans,8.25,-1,5,400,0,0,0,0,0,0,0,0,0,0,1", lines)
+        self.assertLess(lines.index("[General]"), lines.index("font[$i]=DejaVu Sans,9.75,-1,5,400,0,0,0,0,0,0,0,0,0,0,1"))
+        scheme = (output / "share" / "color-schemes" / "DesktopTheme.colors").read_text()
+        self.assertNotIn("font[", scheme)
+
+    def test_a_menu_font_of_its_own_sets_the_menu_size(self):
+        theme = self.home / "themed"
+        shutil.copytree(THEMES_DIR / "plain", theme)
+        toml = theme / "theme.toml"
+        toml.write_text(re.sub(r"^menu .*$", 'menu = { family = "DejaVu Serif", size = 14 }', toml.read_text(), count=1, flags=re.M))
+        output = self.home / "app-theme"
+        self.run_script("make_app_theme.py", theme, output)
+        lines = (output / "xdg" / "kdeglobals").read_text().split("\n")
+        self.assertIn("menuFont[$i]=DejaVu Serif,10.5,-1,5,400,0,0,0,0,0,0,0,0,0,0,1", lines)
+
+    def test_a_theme_without_an_interface_font_leaves_kde_fonts_alone(self):
+        theme = self.home / "themed"
+        shutil.copytree(THEMES_DIR / "plain", theme)
+        toml = theme / "theme.toml"
+        toml.write_text(re.sub(r"^interface .*\n", "", toml.read_text(), count=1, flags=re.M))
+        output = self.home / "app-theme"
+        self.run_script("make_app_theme.py", theme, output)
+        self.assertNotIn("[General]", (output / "xdg" / "kdeglobals").read_text())
+
+    def environment_for(self, app_theme):
+        """write_environment from configure-desktop, on its own, with the settings stubbed."""
+        source = (SESSION_SOURCE_DIR / "configure-desktop").read_text()
+        functions = "".join(re.findall(r"^(?:environment_line|write_environment)\(\) \{.*?^\}\n", source, re.M | re.S))
+        state = self.home / "state"
+        state.mkdir(exist_ok=True)
+        script = (f"setting() {{ echo; }}\nconfig_flag() {{ echo yes; }}\n{functions}"
+                  f"app_theme={shlex.quote(str(app_theme))}\nstate_dir={shlex.quote(str(state))}\nwrite_environment\n")
+        environment = {key: value for key, value in os.environ.items() if not key.startswith("DESKTOP_BEFORE")}
+        subprocess.run(["bash", "-c", script], check=True, env=environment, timeout=10)
+        return (state / "desktop.env").read_text()
+
+    def test_qt_reads_the_themes_fonts_through_the_kde_platform_theme(self):
+        # without a platform theme nothing reads kdeglobals fonts and Qt falls back to its own default
+        output = self.home / "app-theme"
+        self.run_script("make_app_theme.py", THEMES_DIR / "plain", output)
+        self.assertIn("export QT_QPA_PLATFORMTHEME=kde\n", self.environment_for(output))
+
+    def test_no_font_to_read_means_no_platform_theme(self):
+        output = self.home / "app-theme"
+        self.run_script("make_app_theme.py", THEMES_DIR / "plain", output)
+        settings = output / "xdg" / "kdeglobals"
+        settings.write_text(re.sub(r"^\w+\[\$i\]=.*Sans.*\n", "", settings.read_text(), flags=re.M))
+        self.assertIn("unset QT_QPA_PLATFORMTHEME\n", self.environment_for(output))
+
+    def test_services_and_logins_carry_the_platform_theme(self):
+        for script in ("configure-desktop", "start-desktop", "at_login.py"):
+            with self.subTest(script=script):
+                self.assertIn("QT_QPA_PLATFORMTHEME", (SESSION_SOURCE_DIR / script).read_text())
 
     def test_default_scheme_is_the_themes(self):
         # A KDE program set to "Default" takes Breeze's scheme by its file

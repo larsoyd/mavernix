@@ -142,7 +142,7 @@ export DCONF_PROFILE="$dconf_profile"
 } > "$state_dir/current"
 
 # Keep the values from before the session, for desktops that set none.
-for name in GTK_THEME QT_STYLE_OVERRIDE QT_QPA_SYSTEM_ICON_THEME XCURSOR_THEME XCURSOR_SIZE; do
+for name in GTK_THEME QT_STYLE_OVERRIDE QT_QPA_PLATFORMTHEME QT_QPA_SYSTEM_ICON_THEME XCURSOR_THEME XCURSOR_SIZE; do
     if [[ -v $name ]]; then
         export "DESKTOP_BEFORE_$name=${!name}"
     fi
