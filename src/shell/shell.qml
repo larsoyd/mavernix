@@ -21,13 +21,14 @@ ShellRoot {
     readonly property var settings: JSON.parse(settingsFile.text())
 
 
-    // The screen for the panel, dock and overlays: [display] main_screen, else
-    // the first one.
+    // panel, dock and overlays go on [display] main_screen, else the leftmost screen
+    // the screen list reorders when a monitor returns, the layout stays
     readonly property var mainScreen: {
         // The settings' Display pane may change it while the shell runs.
         const wanted = userChoices.value("display", "main_screen")
         const screens = Quickshell.screens
-        return screens.find(screen => screen.name === wanted) ?? screens[0] ?? null
+        const leftmost = Array.from(screens).sort((a, b) => a.x - b.x || a.y - b.y)[0]
+        return screens.find(screen => screen.name === wanted) ?? leftmost ?? null
     }
 
     // X11 programs, games above all, take the main screen for their own.
