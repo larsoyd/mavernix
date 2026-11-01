@@ -46,11 +46,17 @@ class warp_transformer_t : public wf::scene::view_2d_transformer_t
     void gen_render_instances(std::vector<wf::scene::render_instance_uptr>& instances,
         wf::scene::damage_callback push_damage, wf::output_t *shown_on) override;
 
+    bool has_held_picture();
+
     OpenGL::program_t program;
     // The window and the icon.
     wf::geometry_t affected_area;
+    // a hiding window may blank itself once told, long before the effect ends
+    wf::auxilliary_buffer_t held_picture;
 
   private:
+    void hold_picture();
+
     std::weak_ptr<wf::view_interface_t> _view;
     effect_t effect;
     wf::geometry_t icon;

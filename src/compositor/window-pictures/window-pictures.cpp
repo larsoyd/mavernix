@@ -10,17 +10,23 @@
 //
 // (wayfire-plugins-extra's "view-shot" writes full size and is not packaged
 // on Arch.)
+//
+// some clients drop their contents once told they are minimised, steam goes
+// white within 30 ms, so a window is captured at the request
 
 #include <fstream>
+#include <optional>
 
 #include <drm_fourcc.h>
 
 #include <wayfire/img.hpp>
+#include <wayfire/per-output-plugin.hpp>
 #include <wayfire/plugin.hpp>
 #include <wayfire/plugins/common/shared-core-data.hpp>
 #include <wayfire/plugins/ipc/ipc-helpers.hpp>
 #include <wayfire/plugins/ipc/ipc-method-repository.hpp>
 #include <wayfire/render.hpp>
+#include <wayfire/signal-definitions.hpp>
 #include <wayfire/toplevel-view.hpp>
 #include <wayfire/view.hpp>
 
@@ -47,20 +53,33 @@ static bool write_plain(const std::string& path, const picture_t& picture)
     return file.good();
 }
 
-/** The window's contents at its output's density; empty if it has none. */
-static picture_t contents_of(wayfire_view view)
+// a window at one moment with its rectangles, a minimised window can still change size
+struct capture_t : public wf::custom_data_t
+{
+    wf::auxilliary_buffer_t snapshot;
+    wf::geometry_t everything{};
+    wf::geometry_t window{};
+
+    explicit capture_t(wayfire_view view)
+    {
+        // Wayfire's take_snapshot() needs the window's output, which a window
+        // being taken away, or one on no screen, does not have.
+        if (!view->is_mapped() || (view->get_output() == nullptr))
+        {
+            return;
+        }
+        view->take_snapshot(snapshot);
+        everything = view->get_surface_root_node()->get_bounding_box();
+        auto toplevel = wf::toplevel_cast(view);
+        window = toplevel ? toplevel->get_geometry() : everything;
+    }
+};
+
+// the capture's pixels at its output's density, empty if it has none
+static picture_t contents_of(capture_t& capture)
 {
     picture_t contents;
-    // Wayfire's take_snapshot() needs the window's output, which a window
-    // being taken away, or one on no screen, does not have.
-    if (!view->is_mapped() || (view->get_output() == nullptr))
-    {
-        return contents;
-    }
-
-    wf::auxilliary_buffer_t snapshot;
-    view->take_snapshot(snapshot);
-    const auto size = snapshot.get_size();
+    const auto size = capture.snapshot.get_size();
     if ((size.width <= 0) || (size.height <= 0))
     {
         return contents;
@@ -75,7 +94,7 @@ static picture_t contents_of(wayfire_view view)
     options.data = contents.pixels.data();
     options.format = DRM_FORMAT_ABGR8888;
     options.stride = uint32_t(size.width) * 4;
-    if (!wlr_texture_read_pixels(snapshot.get_texture(), &options))
+    if (!wlr_texture_read_pixels(capture.snapshot.get_texture(), &options))
     {
         return picture_t{};
     }
@@ -83,9 +102,21 @@ static picture_t contents_of(wayfire_view view)
     return contents;
 }
 
-class plugin_t : public wf::plugin_interface_t
+class plugin_t : public wf::plugin_interface_t, public wf::per_output_tracker_mixin_t<>
 {
     wf::shared_data::ref_ptr_t<wf::ipc::method_repository_t> methods;
+
+    wf::signal::connection_t<wf::view_minimize_request_signal> on_minimize_request =
+        [](wf::view_minimize_request_signal* request) {
+        if (request->state)
+        {
+            request->view->store_data(std::make_unique<capture_t>(request->view));
+        }
+        else
+        {
+            request->view->erase_data<capture_t>();
+        }
+    };
 
     wf::ipc::method_callback write_picture = [](const wf::json_t& data) -> wf::json_t {
         auto view = wf::ipc::json_find_view_or_throw(data);
@@ -101,7 +132,14 @@ class plugin_t : public wf::plugin_interface_t
                 "window-pictures/write needs a path ending in .png or .rgba and a largest_side above 0");
         }
 
-        const picture_t contents = contents_of(view);
+        std::optional<capture_t> now;
+        capture_t* capture = view->get_data<capture_t>().get();
+        if (!capture)
+        {
+            capture = &now.emplace(view);
+        }
+
+        const picture_t contents = contents_of(*capture);
         if (contents.pixels.empty())
         {
             return wf::ipc::json_error("the window has no contents to take a picture of");
@@ -109,13 +147,8 @@ class plugin_t : public wf::plugin_interface_t
 
         // Cut away the shadow. The rectangles are in points, the contents in
         // pixels.
-        const wf::geometry_t everything = view->get_surface_root_node()->get_bounding_box();
-        wf::geometry_t window = everything;
-        auto toplevel = wf::toplevel_cast(view);
-        if (toplevel && !with_shadow)
-        {
-            window = toplevel->get_geometry();
-        }
+        const wf::geometry_t everything = capture->everything;
+        const wf::geometry_t window = with_shadow ? everything : capture->window;
 
         const double pixels_per_point = contents.width / std::max(1.0, double(everything.width));
         const int left = std::clamp(int((window.x - everything.x) * pixels_per_point), 0, contents.width - 1);
@@ -149,9 +182,19 @@ class plugin_t : public wf::plugin_interface_t
     };
 
   public:
-    void init() override { methods->register_method(WRITE_METHOD, write_picture); }
+    void init() override
+    {
+        methods->register_method(WRITE_METHOD, write_picture);
+        init_output_tracking();
+    }
 
-    void fini() override { methods->unregister_method(WRITE_METHOD); }
+    void fini() override
+    {
+        fini_output_tracking();
+        methods->unregister_method(WRITE_METHOD);
+    }
+
+    void handle_new_output(wf::output_t* output) override { output->connect(&on_minimize_request); }
 };
 } // namespace window_pictures
 
