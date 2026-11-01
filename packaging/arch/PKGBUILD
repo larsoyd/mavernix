@@ -13,7 +13,7 @@ depends=(
   'qt6-base' 'qt6-declarative' 'qt6-multimedia' 'qt6-wayland' 'qt6-svg' 'qt6-imageformats'
   'librsvg' 'glib2' 'tomlplusplus' 'libxcb'
   'python' 'python-pillow'
-  'kvantum'
+  'kvantum' 'plasma-integration'
   'gsettings-desktop-schemas'
   'xsettingsd'
   'gvfs'
