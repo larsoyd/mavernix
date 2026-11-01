@@ -91,6 +91,8 @@ class plugin_t : public wf::plugin_interface_t
         auto view = wf::ipc::json_find_view_or_throw(data);
         const std::string path = wf::ipc::json_get_string(data, "path");
         const int largest_side = int(wf::ipc::json_get_int64(data, "largest_side"));
+        // optional, the answer says if this build honoured it
+        const bool with_shadow = wf::ipc::json_get_optional_bool(data, "shadow").value_or(false);
 
         const bool as_plain_pixels = ends_with(path, PLAIN_FILE_ENDING);
         if ((!as_plain_pixels && !ends_with(path, PNG_FILE_ENDING)) || (largest_side <= 0))
@@ -109,7 +111,8 @@ class plugin_t : public wf::plugin_interface_t
         // pixels.
         const wf::geometry_t everything = view->get_surface_root_node()->get_bounding_box();
         wf::geometry_t window = everything;
-        if (auto toplevel = wf::toplevel_cast(view))
+        auto toplevel = wf::toplevel_cast(view);
+        if (toplevel && !with_shadow)
         {
             window = toplevel->get_geometry();
         }
@@ -141,6 +144,7 @@ class plugin_t : public wf::plugin_interface_t
         auto answer = wf::ipc::json_ok();
         answer["width"] = small.width;
         answer["height"] = small.height;
+        answer["shadow"] = with_shadow;
         return answer;
     };
 
