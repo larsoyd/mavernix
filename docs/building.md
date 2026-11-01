@@ -35,7 +35,7 @@ Fedora 44 and 45 have an older Wayfire and Quickshell than Mavernix needs, so `p
 | librsvg | 2.63.4 | `librsvg` | icons that are drawings |
 | Python, with Pillow | 3.14.8 (3.11 is the oldest that can work), 13.0.0 | `python` `python-pillow` | the session's scripts. Pillow cuts up the pictures for the toolkit themes. Without it, programs keep their own look. |
 | Kvantum | 1.1.8 | `kvantum` | draws Qt programs in the theme's look |
-| Plasma Integration | 6.8.2 | `plasma-integration` | gives Qt programs the theme's fonts |
+| qt6ct | 0.11 | `qt6ct` | gives Qt programs the theme's font |
 | PipeWire and WirePlumber | | `pipewire` `wireplumber` | the desktop's sounds |
 | GSettings schemas | 51.0 | `gsettings-desktop-schemas` | the look of GTK programs |
 | Adwaita icons, DejaVu fonts | | `adwaita-icon-theme` `adwaita-icon-theme-legacy` `ttf-dejavu` | the plain theme's icons and fonts. Without the icons, the desktop falls back to Breeze, Papirus or hicolor. |
@@ -51,7 +51,7 @@ sudo pacman -S --needed base-devel meson ninja wayfire glm vulkan-headers tomlpl
     qt6-base qt6-declarative qt6-multimedia qt6-wayland librsvg glib2
 
 # to run
-sudo pacman -S --needed quickshell python python-pillow qt6-svg kvantum plasma-integration \
+sudo pacman -S --needed quickshell python python-pillow qt6-svg kvantum qt6ct \
     pipewire wireplumber gsettings-desktop-schemas gvfs \
     adwaita-icon-theme adwaita-icon-theme-legacy adwaita-cursors ttf-dejavu \
     7zip cpio bzip2 lbzip2 libicns ffmpeg poppler bubblewrap
