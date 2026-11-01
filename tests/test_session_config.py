@@ -139,7 +139,8 @@ class TestWrittenSettings(SessionTestCase):
             (folder / name / "extension.toml").write_text('title = "Echo"\n')
         written = self.home / "plain.json"
         self.run_script("make_shell_config.py", CONFIG_DIR / "plain.toml", written)
-        self.assertEqual(sorted(json.loads(written.read_text())["extensions"]), ["echo", "focus-follows-mouse"])
+        self.assertEqual(sorted(json.loads(written.read_text())["extensions"]),
+                         ["borderless-maximized", "echo", "focus-follows-mouse"])
 
 
 class TestRefreshedExtensions(SessionTestCase):
@@ -273,6 +274,11 @@ class TestExtensionPlugins(SessionTestCase):
             "focus-follows-mouse": {"delay_ms": 250, "raise": True},
         }})
         self.assertEqual(dict(settings["focus-follows-mouse"]), {"delay_ms": "250", "raise": "true"})
+
+    def test_a_plugin_with_no_settings_loads_with_an_empty_section(self):
+        settings = self.wayfire_settings({"extensions": {"enabled": ["borderless-maximized"]}})
+        self.assertIn("borderless-maximized", settings["core"]["plugins"].split())
+        self.assertEqual(dict(settings["borderless-maximized"]), {})
 
     def test_an_extension_that_is_gone_loads_nothing(self):
         settings = self.wayfire_settings({"extensions": {"enabled": ["not-here"]}})

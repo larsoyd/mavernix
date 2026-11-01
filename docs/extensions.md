@@ -97,6 +97,8 @@ An extension can't see the pointer over other programs' windows or move the keyb
 
 `focus-follows-mouse` ships with the desktop and works this way. The window the pointer enters takes the keyboard after `delay_ms`, without coming to the front unless `raise` is on. The focus stays put on an empty desktop or screen, and moving inside a window never takes it from one you picked with the keyboard.
 
+`borderless-maximized` ships the same way. A window maximized both ways loses its title bar and frame, and gets them back when it's restored. Half and quarter tiles keep theirs, and a program that draws its own title bar keeps it. Super+Down or a drag with Super held brings a maximized window back.
+
 ## Trying one
 
 Switch it on in the desktop config (`[extensions] enabled = ["NAME"]`) or in the settings window. Then check the shell's log (`$XDG_RUNTIME_DIR/mavernix/login.log`) for "extensions:" and for QML errors. If an extension has an error in a file, it's left out with a message and the desktop carries on. `dev/run-in-container` is a safe place to try one.

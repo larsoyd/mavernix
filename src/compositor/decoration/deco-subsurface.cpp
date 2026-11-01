@@ -19,6 +19,7 @@
 #include <wayfire/signal-definitions.hpp>
 #include <wayfire/toplevel-view.hpp>
 #include "deco-subsurface.hpp"
+#include "hide-maximized.hpp"
 #include "deco-layout.hpp"
 #include "deco-theme.hpp"
 #include <wayfire/window-manager.hpp>
@@ -32,6 +33,12 @@
 // The corner clip's place among a window's transformers (lowest first).
 const int CORNER_CLIP_Z_ORDER = 0;
 const char *const CORNER_CLIP_NAME = "themed-decoration-corner-clip";
+
+static bool frame_hidden(const wf::toplevel_state_t& state)
+{
+    return state.fullscreen || ((state.tiled_edges == wf::TILED_EDGES_ALL) &&
+        wf::get_core().has_data<wf::hide_maximized_frames_t>());
+}
 
 class simple_decoration_node_t : public wf::scene::node_t, public wf::pointer_interaction_t,
     public wf::touch_interaction_t
@@ -696,7 +703,7 @@ class simple_decoration_node_t : public wf::scene::node_t, public wf::pointer_in
             size = dims;
             layout.set_fixed_size(has_fixed_size(view));
             layout.resize(size.width, size.height);
-            if (!view->toplevel()->current().fullscreen)
+            if (!frame_hidden(view->toplevel()->current()))
             {
                 this->cached_region = layout.calculate_region();
             }
@@ -716,8 +723,7 @@ class simple_decoration_node_t : public wf::scene::node_t, public wf::pointer_in
 
     void update_decoration_size()
     {
-        bool fullscreen = _view.lock()->toplevel()->current().fullscreen;
-        if (fullscreen)
+        if (frame_hidden(_view.lock()->toplevel()->current()))
         {
             current_thickness = 0;
             current_titlebar  = 0;
@@ -751,6 +757,7 @@ wf::simple_decorator_t::simple_decorator_t(wayfire_toplevel_view view, bool tool
     view->connect(&on_view_activated);
     view->connect(&on_view_geometry_changed);
     view->connect(&on_view_fullscreen);
+    view->connect(&on_view_tiled);
 
     on_view_activated = [this] (auto)
     {
@@ -763,15 +770,8 @@ wf::simple_decorator_t::simple_decorator_t(wayfire_toplevel_view view, bool tool
         deco->resize(wf::dimensions(this->view->get_geometry()));
     };
 
-    on_view_fullscreen = [this] (auto)
-    {
-        update_corner_clip();
-        deco->update_decoration_size();
-        if (!this->view->toplevel()->current().fullscreen)
-        {
-            deco->resize(wf::dimensions(this->view->get_geometry()));
-        }
-    };
+    on_view_fullscreen = [this] (auto) { update_frame(); };
+    on_view_tiled = [this] (auto) { update_frame(); };
 }
 
 wf::simple_decorator_t::~simple_decorator_t()
@@ -793,6 +793,12 @@ wf::simple_decorator_t::~simple_decorator_t()
     wf::scene::remove_child(deco);
 }
 
+void wf::simple_decorator_t::update_frame()
+{
+    update_corner_clip();
+    deco->update_decoration_size();
+}
+
 void wf::simple_decorator_t::update_corner_clip()
 {
     if (!corner_clip || !corner_clip->can_draw())
@@ -800,9 +806,9 @@ void wf::simple_decorator_t::update_corner_clip()
         return;
     }
 
-    // Without a transformer a fullscreen window can use direct scan-out.
+    // a window with no frame can use direct scan-out without a transformer
     auto transformed = view->get_transformed_node();
-    const bool wanted = !view->toplevel()->current().fullscreen;
+    const bool wanted = !frame_hidden(view->toplevel()->current());
     const bool present = (transformed->get_transformer<corner_clip_transformer_t>(CORNER_CLIP_NAME) != nullptr);
     if (wanted && !present)
     {
@@ -817,7 +823,7 @@ void wf::simple_decorator_t::update_corner_clip()
 
 wf::decoration_margins_t wf::simple_decorator_t::get_margins(const wf::toplevel_state_t& state)
 {
-    if (state.fullscreen)
+    if (frame_hidden(state))
     {
         return {0, 0, 0, 0};
     }

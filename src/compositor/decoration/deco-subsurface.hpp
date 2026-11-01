@@ -24,10 +24,12 @@ class simple_decorator_t : public wf::custom_data_t
     // Not used for a fullscreen window, or when it cannot draw.
     std::shared_ptr<corner_clip_transformer_t> corner_clip;
     void update_corner_clip();
+    void update_frame();
 
     wf::signal::connection_t<wf::view_activated_state_signal> on_view_activated;
     wf::signal::connection_t<wf::view_geometry_changed_signal> on_view_geometry_changed;
     wf::signal::connection_t<wf::view_fullscreen_signal> on_view_fullscreen;
+    wf::signal::connection_t<wf::view_tiled_signal> on_view_tiled;
 
   public:
     /** @param tool_bar_joined  The window matches the plugin's joined_views. */

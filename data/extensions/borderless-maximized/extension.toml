@@ -1,0 +1,4 @@
+title = "Hide title bars when maximized"
+description = "A window maximized both ways loses its title bar and frame, and gets them back when restored."
+version = "0.1.0"
+compositor_plugin = "borderless-maximized"
