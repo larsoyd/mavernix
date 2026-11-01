@@ -173,7 +173,8 @@ class warp_render_instance_t :
             picture_positions.insert(picture_positions.end(), {frame_right, texture_height});
         }
 
-        auto picture = wf::gles_texture_t{this->get_texture(data.target.scale)};
+        auto picture = self->has_held_picture() ? wf::gles_texture_t{self->held_picture.get_texture()} :
+            wf::gles_texture_t{this->get_texture(data.target.scale)};
         data.pass->custom_gles_subpass(data.target, [&]
         {
             self->program.use(wf::TEXTURE_TYPE_RGBA);
@@ -231,10 +232,24 @@ warp_transformer_t::~warp_transformer_t()
     });
 }
 
+void warp_transformer_t::hold_picture()
+{
+    if (auto view = _view.lock(); view && !has_held_picture())
+    {
+        view->take_snapshot(held_picture);
+    }
+}
+
+bool warp_transformer_t::has_held_picture()
+{
+    return held_picture.get_buffer() != nullptr;
+}
+
 void warp_transformer_t::start(bool hiding)
 {
     if (hiding)
     {
+        hold_picture();
         progress.animate(0.0, 1.0);
     } else
     {
@@ -246,6 +261,11 @@ void warp_transformer_t::reverse()
 {
     const double now    = progress;
     const double target = (progress.end > 0.5) ? 0.0 : 1.0;
+    if (target > 0.5)
+    {
+        hold_picture();
+    }
+
     progress.animate(now, target);
 }
 

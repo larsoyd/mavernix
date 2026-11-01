@@ -17,6 +17,7 @@
 3. One transformer serves both effects.
 4. The picture is fetched at the output's density.
 5. Only an icon below the window gets the genie shape; any other arrangement falls back to the scale shape.
+6. A hiding window is drawn from a picture taken at the start, since a client may blank itself once told it is minimised.
 
 ## Known limits
 
