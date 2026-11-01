@@ -14,6 +14,7 @@ import io
 import json
 import os
 import shutil
+import struct
 import subprocess
 import sys
 import tempfile
@@ -818,6 +819,90 @@ class TestSeaLionIcons(unittest.TestCase):
             self.assertEqual(os.readlink(link), "text-plain.png")
             self.assertEqual(link.read_bytes(), b"picture")
         self.assertFalse(os.path.lexists(theme / "32x32" / "mimetypes" / "text-x-python.png"))
+
+
+class TestTypefaceWidths(unittest.TestCase):
+    """Apple's Lucida Grande has a negative average width, which leaves
+    Chrome's find box with no room to type in."""
+
+    def setUp(self):
+        sys.path.insert(0, str(LOOKS_DIR.parent))
+        self.addCleanup(sys.path.remove, str(LOOKS_DIR.parent))
+        import make_theme
+        self.make_theme = make_theme
+        folder = tempfile.TemporaryDirectory()
+        self.addCleanup(folder.cleanup)
+        self.folder = Path(folder.name)
+
+    def face(self, base, average, advances):
+        tables = {b"OS/2": struct.pack(">Hh", 2, average) + b"\1\2\3",
+                  b"hhea": bytes(34) + struct.pack(">H", len(advances)),
+                  b"hmtx": b"".join(struct.pack(">HH", width, 0) for width in advances)}
+        records, body = b"", b""
+        offset = base + 12 + 16 * len(tables)
+        for tag, table in tables.items():
+            records += tag + struct.pack(">LLL", 0, offset + len(body), len(table))
+            body += table + bytes(-len(table) % 4)
+        return b"\0\1\0\0" + struct.pack(">HHHH", len(tables), 0, 0, 0) + records + body
+
+    def collection(self, *faces):
+        start = 12 + 4 * len(faces)
+        built, bases = b"", []
+        for average, advances in faces:
+            bases.append(start + len(built))
+            built += self.face(bases[-1], average, advances)
+        path = self.folder / "faces.ttc"
+        path.write_bytes(b"ttcf\0\1\0\0" + struct.pack(f">L{len(faces)}L", len(faces), *bases) + built)
+        return path
+
+    def averages(self, path):
+        data = path.read_bytes()
+        count = struct.unpack_from(">L", data, 8)[0]
+        found = []
+        for base in struct.unpack_from(f">{count}L", data, 12):
+            tag_at = data.index(b"OS/2", base)
+            table_at = struct.unpack_from(">L", data, tag_at + 8)[0]
+            found.append(struct.unpack_from(">h", data, table_at + 2)[0])
+        return found
+
+    def test_a_negative_average_becomes_the_mean_of_the_real_advances(self):
+        path = self.collection((-1003, [1000, 0, 2000, 3000]), (-7, [600, 600]))
+        self.make_theme.mend_average_widths(path)
+        self.assertEqual(self.averages(path), [2000, 600])
+
+    def test_a_sound_average_stays(self):
+        path = self.collection((900, [1000, 2000]))
+        self.make_theme.mend_average_widths(path)
+        self.assertEqual(self.averages(path), [900])
+
+    def test_the_table_checksum_follows_the_new_value(self):
+        path = self.collection((-1003, [1000, 2000]))
+        self.make_theme.mend_average_widths(path)
+        data = path.read_bytes()
+        tag_at = data.index(b"OS/2", 16)
+        checksum, table_at, length = struct.unpack_from(">LLL", data, tag_at + 4)
+        padded = data[table_at:table_at + length].ljust((length + 3) // 4 * 4, b"\0")
+        self.assertEqual(checksum, sum(struct.unpack(f">{len(padded) // 4}L", padded)) & 0xffffffff)
+
+    def test_faces_sharing_a_table_all_get_its_new_checksum(self):
+        path = self.collection((-1003, [1000, 2000]), (-1003, [1000, 2000]))
+        data = bytearray(path.read_bytes())
+        first = data.index(b"OS/2", 16)
+        second = data.index(b"OS/2", first + 4)
+        struct.pack_into(">L", data, second + 8, struct.unpack_from(">L", data, first + 8)[0])
+        path.write_bytes(data)
+        self.make_theme.mend_average_widths(path)
+        data = path.read_bytes()
+        self.assertNotEqual(data[first + 4:first + 8], bytes(4))
+        self.assertEqual(data[first + 4:first + 8], data[second + 4:second + 8])
+
+    def test_the_import_mends_the_collection_it_copies(self):
+        fonts = self.folder / "root" / "System" / "Library" / "Fonts"
+        fonts.mkdir(parents=True)
+        self.collection((-1003, [1000, 2000])).rename(fonts / "LucidaGrande.ttc")
+        (fonts / "Helvetica.dfont").write_bytes(b"resources")
+        self.make_theme.copy_typeface(self.folder / "root", self.folder / "theme")
+        self.assertEqual(self.averages(self.folder / "theme" / "LucidaGrande.ttc"), [1500])
 
 
 class TestThemeUpdates(unittest.TestCase):

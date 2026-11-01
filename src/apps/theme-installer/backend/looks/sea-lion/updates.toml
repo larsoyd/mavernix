@@ -313,3 +313,9 @@ revision = 9
 import_brings = [
     "Every kind of file gets a Mavericks icon in file managers: text TextEdit's document, anything Mavericks never drew the plain document, packages Installer's, instead of the fallback theme's.",
 ]
+
+[[update]]
+revision = 10
+import_brings = [
+    "Text boxes sized from the interface font, such as Chrome's find bar, get their full width.",
+]
