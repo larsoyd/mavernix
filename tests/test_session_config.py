@@ -1395,7 +1395,7 @@ class TestAutostartWaitsForTray(unittest.TestCase):
     def tray_is_up():
         return subprocess.CompletedProcess([], 0, stdout="b true\n", stderr="")
 
-    def test_file_dialog_portal_restarts_with_the_session_look(self):
+    def test_file_dialog_portal_is_left_out_of_the_restart(self):
         calls = []
         def record(command, **kwargs):
             calls.append(command)
@@ -1403,7 +1403,8 @@ class TestAutostartWaitsForTray(unittest.TestCase):
         with unittest.mock.patch("at_login.subprocess.run", record):
             self.at_login.restart_early_portals()
         restart = next(command for command in calls if "try-restart" in command)
-        self.assertIn("plasma-xdg-desktop-portal-kde.service", restart)
+        # a restarted helper with the session's qt6ct settings deadlocks the portal for 25 seconds
+        self.assertNotIn("plasma-xdg-desktop-portal-kde.service", restart)
 
 
 class TestGtkWindowButtons(SessionTestCase):
