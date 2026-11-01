@@ -16,6 +16,13 @@
 			<min>0</min>
 			<max>50</max>
 		</option>
+		<option name="grip" type="int">
+			<_short>Grip</_short>
+			<_long>How many pixels either side of a shared edge take a press, whichever window is on top. Windows that draw their own frame often have no resize edge while tiled.</_long>
+			<default>4</default>
+			<min>1</min>
+			<max>20</max>
+		</option>
 		<option name="min_size" type="int">
 			<_short>Least size</_short>
 			<_long>How many pixels wide or high a window may be made by dragging a shared edge, whatever the window itself allows.</_long>
