@@ -195,6 +195,8 @@ class plugin_t : public wf::plugin_interface_t, public wf::per_output_tracker_mi
     }
 
     void handle_new_output(wf::output_t* output) override { output->connect(&on_minimize_request); }
+    // the default reaches for an instance this plugin never made
+    void handle_output_removed(wf::output_t*) override {}
 };
 } // namespace window_pictures
 
