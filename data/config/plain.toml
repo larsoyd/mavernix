@@ -121,6 +121,11 @@ mute_label = "Mute"
 settings_label = "Sound Settings…"
 settings_command = ["mavernix-settings", "sound"]
 
+[status.tray]
+# Programs whose icon is a plain light shape, lost on a light panel. Drawn in
+# the panel's ink, like the status icons beside them.
+one_colour = ["steam"]
+
 [status.network]
 # A network applet whose tray icon is left out, so there is one network
 # icon. It keeps running: NetworkManager asks it for saved passwords.
