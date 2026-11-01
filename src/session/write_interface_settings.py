@@ -12,13 +12,15 @@ schema's default of a close button only. It comes from [gtk] button_side and
 button_order, falling back to [window]. `--window-buttons-only` writes it
 alone, for mavernix-reconfigure.
 
-Without `gsettings` it changes nothing.
+Without `gsettings`, only the optional X11 settings file is written.
 """
 
+import argparse
 import json
 import shutil
 import subprocess
 import sys
+from pathlib import Path
 
 INTERFACE_SCHEMA = "org.gnome.desktop.interface"
 WINDOW_BUTTONS_SCHEMA = "org.gnome.desktop.wm.preferences"
@@ -59,13 +61,15 @@ def wanted_window_button_values(config):
     return {} if layout is None else {"button-layout": layout}
 
 
-def wanted_interface_values(theme):
+def wanted_interface_values(theme, config):
     """The org.gnome.desktop.interface values the theme decides."""
     values = {}
     # A theme without [controls] leaves applications alone.
     controls = theme.get("controls")
     if controls is not None:
         values["color-scheme"] = DARK_SCHEME if controls.get("dark", False) else LIGHT_SCHEME
+        if config.get("gtk", {}).get("use_theme", True):
+            values["gtk-theme"] = "DesktopTheme"
     icon_theme = theme.get("icons", {}).get("theme")
     if icon_theme:
         values["icon-theme"] = icon_theme
@@ -83,7 +87,24 @@ def wanted_interface_values(theme):
 
 # Keys a theme may leave out that must not keep the last desktop's value:
 # the session's database outlives a switch.
-RESET_WHEN_UNSET = ["cursor-theme", "cursor-size"]
+RESET_WHEN_UNSET = ["cursor-theme", "cursor-size", "gtk-theme"]
+
+
+def write_xsettings(settings, path):
+    interface = wanted_interface_values(settings["theme"], settings["config"])
+    names = {"gtk-theme": "Net/ThemeName", "icon-theme": "Net/IconThemeName",
+             "font-name": "Gtk/FontName", "cursor-theme": "Gtk/CursorThemeName",
+             "cursor-size": "Gtk/CursorThemeSize"}
+    values = {name: interface[key] for key, name in names.items() if key in interface}
+    if "cursor-size" in interface:
+        values["Gtk/CursorThemeSize"] = int(interface["cursor-size"])
+    layout = button_layout(settings["config"])
+    if layout is not None:
+        values["Gtk/DecorationLayout"] = layout
+    text = "".join(f"{key} {json.dumps(value, ensure_ascii=False)}\n" for key, value in values.items())
+    temporary = path.with_suffix(".tmp")
+    temporary.write_text(text)
+    temporary.replace(path)
 
 
 def reset_values(schema, keys):
@@ -111,19 +132,21 @@ def write_values(schema, values):
 
 
 def main():
-    arguments = sys.argv[1:]
-    buttons_only = "--window-buttons-only" in arguments
-    paths = [argument for argument in arguments if argument != "--window-buttons-only"]
-    if len(paths) != 1:
-        sys.exit("usage: write_interface_settings.py SHELL-SETTINGS.json [--window-buttons-only]")
-    with open(paths[0]) as file:
+    parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    parser.add_argument("settings")
+    parser.add_argument("--window-buttons-only", action="store_true")
+    parser.add_argument("--xsettings-file", type=Path)
+    arguments = parser.parse_args()
+    with open(arguments.settings) as file:
         settings = json.load(file)
+    if arguments.xsettings_file:
+        write_xsettings(settings, arguments.xsettings_file)
 
     if shutil.which("gsettings") is None:
         say("gsettings is not installed (package glib2); GTK programs keep the user's own settings")
         return
-    if not buttons_only:
-        wanted = wanted_interface_values(settings["theme"])
+    if not arguments.window_buttons_only:
+        wanted = wanted_interface_values(settings["theme"], settings["config"])
         if not write_values(INTERFACE_SCHEMA, wanted):
             return
         reset_values(INTERFACE_SCHEMA, [key for key in RESET_WHEN_UNSET if key not in wanted])

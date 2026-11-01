@@ -15,6 +15,7 @@ depends=(
   'python' 'python-pillow'
   'kvantum'
   'gsettings-desktop-schemas'
+  'xsettingsd'
   'gvfs'
   'adwaita-icon-theme' 'adwaita-icon-theme-legacy' 'adwaita-cursors' 'ttf-dejavu'
   '7zip' 'cpio' 'bzip2' 'lbzip2' 'libicns' 'ffmpeg' 'poppler' 'bubblewrap'
@@ -35,7 +36,8 @@ optdepends=(
   'network-manager-applet: asking for a network password NetworkManager needs again, and networks that sign in with a user name or a certificate'
   'dex: starting the programs in ~/.config/autostart'
   "hwdata: the graphics card's name in About This Computer"
-  'xdg-desktop-portal-gtk: file choosers for sandboxed programs'
+  'xdg-desktop-portal-gtk: desktop settings and fallback file choosers'
+  'xdg-desktop-portal-kde: Dolphin-style file choosers'
   'xdg-desktop-portal-wlr: screen sharing'
 )
 source=("$pkgname-$pkgver.tar.gz::$url/archive/refs/tags/v$pkgver.tar.gz")

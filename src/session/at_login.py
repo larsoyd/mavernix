@@ -153,7 +153,7 @@ def restart_early_portals():
 
 def stop_early_kde_service():
     """Stops a kded6 started before the environment was set, so it would
-    miss the session's kded6rc. It is D-Bus activated and comes back on demand.
+    miss the session's module settings. It is D-Bus activated and comes back on demand.
     """
     subprocess.run(["systemctl", "--user", "stop", "dbus-*-org.kde.kded6@*.service"],
                    capture_output=True)
@@ -177,6 +177,14 @@ def start_listed_programs(config):
             say(f"not starting {command[0]}: it is not installed")
             continue
         start(command)
+
+
+def start_xsettings(settings_path):
+    if os.environ.get("DISPLAY") and shutil.which("xsettingsd"):
+        script = os.path.join(os.path.dirname(os.path.abspath(__file__)), "run_xsettings.py")
+        config = os.path.join(os.path.dirname(os.path.abspath(settings_path)), "xsettingsd.conf")
+        if os.path.isfile(config):
+            start([sys.executable, script, config])
 
 
 def start_users_programs():
@@ -274,6 +282,7 @@ def main():
 
     hand_login_to_wallet()
     tell_services(config, os.path.dirname(os.path.abspath(sys.argv[1])))
+    start_xsettings(sys.argv[1])
     start_listed_programs(config)
     if config.get("session", {}).get("users_autostart", True):
         start_users_programs()

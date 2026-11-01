@@ -560,12 +560,10 @@ GTK_DARK_BASE_IMPORT = {
     "gtk-4.0": '@import url("resource:///org/gtk/libgtk/theme/Default/Default-dark.css");',
 }
 
-# How each toolkit version writes "this picture, or that one on a dense screen".
+# both gtk versions use the same syntax for images at different densities
 def gtk_picture(version, file_name):
     stem, dot, extension = file_name.rpartition(".")
-    if version == "gtk-3.0":
-        return f'-gtk-scaled(url("assets/{file_name}"), url("assets/{stem}@2x.{extension}"))'
-    return f'image-set(url("assets/{file_name}") 1x, url("assets/{stem}@2x.{extension}") 2x)'
+    return f'-gtk-scaled(url("assets/{file_name}"), url("assets/{stem}@2x.{extension}"))'
 
 
 def middle_name(file_name):
@@ -590,6 +588,68 @@ def cut_middles(assets_directory, middles):
                    image.width - right * density, image.height - bottom * density)
             middle_stem = middle_name(file_name).rpartition(".")[0]
             image.crop(box).save(assets_directory / f"{middle_stem}{suffix}.{extension}")
+
+
+def gtk_window_buttons(theme, version):
+    buttons = theme.get("window", {}).get("buttons")
+    if not buttons:
+        return []
+    width, height = buttons["size"]
+    lines = []
+    for name in ("close", "minimize", "maximize"):
+        looks = buttons[name]
+        selectors = [f"button.titlebutton.{name}", f"windowcontrols button.{name}"]
+
+        def rule(suffix, declarations):
+            return [", ".join(selector + suffix for selector in selectors) + " {",
+                    *[f"  {declaration}" for declaration in declarations], "}", ""]
+
+        lines += rule("", [
+            f"min-width: {width}px; min-height: {height}px;",
+            "padding: 0; border: none; box-shadow: none;",
+            "background-color: transparent; color: transparent;",
+            "text-shadow: none; -gtk-icon-shadow: none; transition: none;",
+        ])
+        lines += rule(" image", ["opacity: 0; min-width: 0; min-height: 0;"])
+        states = (("normal", ""), ("inactive", ":backdrop"),
+                  ("hover", ":hover"), ("pressed", ":active"), ("disabled", ":disabled"),
+                  ("inactive", ":backdrop:disabled"))
+        for state, suffix in states:
+            fill = looks.get(state, looks["normal"])
+            declarations = ["background-image: none; background-color: transparent;",
+                            f"border-radius: {fill.get('radius', 0)}px;"]
+            if "image" in fill:
+                actual_state = state if state in looks else "normal"
+                extension = Path(fill["image"]).suffix
+                image = gtk_picture(version, f"window-{name}-{actual_state}{extension}")
+                declarations += [f"background-image: {image};",
+                                 "background-repeat: no-repeat; background-position: center;",
+                                 f"background-size: {width}px {height}px;"]
+            elif "color" in fill:
+                declarations.append(f"background-color: {fill['color']};")
+            elif "gradient" in fill:
+                colors = fill["gradient"]
+                positions = fill.get("positions", [i / (len(colors) - 1) for i in range(len(colors))])
+                stops = ", ".join(f"{color} {position * 100:g}%" for color, position in zip(colors, positions))
+                declarations.append(f"background-image: linear-gradient(to bottom, {stops});")
+            lines += rule(suffix, declarations)
+            if state in ("hover", "pressed", "disabled"):
+                lines += rule(":backdrop" + suffix, declarations)
+    return lines
+
+
+def copy_gtk_window_buttons(theme, theme_directory, assets_directory):
+    buttons = theme.get("window", {}).get("buttons", {})
+    for name in ("close", "minimize", "maximize"):
+        for state, fill in buttons.get(name, {}).items():
+            if "image" not in fill:
+                continue
+            source = theme_directory / fill["image"]
+            for suffix in ("", "@2x"):
+                picture = source.with_name(f"{source.stem}{suffix}{source.suffix}")
+                if not picture.is_file() and suffix:
+                    picture = source
+                shutil.copyfile(picture, assets_directory / f"window-{name}-{state}{suffix}{source.suffix}")
 
 
 def gtk_css(theme, theme_directory, version):
@@ -803,6 +863,7 @@ def gtk_css(theme, theme_directory, version):
             lines += indicator_rule(f"{node}{pseudo_class}:disabled", states, "disabled")
         lines.append("")
 
+    lines += gtk_window_buttons(theme, version)
     return "\n".join(lines) + "\n", middles
 
 
@@ -888,7 +949,7 @@ def write_gtk_settings(theme, output_directory):
     icon_theme = theme.get("icons", {}).get("theme")
     if icon_theme is not None:
         lines.append(f"gtk-icon-theme-name={icon_theme}")
-    interface = wanted_interface_values(theme)
+    interface = wanted_interface_values(theme, {})
     for key, setting in (("font-name", "gtk-font-name"), ("cursor-theme", "gtk-cursor-theme-name"),
                          ("cursor-size", "gtk-cursor-theme-size")):
         if key in interface:
@@ -915,6 +976,7 @@ def write_gtk_themes(theme, theme_directory, output_directory):
             for picture in controls_pictures.glob("*.png"):
                 shutil.copyfile(picture, assets_directory / picture.name)
 
+        copy_gtk_window_buttons(theme, theme_directory, assets_directory)
         text, middles = gtk_css(theme, theme_directory, version)
         (gtk_directory / "gtk.css").write_text(text)
         cut_middles(assets_directory, middles)

@@ -181,7 +181,7 @@ session_settings="$state_dir/settings"
 rm -rf "$session_settings"
 mkdir -p "$session_settings/xdg-desktop-portal"
 ln -s "$session_dir/portals/wayfire-portals.conf" "$session_settings/xdg-desktop-portal/wayfire-portals.conf"
-ln -s "$session_dir/kded6rc" "$session_settings/kded6rc"
+ln -s "$session_dir/kded5rc" "$session_settings/kded5rc"
 add_config_dir "$session_settings"
 
 add_config_dir "$state_dir/default-programs"

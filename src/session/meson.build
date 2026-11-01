@@ -39,7 +39,8 @@ install_data(
     'toml_text.py',
     'user_choices.py',
     'write_interface_settings.py',
-    'kded6rc',
+    'run_xsettings.py',
+    'kded5rc',
     install_dir: session_dir,
 )
 install_data('bin/mavernix-dock-geometry', 'bin/mavernix-switch', 'bin/mavernix-reconfigure', 'bin/mavernix-file-action',

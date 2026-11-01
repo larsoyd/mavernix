@@ -1,8 +1,5 @@
-# KDE background modules switched off in this session. kded6 is started on
-# demand by KDE programs and brings Plasma parts this desktop has its own of.
-# Listed in XDG_CONFIG_DIRS for this session only, so the user's own kded6rc
-# and Plasma are unaffected. Modules not listed (appmenu, soliduiserver,
-# freespacenotifier, smart, ...) keep running.
+# kded6 still reads the version 5 configuration name.
+# These defaults apply only in this session.
 
 # Rewrites ~/.config/gtk-3.0 and gtk-4.0 and starts xsettingsd with Plasma's
 # colours, icons and fonts, which then win over this desktop's.

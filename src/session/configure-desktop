@@ -115,7 +115,7 @@ write_application_themes() {
 # follow at once.
 write_interface_settings() {
     export DCONF_PROFILE="$state_dir/dconf-profile"
-    if ! python3 "$session_dir/write_interface_settings.py" "$shell_settings" "$@"; then
+    if ! python3 "$session_dir/write_interface_settings.py" "$shell_settings" --xsettings-file "$state_dir/xsettingsd.conf" "$@"; then
         echo "configure-desktop: could not write the theme's settings for GTK (message above); GTK programs keep the user's own." >&2
     fi
 }
