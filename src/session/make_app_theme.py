@@ -888,7 +888,7 @@ def write_qt6ct_settings(theme, output_directory):
     if not font.get("family") or not font.get("size"):
         return
     points = round(font["size"] * POINTS_PER_PIXEL, 2)
-    lines = ["[Appearance]", "custom_palette=false", "standard_dialogs=default"]
+    lines = ["[Appearance]", "custom_palette=false", "standard_dialogs=xdgdesktopportal"]
     icon_theme = theme.get("icons", {}).get("theme")
     if icon_theme is not None:
         lines.append(f"icon_theme={icon_theme}")

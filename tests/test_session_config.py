@@ -1144,7 +1144,8 @@ class TestKdeColours(SessionTestCase):
         settings.read(output / "xdg" / "qt6ct" / "qt6ct.conf")
         self.assertEqual(settings["Fonts"]["general"], '"DejaVu Sans,9.75,-1,5,400,0,0,0,0,0,0,0,0,0,0,1"')
         self.assertEqual(settings["Appearance"]["custom_palette"], "false")
-        self.assertEqual(settings["Appearance"]["standard_dialogs"], "default")
+        # Platform.FileDialog does nothing at all without a dialog from the theme
+        self.assertEqual(settings["Appearance"]["standard_dialogs"], "xdgdesktopportal")
         self.assertEqual(settings["Appearance"]["icon_theme"], "Adwaita")
 
     def test_kdeglobals_carries_no_fonts(self):
