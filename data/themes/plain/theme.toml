@@ -460,7 +460,7 @@ curve = "ease-out"
 [notifications.banner]
 # The small panel in which a notification shows up at the screen's corner.
 width = 340
-top_gap = 10
+bottom_gap = 10
 edge_gap = 10
 gap = 8
 # Background and height per number of text lines under the title (0, 1, 2).

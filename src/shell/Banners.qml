@@ -1,7 +1,4 @@
-// Notifications: the shell is the session's notification service. Each
-// notification shows as a banner in the screen's top right corner for
-// notifications.banner_seconds, then moves to `kept`, the list of past
-// notifications. Looks: the theme's [notifications.banner] and [animation.banner].
+// the session's notification service, banners sit bottom right then move to kept
 
 import QtQuick
 import Quickshell
@@ -148,16 +145,17 @@ Scope {
         // (background_margins: top, right, bottom, left).
         readonly property var margin: root.looks.background_margins ?? [0, 0, 0, 0]
         readonly property var panelLooks: root.theme.panel ?? ({})
-        readonly property bool panelOnTop: (root.settings.config.panel?.position ?? "top") === "top"
+        readonly property bool panelOnBottom: (root.settings.config.panel?.position ?? "top") === "bottom"
 
         anchors {
-            top: true
+            bottom: true
             right: true
         }
         exclusionMode: ExclusionMode.Ignore
         WlrLayershell.layer: WlrLayer.Overlay
         WlrLayershell.keyboardFocus: WlrKeyboardFocus.None
-        margins.top: (panelOnTop ? (panelLooks.height ?? 0) : 0) + (root.looks.top_gap ?? 8) - margin[0]
+        margins.bottom: (panelOnBottom ? (panelLooks.height ?? 0) : 0)
+                        + (root.looks.bottom_gap ?? root.looks.top_gap ?? 8) - margin[2]
         margins.right: (root.looks.edge_gap ?? 8) - margin[1]
         color: "transparent"
 
@@ -225,7 +223,7 @@ Scope {
                     transform: Translate {
                         x: (banner.share(root.arriving, "slide", 1 - banner.come) + banner.share(root.leaving, "slide", banner.gone))
                            * (banner.width + stackWindow.margin[1]) + banner.swiped
-                        // Up past the window's top, so the banner comes out from under the panel.
+                        // drop animations enter from above the banner stack
                         y: -(banner.share(root.arriving, "drop", 1 - banner.come) + banner.share(root.leaving, "drop", banner.gone))
                            * (banner.y + banner.height + stackWindow.margin[0])
                     }
