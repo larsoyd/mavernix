@@ -1,23 +1,23 @@
-// The plugin "shared-edges": dragging the edge two tiled windows share
-// makes one grow as the other shrinks. Wayfire's own resize un-tiles the one
-// window it holds.
-//
-// Every resize request goes through `wf::get_core().default_wm`; this plugin
-// replaces it with one that takes single-edge drags on tiled windows with
-// tiled neighbours and leaves the rest to the stock code. Each movement
-// resizes all windows on the seam in one transaction, so no gap shows.
+// dragging the edge two tiled windows share resizes both, stock resize un-tiles the one it holds
 
 #include <linux/input-event-codes.h>
 
+#include <cmath>
+#include <map>
 #include <vector>
 
 #include <wayfire/core.hpp>
 #include <wayfire/nonstd/wlroots-full.hpp>
 #include <wayfire/option-wrapper.hpp>
 #include <wayfire/output.hpp>
+#include <wayfire/per-output-plugin.hpp>
 #include <wayfire/plugin.hpp>
 #include <wayfire/plugins/common/input-grab.hpp>
+#include <wayfire/plugins/crossfade.hpp>
+#include <wayfire/plugins/grid.hpp>
 #include <wayfire/scene-input.hpp>
+#include <wayfire/scene-operations.hpp>
+#include <wayfire/scene.hpp>
 #include <wayfire/signal-definitions.hpp>
 #include <wayfire/toplevel-view.hpp>
 #include <wayfire/toplevel.hpp>
@@ -33,11 +33,32 @@ namespace
 {
 const std::string PLUGIN_NAME = "shared-edges";
 
+// grid reuses the animation it finds, a crossfade would leave a gap beside the neighbour
+void skip_crossfade(wayfire_toplevel_view view)
+{
+    if (view->get_output() && !view->has_data<wf::grid::grid_animation_t>())
+    {
+        wf::option_wrapper_t<wf::animation_description_t> duration{"grid/duration"};
+        view->store_data(std::make_unique<wf::grid::grid_animation_t>(
+            view, wf::grid::grid_animation_t::NONE, duration));
+    }
+}
+
 // The stock window manager, but asking this plugin first about resizes.
 class shared_edge_window_manager_t : public wf::window_manager_t
 {
   public:
     std::function<bool(wayfire_toplevel_view, uint32_t)> take_over_resize;
+
+    void tile_request(wayfire_toplevel_view view, uint32_t edges, std::optional<wf::point_t> ws = {}) override
+    {
+        if (edges != wf::TILED_EDGES_ALL && edges != 0)
+        {
+            skip_crossfade(view);
+        }
+
+        wf::window_manager_t::tile_request(view, edges, ws);
+    }
 
     void resize_request(wayfire_toplevel_view view, uint32_t edges = 0) override
     {
@@ -50,10 +71,11 @@ class shared_edge_window_manager_t : public wf::window_manager_t
     }
 };
 
-// Nothing for a corner.
-std::optional<shared_edges::side_t> single_side(uint32_t edges)
+// edges tiled to the screen cannot move, so a corner there drags the other edge
+std::optional<shared_edges::side_t> single_side(uint32_t edges, uint32_t tiled_edges)
 {
-    switch (edges)
+    const uint32_t free_edges = edges & ~tiled_edges;
+    switch (free_edges ? free_edges : edges)
     {
     case WLR_EDGE_LEFT:
         return shared_edges::side_t::LEFT;
@@ -98,11 +120,70 @@ shared_edges::window_t describe(wayfire_toplevel_view view)
     return window;
 }
 
-class shared_edges_t : public wf::plugin_interface_t, public wf::pointer_interaction_t
+// clients drawing their own frame may have no resize edge once tiled, so this takes seams
+class seam_strip_node_t : public wf::scene::node_t, public wf::pointer_interaction_t
+{
+  public:
+    struct hit_t
+    {
+        wayfire_toplevel_view view;
+        uint32_t edge;
+    };
+
+    std::function<std::optional<hit_t>(wf::output_t*, wf::pointf_t)> seam_at;
+    std::function<void(const hit_t&)> pressed;
+
+    explicit seam_strip_node_t(wf::output_t* output) : node_t(false), output(output) {}
+
+    std::optional<wf::scene::input_node_t> find_node_at(const wf::pointf_t& at) override
+    {
+        if (seam_at(output, at))
+        {
+            return wf::scene::input_node_t{.node = this, .local_coords = at};
+        }
+
+        return {};
+    }
+
+    wf::pointer_interaction_t& pointer_interaction() override { return *this; }
+    std::string stringify() const override { return "shared-edges strip"; }
+
+    void handle_pointer_enter(wf::pointf_t at) override { show_cursor(at); }
+    void handle_pointer_motion(wf::pointf_t at, uint32_t) override { show_cursor(at); }
+
+    void handle_pointer_button(const wlr_pointer_button_event& event) override
+    {
+        const auto hit = seam_at(output, wf::get_core().get_cursor_position());
+        if (hit && (event.state == WL_POINTER_BUTTON_STATE_PRESSED) && (event.button == BTN_LEFT))
+        {
+            pressed(*hit);
+        }
+    }
+
+  private:
+    wf::output_t* output;
+
+    void show_cursor(wf::pointf_t at)
+    {
+        if (const auto hit = seam_at(output, at))
+        {
+            wf::get_core().set_cursor(wlr_xcursor_get_resize_name((wlr_edges)hit->edge));
+        }
+    }
+};
+
+class shared_edges_t : public wf::plugin_interface_t,
+    public wf::per_output_tracker_mixin_t<>,
+    public wf::pointer_interaction_t
 {
     wf::option_wrapper_t<bool> enabled{PLUGIN_NAME + "/enabled"};
     wf::option_wrapper_t<int> tolerance_px{PLUGIN_NAME + "/tolerance"};
     wf::option_wrapper_t<int> least_size_px{PLUGIN_NAME + "/min_size"};
+    wf::option_wrapper_t<int> grip_px{PLUGIN_NAME + "/grip"};
+    wf::option_wrapper_t<int> snap_threshold{"move/snap_threshold"};
+    wf::option_wrapper_t<int> quarter_snap_threshold{"move/quarter_snap_threshold"};
+
+    std::map<wf::output_t*, std::shared_ptr<seam_strip_node_t>> strips;
 
     wf::plugin_activation_data_t grab_interface = {
         .name = PLUGIN_NAME,
@@ -133,21 +214,26 @@ class shared_edges_t : public wf::plugin_interface_t, public wf::pointer_interac
         }
     };
 
-    // Returns whether this plugin takes the drag.
-    bool take_over(wayfire_toplevel_view view, uint32_t edges)
-    {
-        const auto side = single_side(edges);
-        if (!enabled || dragging() || !side || !view->get_output() || !is_tiled_and_resizable(view))
+    // a drop tiles without a tile request
+    wf::signal::connection_t<wf::grid::grid_handle_move_signal> on_grid_move =
+        [=](wf::grid::grid_handle_move_signal* event) {
+        if (event->operation != wf::grid::MOVE_OP_DROP)
         {
-            return false;
+            return;
         }
 
-        wf::output_t* view_output = view->get_output();
-        std::vector<wayfire_toplevel_view> candidates;
-        std::vector<shared_edges::window_t> windows;
-        std::size_t dragged = 0;
+        const auto slot = wf::grid::calc_slot(event->output, event->input, snap_threshold, quarter_snap_threshold);
+        if ((slot != wf::grid::SLOT_NONE) && (slot != wf::grid::SLOT_CENTER))
+        {
+            skip_crossfade(event->view);
+        }
+    };
+
+    void tiled_windows(wayfire_toplevel_view view, std::vector<wayfire_toplevel_view>& candidates,
+        std::vector<shared_edges::window_t>& windows, std::size_t& dragged)
+    {
         const uint32_t which = wf::WSET_MAPPED_ONLY | wf::WSET_EXCLUDE_MINIMIZED | wf::WSET_CURRENT_WORKSPACE;
-        for (auto& other : view_output->wset()->get_views(which))
+        for (auto& other : view->get_output()->wset()->get_views(which))
         {
             if (other == view)
             {
@@ -161,6 +247,26 @@ class shared_edges_t : public wf::plugin_interface_t, public wf::pointer_interac
             candidates.push_back(other);
             windows.push_back(describe(other));
         }
+    }
+
+    bool take_over(wayfire_toplevel_view view, uint32_t edges)
+    {
+        if (!enabled || dragging() || !view->get_output() || !is_tiled_and_resizable(view))
+        {
+            return false;
+        }
+
+        const auto side = single_side(edges, view->pending_tiled_edges());
+        if (!side)
+        {
+            return false;
+        }
+
+        wf::output_t* view_output = view->get_output();
+        std::vector<wayfire_toplevel_view> candidates;
+        std::vector<shared_edges::window_t> windows;
+        std::size_t dragged = 0;
+        tiled_windows(view, candidates, windows, dragged);
 
         auto found = shared_edges::find_seam(windows, dragged, *side, tolerance_px);
         if (!found || !view_output->activate_plugin(&grab_interface))
@@ -196,6 +302,47 @@ class shared_edges_t : public wf::plugin_interface_t, public wf::pointer_interac
 
         wf::get_core().set_cursor(wlr_xcursor_get_resize_name((wlr_edges)edges));
         return true;
+    }
+
+    // asks the workspace so a popup or window above the seam keeps its clicks
+    std::optional<seam_strip_node_t::hit_t> seam_at(wf::output_t* on, wf::pointf_t at)
+    {
+        if (!enabled)
+        {
+            return {};
+        }
+
+        const auto under = on->wset()->get_node()->find_node_at(at);
+        wayfire_toplevel_view view = under ? wf::toplevel_cast(wf::node_to_view(under->node.get())) : nullptr;
+        if (!view || !is_tiled_and_resizable(view))
+        {
+            return {};
+        }
+
+        const auto origin = wf::origin(on->get_layout_geometry());
+        const wf::pointf_t local = {at.x - origin.x, at.y - origin.y};
+        const auto box = view->toplevel()->pending().geometry;
+        const std::pair<uint32_t, double> distances[] = {
+            {WLR_EDGE_RIGHT, box.x + box.width - local.x},
+            {WLR_EDGE_LEFT, local.x - box.x},
+            {WLR_EDGE_BOTTOM, box.y + box.height - local.y},
+            {WLR_EDGE_TOP, local.y - box.y},
+        };
+
+        std::vector<wayfire_toplevel_view> candidates;
+        std::vector<shared_edges::window_t> windows;
+        std::size_t dragged = 0;
+        tiled_windows(view, candidates, windows, dragged);
+        for (const auto& [edge, distance] : distances)
+        {
+            const auto side = single_side(edge, 0);
+            if ((std::abs(distance) < grip_px) && shared_edges::find_seam(windows, dragged, *side, tolerance_px))
+            {
+                return seam_strip_node_t::hit_t{view, edge};
+            }
+        }
+
+        return {};
     }
 
     void end_drag()
@@ -254,12 +401,33 @@ class shared_edges_t : public wf::plugin_interface_t, public wf::pointer_interac
         auto manager = std::make_unique<shared_edge_window_manager_t>();
         manager->take_over_resize = [=](wayfire_toplevel_view view, uint32_t edges) { return take_over(view, edges); };
         wf::get_core().default_wm = std::move(manager);
+        wf::get_core().connect(&on_grid_move);
+        init_output_tracking();
     }
 
     void fini() override
     {
         end_drag();
+        fini_output_tracking();
         wf::get_core().default_wm = std::make_unique<wf::window_manager_t>();
+    }
+
+    // runs before grid, which has to find the animation on a drop
+    int get_order_hint() const override { return -1; }
+
+    void handle_new_output(wf::output_t* new_output) override
+    {
+        auto strip = std::make_shared<seam_strip_node_t>(new_output);
+        strip->seam_at = [=](wf::output_t* on, wf::pointf_t at) { return seam_at(on, at); };
+        strip->pressed = [=](const seam_strip_node_t::hit_t& hit) { take_over(hit.view, hit.edge); };
+        wf::scene::add_front(new_output->node_for_layer(wf::scene::layer::WORKSPACE), strip);
+        strips[new_output] = strip;
+    }
+
+    void handle_output_removed(wf::output_t* old_output) override
+    {
+        wf::scene::remove_child(strips[old_output]);
+        strips.erase(old_output);
     }
 
     void handle_pointer_button(const wlr_pointer_button_event& event) override
