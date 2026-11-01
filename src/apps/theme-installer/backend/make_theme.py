@@ -13,6 +13,7 @@ the colour table, which must exist already:
 import argparse
 import json
 import shutil
+import struct
 import subprocess
 import sys
 import tempfile
@@ -652,8 +653,32 @@ THEME_FONTS = "fonts"
 HELVETICA_FILE = "System/Library/Fonts/Helvetica.dfont"
 
 
+def font_table(data, face, tag):
+    """A face's table in a collection: where its record is, and its offset and length."""
+    for record in range(face + 12, face + 12 + 16 * struct.unpack_from(">H", data, face + 4)[0], 16):
+        if data[record:record + 4] == tag:
+            return (record, *struct.unpack_from(">LL", data, record + 8))
+    fail(f"a face at {face} has no {tag.decode()} table")
+
+
+def mend_average_widths(font_file):
+    """Apple left xAvgCharWidth negative, and Chrome's find box shrinks to nothing on it."""
+    data = bytearray(font_file.read_bytes())
+    for face in struct.unpack_from(f">{struct.unpack_from('>L', data, 8)[0]}L", data, 12):
+        record, os2, length = font_table(data, face, b"OS/2")
+        if struct.unpack_from(">h", data, os2 + 2)[0] <= 0:
+            metrics = struct.unpack_from(">H", data, font_table(data, face, b"hhea")[1] + 34)[0]
+            hmtx = font_table(data, face, b"hmtx")[1]
+            widths = [width for width in struct.unpack_from(">" + "Hxx" * metrics, data, hmtx) if width]
+            struct.pack_into(">h", data, os2 + 2, round(sum(widths) / len(widths)))
+        table = data[os2:os2 + length].ljust((length + 3) // 4 * 4, b"\0")
+        checksum = sum(struct.unpack(f">{len(table) // 4}L", table)) & 0xffffffff
+        struct.pack_into(">L", data, record + 4, checksum)
+    font_file.write_bytes(data)
+
+
 def copy_typeface(root_dir, fonts_dir):
-    """Copies the system's font files into the theme, unchanged."""
+    """Copies the system's font files into the theme, mending the collection's widths."""
     fonts_dir.mkdir(parents=True, exist_ok=True)
     for name in (SYSTEM_FONT_FILE, HELVETICA_FILE):
         font_file = root_dir / name
@@ -661,6 +686,7 @@ def copy_typeface(root_dir, fonts_dir):
             fail(f"{font_file} is missing")
 
         shutil.copyfile(font_file, fonts_dir / font_file.name)
+    mend_average_widths(fonts_dir / Path(SYSTEM_FONT_FILE).name)
 
 
 def copy_desktop_pictures(source_dir, pictures_dir):
