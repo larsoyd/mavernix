@@ -108,6 +108,7 @@ write_application_themes() {
     fi
     link_kvantum_theme
     link_qt6ct_settings
+    link_mozilla_style
 }
 
 # The theme's values into the session's dconf database; open GTK programs
@@ -317,6 +318,19 @@ link_qt6ct_settings() {
     fi
     mkdir -p "$(dirname "$link")"
     ln -sfn "$settings" "$link"
+}
+
+# Firefox and Thunderbird take their title bar buttons from a style in each profile.
+link_mozilla_style() {
+    local theme="$app_theme/share/themes/DesktopTheme"
+    if [[ -n "${DESKTOP_NESTED:-}" ]]; then
+        return 0
+    fi
+    if [[ -f "$theme/mozilla/titlebar.css" && $(config_flag gtk use_theme yes) == yes ]]; then
+        python3 "$session_dir/link_mozilla_style.py" "$theme"
+    else
+        python3 "$session_dir/link_mozilla_style.py"
+    fi
 }
 
 # After a switch: services started on demand from now on (a file manager
