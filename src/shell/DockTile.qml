@@ -55,6 +55,7 @@ Item {
         to: 1
         duration: tile.appearDuration
         easing.type: Easing.InOutSine
+        onFinished: console.debug("[dock] tile_grew label=" + tile.labelText)
     }
     Component.onCompleted: {
         if (appearDuration > 0) {
