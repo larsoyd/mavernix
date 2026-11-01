@@ -163,11 +163,13 @@ QString WindowPictures::tileFor(const QString& appId, const QString& title, int 
         }
 
         windows[id].tileBadge = badge;
+        tilesComposed += 1;
+        windows[id].tileNumber = tilesComposed;
     }
 
-    // A new address per revision keeps QML from showing a cached picture.
+    // one address per picture, so qml rereads the file only when it changed
     QUrl address = QUrl::fromLocalFile(tilePicturePath(id));
-    address.setQuery(QString::number(currentRevision));
+    address.setQuery(QString::number(windows[id].tileNumber));
     return address.toString();
 }
 

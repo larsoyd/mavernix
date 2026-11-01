@@ -371,8 +371,7 @@ PanelWindow {
             } else if (place.isTrash) {
                 place.key = "trash"
             } else if (place.window !== null) {
-                place.key = "window " + place.window.appId + " " + place.window.title
-                    + " " + sameNamedBefore(place.window)
+                place.key = "window " + windowNumber(place.window)
             } else if ((place.custom ?? null) !== null) {
                 place.key = "custom " + JSON.stringify(place.custom)
             } else if ((place.appId ?? "") !== "") {
@@ -422,6 +421,17 @@ PanelWindow {
         delayMs: dock.settings.theme.animation?.minimize?.duration_ms ?? 0
     }
 
+    // titles change while a window waits here, a tile named after one would grow in anew
+    readonly property var windowNumbers: new WeakMap()
+    readonly property var nextWindowNumber: ({ value: 0 })
+    function windowNumber(window) {
+        if (!windowNumbers.has(window)) {
+            nextWindowNumber.value += 1
+            windowNumbers.set(window, nextWindowNumber.value)
+        }
+        return windowNumbers.get(window)
+    }
+
     // Tells apart windows with the same application and title.
     function sameNamedBefore(window) {
         const sameNamed = ToplevelManager.toplevels.values.filter(
@@ -429,11 +439,17 @@ PanelWindow {
         return Math.max(0, sameNamed.indexOf(window))
     }
 
+    // a new title gets here before the native module knows it, the last picture stands in
+    readonly property var lastPictures: new WeakMap()
     function windowPicture(window, entry) {
         // Read so that bindings follow the pictures.
         windowPictures.revision
-        return windowPictures.tileFor(window.appId, window.title, sameNamedBefore(window),
-                                      themeIcons.nameFor(entry))
+        const picture = windowPictures.tileFor(window.appId, window.title, sameNamedBefore(window),
+                                               themeIcons.nameFor(entry))
+        if (picture !== "") {
+            lastPictures.set(window, picture)
+        }
+        return lastPictures.get(window) ?? ""
     }
     // Brings a minimised window back. The native module switches to its
     // desktop first if needed and restores it when the slide is over.
