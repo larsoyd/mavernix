@@ -19,6 +19,7 @@ extern "C"
 #include <sstream>
 
 #include "deco-subsurface.hpp"
+#include "hide-maximized.hpp"
 #include "wayfire/core.hpp"
 #include "wayfire/plugin.hpp"
 #include "wayfire/signal-provider.hpp"
@@ -119,6 +120,12 @@ class wayfire_decoration : public wf::plugin_interface_t
         update_view_decoration(ev->view);
     };
 
+    wf::signal::connection_t<wf::hide_maximized_changed_signal> on_hide_maximized_changed =
+        [=] (wf::hide_maximized_changed_signal*)
+    {
+        redecorate_all_views();
+    };
+
   public:
     void init() override
     {
@@ -127,6 +134,7 @@ class wayfire_decoration : public wf::plugin_interface_t
         wf::get_core().connect(&on_view_tiled);
         theme_in_use = theme_directory;
         wf::get_core().connect(&on_config_reloaded);
+        wf::get_core().connect(&on_hide_maximized_changed);
 
         for (auto& view : wf::get_core().get_all_views())
         {
