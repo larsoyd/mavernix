@@ -120,6 +120,16 @@ class Frame:
         self.delay_ms = delay_ms
 
 
+def with_text_outline(picture, hot_x, hot_y, factor):
+    radius = max(1, round(factor))
+    canvas = Image.new("RGBA", (picture.width + 2 * radius, picture.height + 2 * radius))
+    canvas.alpha_composite(picture, (radius, radius))
+    outline = Image.new("RGBA", canvas.size, "white")
+    outline.putalpha(canvas.getchannel("A").filter(ImageFilter.MaxFilter(2 * radius + 1)))
+    outline.alpha_composite(canvas)
+    return outline, hot_x + radius, hot_y + radius
+
+
 def with_shadow(picture, hot_x, hot_y, shadow, factor):
     """The picture (straight "RGBA") over its shadow, on a canvas grown to
     hold the blur, and the hot spot moved with it."""
@@ -170,7 +180,7 @@ def core_graphics_cursor(binary, symbol_name):
             "bitmaps": sorted(bitmaps, key=lambda bitmap: bitmap[0])}
 
 
-def frames_from_core_graphics(cursor, factor, shadow):
+def frames_from_core_graphics(cursor, factor, shadow, text_outline=False):
     """The cursor's frames at `factor` pixels per point, each made from the
     smallest of its pictures that is at least that sharp."""
     scale, pictures = next((bitmap for bitmap in cursor["bitmaps"] if bitmap[0] >= factor),
@@ -182,6 +192,8 @@ def frames_from_core_graphics(cursor, factor, shadow):
             # Scaled premultiplied, so the clear pixels' colour does not bleed in.
             picture = picture.convert("RGBa").resize(size, Image.LANCZOS).convert("RGBA")
         hot_x, hot_y = cursor["hot_x"] * factor, cursor["hot_y"] * factor
+        if text_outline:
+            picture, hot_x, hot_y = with_text_outline(picture, hot_x, hot_y, factor)
         if shadow:
             picture, hot_x, hot_y = with_shadow(picture, hot_x, hot_y, shadow, factor)
         frames.append(Frame(picture.convert("RGBa"), hot_x, hot_y, round(cursor["interval_s"] * 1000)))
@@ -209,7 +221,7 @@ def render_pdf(pdf, width, height, scratch):
     return Image.open(f"{base}.png").convert("RGBA")
 
 
-def frames_from_drawing(folder, factor, scratch):
+def frames_from_drawing(folder, factor, scratch, text_outline=False):
     """An HIServices cursor's frames at `factor` pixels per point. The frames
     of an animation lie under each other on the page, the first on top."""
     info = plistlib.loads((folder / "info.plist").read_bytes())
@@ -227,8 +239,10 @@ def frames_from_drawing(folder, factor, scratch):
     for number in range(count):
         picture = sheet.crop((0, number * frame_height, frame_width, (number + 1) * frame_height))
         frame_hot_x, frame_hot_y = hot_x, hot_y
+        if text_outline:
+            picture, frame_hot_x, frame_hot_y = with_text_outline(picture, frame_hot_x, frame_hot_y, factor)
         if shadow:
-            picture, frame_hot_x, frame_hot_y = with_shadow(picture, hot_x, hot_y, shadow, factor)
+            picture, frame_hot_x, frame_hot_y = with_shadow(picture, frame_hot_x, frame_hot_y, shadow, factor)
         frames.append(Frame(picture.convert("RGBa"), frame_hot_x, frame_hot_y,
                             round(info.get("delay", 0) * 1000) if count > 1 else 0))
     return frames
@@ -278,13 +292,15 @@ def main():
                 cursor = core_graphics_cursor(binary, CORE_GRAPHICS_CURSORS[name])
                 shadow = SYSTEM_SHADOW if name in SHADOWED_CORE_GRAPHICS_CURSORS else None
                 for size in NOMINAL_SIZES:
-                    sized[size] = frames_from_core_graphics(cursor, size / POINTS_AT_NOMINAL, shadow)
+                    sized[size] = frames_from_core_graphics(
+                        cursor, size / POINTS_AT_NOMINAL, shadow, text_outline=name == "ibeam")
             else:
                 folder = drawings / name
                 if not (folder / "cursor.pdf").is_file():
                     fail(f"{folder}/cursor.pdf is missing; has the installer image been unpacked?")
                 for size in NOMINAL_SIZES:
-                    sized[size] = frames_from_drawing(folder, size / POINTS_AT_NOMINAL, Path(scratch))
+                    sized[size] = frames_from_drawing(
+                        folder, size / POINTS_AT_NOMINAL, Path(scratch), text_outline=name == "ibeamvertical")
             write_xcursor(target / names[0], sized)
             for alias in names[1:]:
                 link = target / alias
