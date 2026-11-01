@@ -1117,5 +1117,61 @@ class TestLogGuard(unittest.TestCase):
         self.assertIsNone(other.poll())
 
 
+class TestGtkWindowButtons(SessionTestCase):
+    def test_session_theme_name_is_published_to_x11_and_wayland(self):
+        settings = self.home / "shell.json"
+        self.home.mkdir(parents=True)
+        settings.write_text(json.dumps({"theme": {"controls": {}, "icons": {"theme": "Adwaita"}},
+                                        "config": {"window": {"button_side": "right"}}}))
+        fake_bin = self.home / "bin"
+        fake_bin.mkdir()
+        log = self.home / "gsettings.log"
+        gsettings = fake_bin / "gsettings"
+        gsettings.write_text('#!/bin/sh\nprintf "%s\\n" "$*" >> "$SETTINGS_LOG"\n')
+        gsettings.chmod(0o755)
+        self.environment.update(PATH=f"{fake_bin}:{os.environ['PATH']}", SETTINGS_LOG=str(log))
+        output = self.home / "xsettingsd.conf"
+        self.run_script("write_interface_settings.py", settings, "--xsettings-file", output)
+        self.assertIn('Net/ThemeName "DesktopTheme"', output.read_text())
+        self.assertIn('Gtk/DecorationLayout ":close,minimize,maximize"', output.read_text())
+        self.assertIn("set org.gnome.desktop.interface gtk-theme DesktopTheme", log.read_text())
+        settings.write_text(json.dumps({"theme": {"controls": {}}, "config": {"gtk": {"use_theme": False}}}))
+        log.write_text("")
+        self.run_script("write_interface_settings.py", settings, "--xsettings-file", output)
+        self.assertNotIn("Net/ThemeName", output.read_text())
+        self.assertIn("reset org.gnome.desktop.interface gtk-theme", log.read_text())
+
+    def test_plain_buttons_keep_their_shapes_and_states(self):
+        output = self.home / "app-theme"
+        self.run_script("make_app_theme.py", THEMES_DIR / "plain", output)
+        for version in ("gtk-3.0", "gtk-4.0"):
+            css = (output / "share/themes/DesktopTheme" / version / "gtk.css").read_text()
+            self.assertIn("button.titlebutton.close", css)
+            self.assertIn("background-color: #e06060;", css)
+            self.assertIn("background-color: #b04040;", css)
+            self.assertIn("border-radius: 3px;", css)
+
+    def test_button_artwork_is_copied_without_control_name_collisions(self):
+        from PIL import Image
+
+        theme = self.home / "theme"
+        theme.mkdir(parents=True)
+        text = (THEMES_DIR / "plain/theme.toml").read_text()
+        text = text.replace('normal   = { color = "#d0d0d0", radius = 3 }',
+                            'normal   = { image = "close.png" }', 1)
+        (theme / "theme.toml").write_text(text)
+        for suffix, size in (("", 16), ("@2x", 32)):
+            Image.new("RGBA", (size, size), "red").save(theme / f"close{suffix}.png")
+        output = self.home / "app-theme"
+        self.run_script("make_app_theme.py", theme, output)
+        for version in ("gtk-3.0", "gtk-4.0"):
+            gtk = output / "share/themes/DesktopTheme" / version
+            for suffix in ("", "@2x"):
+                self.assertTrue((gtk / f"assets/window-close-normal{suffix}.png").is_file())
+                self.assertEqual((gtk / f"assets/window-close-normal{suffix}.png").read_bytes(),
+                                 (theme / f"close{suffix}.png").read_bytes())
+            self.assertIn("assets/window-close-normal.png", (gtk / "gtk.css").read_text())
+
+
 if __name__ == "__main__":
     unittest.main()

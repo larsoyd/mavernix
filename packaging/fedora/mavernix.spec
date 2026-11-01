@@ -74,6 +74,8 @@ Recommends:     playerctl
 Recommends:     dex-autostart
 Recommends:     hwdata
 Recommends:     xdg-desktop-portal-gtk
+Recommends:     xsettingsd
+Recommends:     xdg-desktop-portal-kde
 Recommends:     xdg-desktop-portal-wlr
 
 %description
