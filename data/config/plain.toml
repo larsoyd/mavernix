@@ -513,9 +513,10 @@ enabled = []
 name = "Settings"
 # The panes, grouped as on the first page.
 groups = [
-    ["theme", "desktop", "dock", "icons", "desktops", "windows", "defaults", "startup", "toolkits"],
+    ["general", "desktop", "dock", "desktops", "windows"],
     ["display", "energy", "keyboard", "mouse", "trackpad", "sound"],
     ["network", "bluetooth"],
+    ["datetime", "startup", "defaults", "icons"],
     ["extensions"],
 ]
 
@@ -595,7 +596,6 @@ windows_drag_key_alt = "Alt"
 windows_buttons = "Window buttons:"
 windows_buttons_left = "At the left"
 windows_buttons_right = "At the right"
-toolkits_title = "App Style"
 toolkits_icons = "Icons in programs:"
 toolkits_icons_desktop = "Icons in the Dock\nand menu bar:"
 toolkits_icons_own = "The theme's own"
@@ -618,7 +618,7 @@ menu_search = "Search"
 menu_window = "Window"
 menu_minimize = "Minimize"
 menu_close = "Close"
-dock_title = "Dock & Menu Bar"
+dock_title = "Dock"
 menu_bar_show = "Show in the menu bar:"
 menu_bar_24_hours = "Show the time with 24 hours"
 menu_bar_seconds = "Show seconds"
@@ -658,7 +658,7 @@ windows_double_click = "A double click on a title bar:"
 windows_double_click_none = "does nothing"
 windows_double_click_minimize = "minimises the window"
 windows_double_click_maximize = "enlarges the window"
-theme_title = "Theme"
+general_title = "General"
 theme_choice = "Theme:"
 theme_more = "Get more themes…"
 theme_schedule = "Schedule:"

@@ -4,6 +4,8 @@
 #include <QComboBox>
 #include <QFrame>
 #include <QLabel>
+#include <QPushButton>
+#include <QRadioButton>
 #include <QSlider>
 #include <QVBoxLayout>
 
@@ -140,6 +142,74 @@ class TestPaneLayout : public QObject
         QCOMPARE(next->y() - noted->geometry().bottom() - 1, row_gap_px);
     }
 
+    void aPushButtonKeepsItsOwnHeight()
+    {
+        Page page;
+        auto* form = new PaneForm(page.pane);
+        auto* button = new QPushButton(QStringLiteral("Play"));
+        button->setFixedHeight(30);
+        form->addCheck(button);
+        page.settle();
+        QCOMPARE(button->height(), 30);
+    }
+
+    void aRadioButtonKeepsThePitch()
+    {
+        QRadioButton radio(QStringLiteral("Left"));
+        keep_to_pitch(&radio);
+        QCOMPARE(radio.height(), check_pitch_px);
+        QCOMPARE(radio.minimumHeight(), check_pitch_px);
+    }
+
+    void aWideRowCrossesBothColumns()
+    {
+        Page page;
+        auto* form = new PaneForm(page.pane);
+        auto* wide = new QLabel(QStringLiteral("Wide"));
+        form->addWide(wide);
+        page.settle();
+        QCOMPARE(wide->x(), 0);
+        QCOMPARE(wide->width(), pane_width);
+    }
+
+    void aHiddenRowLeavesNoRoom()
+    {
+        Page page;
+        QWidget& pane = *page.pane;
+        auto* form = new PaneForm(&pane);
+        auto* first = new QComboBox;
+        auto* hidden = new QComboBox;
+        auto* last = new QComboBox;
+        form->addRow(QStringLiteral("A:"), first);
+        form->addRow(QStringLiteral("B:"), hidden);
+        form->addRow(QStringLiteral("C:"), last);
+        form->setRowVisible(hidden, false);
+        page.settle();
+        QVERIFY(!label_with(pane, QStringLiteral("B:"))->isVisible());
+        QVERIFY(!hidden->isVisible());
+        QCOMPARE(last->y() - first->geometry().bottom() - 1, row_gap_px);
+
+        form->setRowVisible(hidden, true);
+        page.settle();
+        QVERIFY(label_with(pane, QStringLiteral("B:"))->isVisible());
+        QCOMPARE(last->y() - hidden->geometry().bottom() - 1, row_gap_px);
+    }
+
+    void aHiddenTickBoxRowLeavesNoRoom()
+    {
+        Page page;
+        auto* form = new PaneForm(page.pane);
+        auto* first = new QCheckBox(QStringLiteral("One"));
+        auto* hidden = new QCheckBox(QStringLiteral("Two"));
+        auto* last = new QCheckBox(QStringLiteral("Three"));
+        form->addCheck(first);
+        form->addCheck(hidden);
+        form->addCheck(last);
+        form->setRowVisible(hidden, false);
+        page.settle();
+        QCOMPARE(last->y() - first->y(), check_pitch_px);
+    }
+
     void controlsGetRoomBetweenThem()
     {
         Page page;
@@ -173,6 +243,22 @@ class TestPaneLayout : public QObject
         QCOMPARE(line->height(), 2);
         QVERIFY(at.y() - above->geometry().bottom() >= divider_room_px);
         QVERIFY(below->y() - (at.y() + line->height()) >= divider_room_px);
+    }
+
+    void aDividerCanBeSeen()
+    {
+        Page page;
+        page.pane->setPalette(QPalette(QColor(236, 236, 236)));
+        auto* form = new PaneForm(page.pane);
+        form->addDivider();
+        page.settle();
+        auto* line = page.pane->findChild<QFrame*>(QStringLiteral("divider"));
+        QVERIFY(line != nullptr);
+        const QImage picture = line->grab().toImage();
+        const QColor upper = picture.pixelColor(picture.width() / 2, 0);
+        const QColor lower = picture.pixelColor(picture.width() / 2, 1);
+        QVERIFY2(upper != lower, qPrintable(upper.name() + QLatin1Char(' ') + lower.name()));
+        QVERIFY2(upper != page.pane->palette().color(QPalette::Window), qPrintable(upper.name()));
     }
 
     void endWordsStayInsideTheirSlider_data()

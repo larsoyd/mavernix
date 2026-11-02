@@ -1,7 +1,6 @@
 #include "display-modes.hpp"
 
 #include <QComboBox>
-#include <QFormLayout>
 #include <QJsonArray>
 #include <QJsonObject>
 #include <QMessageBox>
@@ -15,6 +14,7 @@
 
 #include "choices.hpp"
 #include "compositor-call.hpp"
+#include "pane-parts.hpp"
 
 // How long a new mode is shown before it is undone, unless kept.
 static const int keep_seconds = 15;
@@ -90,7 +90,7 @@ void DisplayModes::ask()
     });
 }
 
-void DisplayModes::addRowsTo(QFormLayout* rows)
+void DisplayModes::addRowsTo(PaneForm* rows)
 {
     form = rows;
     form->addRow(word("display_resolution", "Resolution:"), resolution_list);

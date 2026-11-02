@@ -1,9 +1,7 @@
-#include "toolkits-pane.hpp"
+#include "icon-theme-boxes.hpp"
 
-#include <QCheckBox>
 #include <QComboBox>
 #include <QCoreApplication>
-#include <QFormLayout>
 #include <QProcess>
 #include <QTimer>
 
@@ -11,10 +9,7 @@
 
 #include "choices.hpp"
 #include "icon-theme-names.hpp"
-#include "pane-parts.hpp"
 
-static const QString gtk_table = QStringLiteral("gtk");
-static const QString qt_table = QStringLiteral("qt");
 static const QString icons_table = QStringLiteral("icons");
 // [icons]: the icon theme for programs, and the one for the Dock, the menu
 // bar and the rest of the shell. Either left out: the theme's own.
@@ -42,24 +37,6 @@ QStringList icon_theme_choices(const Choices& choices)
     }
     return picked;
 }
-
-// A checkbox for a toolkit's "use_theme" key.
-static QCheckBox* use_theme_box(Choices& choices, const QString& table, const QString& words)
-{
-    auto* box = new QCheckBox(words);
-    box->setChecked(choices.value(table, QStringLiteral("use_theme")).toBool());
-    QObject::connect(box, &QCheckBox::toggled, box,
-        [&choices, table](bool on) { choices.set(table, QStringLiteral("use_theme"), on); });
-    return box;
-}
-
-// What the icon theme boxes say, from the config's words.
-struct IconThemeWords
-{
-    QString own;
-    QString used_by_plasma;
-    QString used_by_gnome;
-};
 
 // One entry of an icon theme box: what it says, and the folder name saved
 // (empty for the theme's own).
@@ -145,38 +122,13 @@ static QComboBox* icon_theme_box(Choices& choices, const QList<IconThemeItem>& i
     return box;
 }
 
-ToolkitsPane::ToolkitsPane(Choices& choices, QWidget* parent) : QWidget(parent), choices(choices)
+QList<QComboBox*> icon_theme_boxes(Choices& choices, const IconThemeWords& words)
 {
-    const QVariantMap words = choices.configTable(QStringLiteral("settings")).value(QStringLiteral("words")).toMap();
-    const auto word = [&words](const char* key, const char* fallback) {
-        return words.value(QLatin1String(key), QString::fromUtf8(fallback)).toString();
-    };
-
-    const QList<IconThemeItem> icon_themes = icon_theme_items(
-        choices, {word("toolkits_icons_own", "The theme's own"), word("toolkits_icons_plasma", "used by Plasma"),
-                     word("toolkits_icons_gnome", "used by GNOME")});
-    auto* program_icons = icon_theme_box(choices, icon_themes, icon_theme_keys[0]);
-    auto* desktop_icons = icon_theme_box(choices, icon_themes, icon_theme_keys[1]);
-
-    auto* gtk_theme = use_theme_box(choices, gtk_table, word("toolkits_gtk_theme", "Drawn in the desktop's look"));
-
-    auto* qt_theme = use_theme_box(choices, qt_table, word("toolkits_qt_theme", "Drawn in the desktop's look"));
-
-    // Labels in one column, ending where the controls begin.
-    auto* form = new QFormLayout(this);
-    form->setLabelAlignment(Qt::AlignRight | Qt::AlignTop);
-    form->setFormAlignment(Qt::AlignHCenter | Qt::AlignTop);
-    form->setVerticalSpacing(14);
-    // A control is as wide as what it shows, not as the window.
-    form->setFieldGrowthPolicy(QFormLayout::FieldsStayAtSizeHint);
-    form->addRow(word("toolkits_icons", "Icons in programs:"),
-        with_note_under(program_icons,
-            word("toolkits_icons_note",
-                "GTK, Qt and KDE programs. Programs that are open keep theirs until they start again."),
-            0));
-    form->addRow(word("toolkits_icons_desktop", "Icons in the Dock\nand menu bar:"),
-        with_note_under(desktop_icons,
-            word("toolkits_icons_desktop_note", "Also the app grid, the program switcher and the search."), 0));
-    form->addRow(word("toolkits_gtk", "GTK programs:"), with_note(gtk_theme, word("toolkits_gtk_theme_note", "")));
-    form->addRow(word("toolkits_qt", "Qt programs:"), with_note(qt_theme, word("toolkits_qt_theme_note", "")));
+    const QList<IconThemeItem> items = icon_theme_items(choices, words);
+    QList<QComboBox*> boxes;
+    for (const QString& key : icon_theme_keys)
+    {
+        boxes.append(icon_theme_box(choices, items, key));
+    }
+    return boxes;
 }

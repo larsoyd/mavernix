@@ -42,12 +42,13 @@
 #include "overview.hpp"
 #include "pane-resets.hpp"
 #include "extensions-pane.hpp"
-#include "theme-pane.hpp"
+#include "general-pane.hpp"
+#include "icon-theme-boxes.hpp"
+#include "datetime-pane.hpp"
 #include "icons-pane.hpp"
 #include "mouse-pane.hpp"
 #include "network-pane.hpp"
 #include "trackpad-pane.hpp"
-#include "toolkits-pane.hpp"
 #include "windows-pane.hpp"
 
 // A small magnifying glass in one colour, for the search field: icon themes'
@@ -85,12 +86,12 @@ struct KnownPane
     const char* keywords;
 };
 static const KnownPane known_panes[] = {
-    {"dock", "preferences-dock", "Dock & Menu Bar",
-        "taskbar launcher magnification hide autohide size menu bar clock time 24 hour status icons"},
-    {"icons", "applications-other", "App Icons & Names", "application program icon picture change name rename"},
-    {"theme", "preferences-desktop-theme", "Theme",
-        "look appearance dark light colours colors style night day schedule"},
-    {"desktop", "preferences-desktop-wallpaper", "Desktop", "wallpaper background picture image name icons files"},
+    {"general", "preferences-desktop-theme", "General",
+        "theme look appearance dark light colours colors style night day schedule gtk qt kde programs apps icon theme "
+        "menu bar status icons search"},
+    {"desktop", "preferences-desktop-wallpaper", "Desktop",
+        "wallpaper background picture image name icons files translucent menu bar"},
+    {"dock", "preferences-dock", "Dock", "taskbar launcher magnification hide autohide size"},
     {"sound", "preferences-desktop-sound", "Sound",
         "volume audio speaker headphones microphone input output alert beep"},
     {"trackpad", "input-touchpad", "Touchpad", "touchpad tap click scroll natural gestures"},
@@ -99,17 +100,26 @@ static const KnownPane known_panes[] = {
         "power battery sleep suspend screen off lock lid saver"},
     {"display", "preferences-desktop-display", "Display",
         "screen monitor resolution refresh rate scale size brightness arrange"},
-    {"desktops", "preferences-desktop-virtual", "Desktops", "workspaces spaces virtual mission control"},
+    {"desktops", "preferences-desktop-virtual", "Desktops",
+        "workspaces spaces virtual mission control menu bar every display screen"},
     {"windows", "preferences-system-windows", "Windows", "snap tile title bar buttons double click drag move resize"},
     {"extensions", "preferences-plugin", "Extensions", "plugins add-ons addons"},
-    {"toolkits", "preferences-system", "App Style", "gtk qt kde programs apps look theme icons icon theme"},
     {"network", "preferences-system-network", "Network",
         "wifi wi-fi wlan wireless internet ethernet cable lan ip router password"},
     {"bluetooth", "preferences-system-bluetooth", "Bluetooth", "pair headphones keyboard mouse speaker devices"},
     {"keyboard", "input-keyboard", "Keyboard", "shortcuts keys hotkeys layout language input sources typing repeat"},
     {"defaults", "applications-other", "Default Apps", "default programs browser mail open with"},
     {"startup", "preferences-system-startup", "Startup", "login autostart start programs items"},
+    {"datetime", "preferences-system-time", "Date & Time", "clock time date 24 hour seconds menu bar"},
+    {"icons", "applications-other", "App Icons & Names", "application program icon picture change name rename"},
 };
+
+// theme and app style became general, older configs and commands still name them
+static QString current_pane_name(const QString& name)
+{
+    const bool now_general = name == QLatin1String("theme") || name == QLatin1String("toolkits");
+    return now_general ? QStringLiteral("general") : name;
+}
 
 SettingsWindow::SettingsWindow(Choices& choices) : choices(choices)
 {
@@ -209,16 +219,21 @@ SettingsWindow::SettingsWindow(Choices& choices) : choices(choices)
     for (const QStringList& wanted : wanted_groups)
     {
         QList<Overview::Entry> group;
-        for (const QString& name : wanted)
+        for (const QString& wanted_name : wanted)
         {
+            const QString name = current_pane_name(wanted_name);
+            if (pane_pages.contains(name))
+            {
+                continue;
+            }
             QWidget* pane = makePane(name);
             if (pane == nullptr)
             {
                 std::fprintf(stderr,
                     "mavernix-settings: the config asks for a pane \"%s\", "
-                    "which this program does not have; known: theme, desktop, dock, icons, sound, trackpad, mouse, "
-                    "energy, "
-                    "display, desktops, windows, toolkits, extensions, network, bluetooth, keyboard, defaults\n",
+                    "which this program does not have; known: general, desktop, dock, icons, sound, trackpad, mouse, "
+                    "energy, display, desktops, windows, extensions, network, bluetooth, keyboard, defaults, "
+                    "startup, datetime\n",
                     qPrintable(name));
                 continue;
             }
@@ -237,7 +252,7 @@ SettingsWindow::SettingsWindow(Choices& choices) : choices(choices)
             auto* page_rows = new QVBoxLayout(page);
             const int page_margin = 20;
             page_rows->setContentsMargins(page_margin, page_margin, page_margin, page_margin);
-            page_rows->addWidget(pane, 0, Qt::AlignHCenter | Qt::AlignTop);
+            page_rows->addWidget(pane, 0, Qt::AlignTop);
             page_rows->addStretch();
             pane_widgets.insert(name, pane);
             if (!pane_choices(name).isEmpty())
@@ -252,7 +267,8 @@ SettingsWindow::SettingsWindow(Choices& choices) : choices(choices)
             pane_titles.insert(name, QString(title).replace(QLatin1Char('\n'), QLatin1Char(' ')));
             const QString keywords =
                 words.value(name + QStringLiteral("_keywords"), QLatin1String(known->keywords)).toString();
-            group.append({name, title, QLatin1String(known->icon), keywords});
+            const QString icon = words.value(name + QStringLiteral("_icon"), QLatin1String(known->icon)).toString();
+            group.append({name, title, icon, keywords});
         }
         groups.append(group);
     }
@@ -448,9 +464,13 @@ QWidget* SettingsWindow::makePane(const QString& name)
     {
         return new IconsPane(choices);
     }
-    if (name == QLatin1String("theme"))
+    if (name == QLatin1String("general"))
     {
-        return new ThemePane(choices);
+        return new GeneralPane(choices);
+    }
+    if (name == QLatin1String("datetime"))
+    {
+        return new DateTimePane(choices);
     }
     if (name == QLatin1String("desktop"))
     {
@@ -492,10 +512,6 @@ QWidget* SettingsWindow::makePane(const QString& name)
     {
         return new ExtensionsPane(choices);
     }
-    if (name == QLatin1String("toolkits"))
-    {
-        return new ToolkitsPane(choices);
-    }
     if (name == QLatin1String("bluetooth"))
     {
         return new BluetoothPane(choices);
@@ -532,11 +548,12 @@ QWidget* SettingsWindow::makeKeyboardPane()
 
 void SettingsWindow::showPane(const QString& name)
 {
-    if (!pane_pages.contains(name))
+    const QString current = current_pane_name(name);
+    if (!pane_pages.contains(current))
     {
         return;
     }
-    visit(name);
+    visit(current);
 }
 
 void SettingsWindow::showOverview()

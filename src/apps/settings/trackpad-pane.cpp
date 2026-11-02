@@ -2,11 +2,9 @@
 
 #include <QCheckBox>
 #include <QComboBox>
-#include <QFormLayout>
 #include <QSlider>
 #include <QTimer>
 #include <QProcess>
-#include <QVBoxLayout>
 
 #include "choices.hpp"
 #include "pane-parts.hpp"
@@ -73,15 +71,14 @@ TrackpadPane::TrackpadPane(Choices& choices, QWidget* parent) : QWidget(parent),
         QProcess::startDetached(reconfigure_command, {});
     });
 
-    auto* form = new QFormLayout(this);
-    form->setLabelAlignment(Qt::AlignRight | Qt::AlignTop);
-    form->setFormAlignment(Qt::AlignHCenter | Qt::AlignTop);
-    form->setVerticalSpacing(14);
-    form->addRow(QString(), with_note(tap, word("trackpad_tap_note", "")));
-    form->addRow(QString(), with_note(natural, word("trackpad_natural_scroll_note", "")));
+    auto* form = new PaneForm(this);
+    form->addCheck(with_note(tap, word("trackpad_tap_note", "")));
+    form->addCheck(with_note(natural, word("trackpad_natural_scroll_note", "")));
+    form->addDivider();
     form->addRow(word("trackpad_speed", "Tracking speed:"),
         with_end_words(speed, word("trackpad_speed_slow", "Slow"), word("trackpad_speed_fast", "Fast")));
-    form->addRow(QString(), acceleration);
+    form->addCheck(acceleration);
+    form->addDivider();
     form->addRow(word("trackpad_secondary", "Secondary click:"), secondary);
 }
 

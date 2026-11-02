@@ -11,7 +11,6 @@
 
 class Choices;
 class QCheckBox;
-class QHBoxLayout;
 class QLabel;
 class QSlider;
 class QTimer;
@@ -27,7 +26,7 @@ class EnergyPane : public QWidget
   private:
     // A slider over `stops` standing at the one nearest the config's key,
     // with the time it stands for beside it.
-    QHBoxLayout* timeSlider(const QString& key, QSlider*& slider);
+    QWidget* timeSlider(const QString& key, QSlider*& slider);
     void write();
     // "10 minutes", "Never".
     QString written(int seconds) const;

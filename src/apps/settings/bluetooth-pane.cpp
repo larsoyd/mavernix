@@ -20,6 +20,8 @@
 #include <QVBoxLayout>
 
 #include "choices.hpp"
+#include "menu-bar-box.hpp"
+#include "pane-parts.hpp"
 
 // GetManagedObjects' answer: object path -> interface -> properties.
 using InterfacesOfObject = QMap<QString, QVariantMap>;
@@ -37,7 +39,7 @@ static const char* objects_interface = "org.freedesktop.DBus.ObjectManager";
 // the list is read once after this long.
 static const int reading_delay_ms = 150;
 // Some six devices without scrolling.
-static const QSize list_size(380, 190);
+static const QSize list_size(intro_width_px, 190);
 static const int device_icon_size = 32;
 
 BluetoothPane::BluetoothPane(Choices& choices, QWidget* parent) : QWidget(parent)
@@ -109,6 +111,11 @@ BluetoothPane::BluetoothPane(Choices& choices, QWidget* parent) : QWidget(parent
     rows->addWidget(powered);
     rows->addWidget(devices);
     rows->addLayout(buttons);
+    if (QCheckBox* status_item = menu_bar_box(choices, QStringLiteral("bluetooth"),
+            words.value(QStringLiteral("bluetooth_in_menu_bar"), QStringLiteral("Show Bluetooth in menu bar")).toString()))
+    {
+        rows->addWidget(status_item);
+    }
 
     reading_soon = new QTimer(this);
     reading_soon->setSingleShot(true);

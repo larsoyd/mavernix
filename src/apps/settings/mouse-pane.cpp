@@ -2,8 +2,6 @@
 
 #include <QButtonGroup>
 #include <QCheckBox>
-#include <QFormLayout>
-#include <QHBoxLayout>
 #include <QProcess>
 #include <QRadioButton>
 #include <QSlider>
@@ -107,40 +105,30 @@ MousePane::MousePane(Choices& choices, QWidget* parent) : QWidget(parent), choic
     buttons->addButton(right);
     (choices.value(table, QStringLiteral("left_handed")).toBool() ? right : left)->setChecked(true);
     connect(right, &QRadioButton::toggled, this, [this](bool on) { change(QStringLiteral("left_handed"), on); });
+    keep_to_pitch(left);
+    keep_to_pitch(right);
     auto* primary = new QWidget;
     auto* primary_rows = new QVBoxLayout(primary);
     primary_rows->setContentsMargins(0, 0, 0, 0);
-    primary_rows->setSpacing(4);
+    primary_rows->setSpacing(0);
     primary_rows->addWidget(left);
     primary_rows->addWidget(right);
 
-    // As on the original: the scroll direction across the top, the rest below.
-    auto* rows = new QVBoxLayout(this);
-    rows->setSpacing(pane_spacing_px);
-    rows->addWidget(with_note(natural, word("mouse_natural_scroll_note",
-                                           "The page moves the way you turn the wheel, as on a touchscreen.")),
-        0, Qt::AlignHCenter);
-
-    auto* form = new QFormLayout;
-    form->setLabelAlignment(Qt::AlignRight | Qt::AlignTop);
-    form->setFormAlignment(Qt::AlignHCenter | Qt::AlignTop);
-    form->setVerticalSpacing(pane_spacing_px);
+    // the scroll direction comes first, as on the original
+    auto* form = new PaneForm(this);
+    form->addCheck(with_note(natural, word("mouse_natural_scroll_note", "")));
+    form->addDivider();
     form->addRow(word("mouse_speed", "Tracking speed:"), speed_row);
     form->addRow(word("mouse_scroll_speed", "Scrolling speed:"), scrolling_row);
-    form->addRow(
-        QString(), with_note(acceleration,
-                       word("mouse_acceleration_note",
-                           "Faster movements move the pointer further, so you can cross the screen quickly.")));
+    form->addCheck(with_note(acceleration, word("mouse_acceleration_note", "")));
+    form->addDivider();
     form->addRow(word("mouse_primary", "Primary mouse button:"), primary);
-    form->addRow(QString(),
-        with_note(middle_paste, word("mouse_middle_click_paste_note",
-                                    "A middle click pastes the last selected text, after you log in again.")));
-    form->addRow(QString(),
-        with_note(shake, word("mouse_shake_to_find_note",
-                             "Shaking the mouse quickly makes the pointer grow for a moment, so you can spot it.")));
+    form->addDivider();
+    form->addCheck(with_note(middle_paste, word("mouse_middle_click_paste_note",
+                                               "A middle click pastes the last selected text, after you log in again.")));
+    form->addCheck(with_note(shake, word("mouse_shake_to_find_note",
+                                        "Shaking the mouse quickly makes the pointer grow for a moment, so you can spot it.")));
     form->addRow(word("mouse_shake_needed", "Shake needed:"), shake_row);
-    rows->addLayout(form);
-    rows->addStretch();
 }
 
 QWidget* MousePane::speedSlider(QSlider*& slider, int stops, int at)

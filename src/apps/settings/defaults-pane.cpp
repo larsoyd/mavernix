@@ -1,7 +1,6 @@
 #include "defaults-pane.hpp"
 
 #include <QComboBox>
-#include <QFormLayout>
 #include <QLabel>
 #include <QVBoxLayout>
 
@@ -60,11 +59,7 @@ DefaultsPane::DefaultsPane(Choices& choices, QWidget* parent) : QWidget(parent)
     problem_label->setWordWrap(true);
     problem_label->setAlignment(Qt::AlignHCenter);
 
-    auto* form = new QFormLayout;
-    form->setLabelAlignment(Qt::AlignRight | Qt::AlignVCenter);
-    form->setVerticalSpacing(12);
-    // A list is as wide as the longest program's name, not as the window.
-    form->setFieldGrowthPolicy(QFormLayout::FieldsStayAtSizeHint);
+    auto* form = new PaneForm(nullptr);
 
     QList<QComboBox*> lists;
     for (const KindGroup& group : kind_groups())

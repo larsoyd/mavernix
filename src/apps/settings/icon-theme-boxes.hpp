@@ -1,24 +1,24 @@
-// The settings of how programs are drawn: the icon themes, for programs and
-// for the Dock and menu bar, and whether GTK and Qt programs take the
-// desktop's look. (The side of the window buttons is in Windows.)
+// the icon theme boxes, for programs and for the dock and menu bar
 
 #pragma once
 
+#include <QList>
+#include <QString>
 #include <QStringList>
-#include <QWidget>
 
 class Choices;
+class QComboBox;
 
-class ToolkitsPane : public QWidget
+// what the boxes say, from the config's words
+struct IconThemeWords
 {
-    Q_OBJECT
-
-  public:
-    ToolkitsPane(Choices& choices, QWidget* parent = nullptr);
-
-  private:
-    Choices& choices;
+    QString own;
+    QString used_by_plasma;
+    QString used_by_gnome;
 };
+
+// a box for each [icons] key, programs first, then the dock and menu bar
+QList<QComboBox*> icon_theme_boxes(Choices& choices, const IconThemeWords& words);
 
 // Rewrites everything that shows icons for the icon themes the user's file
 // holds now, programs' and the Dock's and menu bar's, as a switch to the

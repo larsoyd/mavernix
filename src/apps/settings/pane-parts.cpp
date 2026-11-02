@@ -6,6 +6,7 @@
 #include <QFontMetrics>
 #include <QFrame>
 #include <QLabel>
+#include <QRadioButton>
 #include <QStringList>
 #include <QSlider>
 #include <QTimer>
@@ -20,10 +21,9 @@ static int first_line_height(QWidget* control)
     return qBound(control->minimumHeight(), natural, control->maximumHeight());
 }
 
-// kvantum asks 34 px for a tick box whose mark is 18
-static void keep_to_pitch(QWidget* box)
+void keep_to_pitch(QWidget* box)
 {
-    if (qobject_cast<QAbstractButton*>(box) != nullptr)
+    if (qobject_cast<QCheckBox*>(box) != nullptr || qobject_cast<QRadioButton*>(box) != nullptr)
     {
         box->setFixedHeight(check_pitch_px);
     }
@@ -57,6 +57,7 @@ void PaneForm::addRow(QWidget* label, QWidget* control)
     label->setContentsMargins(0, qMax(0, (first_line_height(control) - first_line_height(label)) / 2), label_gap_px, 0);
     addWidget(label, next_row, 0, Qt::AlignRight | Qt::AlignTop);
     addWidget(control, next_row++, 1, Qt::AlignLeft | Qt::AlignTop);
+    rows.insert(control, {label, next_row, row_gap_px});
     leaveRoom(row_gap_px);
 }
 
@@ -65,18 +66,35 @@ void PaneForm::addCheck(QWidget* box)
     keep_to_pitch(box);
     addWidget(box, next_row++, 1, Qt::AlignLeft | Qt::AlignTop);
     // a box with a note needs air before the next one
-    if (qobject_cast<QAbstractButton*>(box) == nullptr)
+    const bool plain_box = box->minimumHeight() == check_pitch_px;
+    rows.insert(box, {nullptr, next_row, plain_box ? 0 : row_gap_px});
+    leaveRoom(plain_box ? 0 : row_gap_px);
+}
+
+void PaneForm::addWide(QWidget* whole_row)
+{
+    addWidget(whole_row, next_row++, 0, 1, 2);
+    leaveRoom(row_gap_px);
+}
+
+void PaneForm::setRowVisible(QWidget* control, bool visible)
+{
+    const Row row = rows.value(control);
+    control->setVisible(visible);
+    if (row.label != nullptr)
     {
-        leaveRoom(row_gap_px);
+        row.label->setVisible(visible);
     }
+    setRowMinimumHeight(row.gap_row, visible ? row.gap_px : 0);
 }
 
 void PaneForm::addDivider()
 {
     auto* line = new QFrame;
     line->setObjectName(QStringLiteral("divider"));
-    line->setFrameShape(QFrame::HLine);
-    line->setFrameShadow(QFrame::Sunken);
+    // a groove of two lines, the style draws its own frames too faintly to see
+    line->setStyleSheet(QStringLiteral("QFrame { border: none; border-top: 1px solid palette(mid);"
+                                       " border-bottom: 1px solid palette(light); }"));
     line->setFixedHeight(2);
     auto* inset = new QWidget;
     auto* across = new QHBoxLayout(inset);

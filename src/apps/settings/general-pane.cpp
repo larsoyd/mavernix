@@ -1,18 +1,23 @@
-#include "theme-pane.hpp"
+#include "general-pane.hpp"
 
 #include <QCheckBox>
 #include <QComboBox>
 #include <QDir>
 #include <QFile>
 #include <QFileInfo>
-#include <QFormLayout>
+#include <QGridLayout>
 #include <QHBoxLayout>
 #include <QLabel>
 #include <QProcess>
 #include <QPushButton>
 #include <QTimeEdit>
+#include <QVBoxLayout>
+
+#include <algorithm>
 
 #include "choices.hpp"
+#include "icon-theme-boxes.hpp"
+#include "menu-bar-box.hpp"
 #include "pane-parts.hpp"
 
 // The session's command that makes the running session another desktop, and
@@ -45,7 +50,20 @@ static QString readable_name(const QString& name)
     return words.join(QLatin1Char(' '));
 }
 
-ThemePane::ThemePane(Choices& choices, QWidget* parent) : QWidget(parent)
+static const QString gtk_table = QStringLiteral("gtk");
+static const QString qt_table = QStringLiteral("qt");
+
+// a checkbox for a toolkit's use_theme key
+static QCheckBox* use_theme_box(Choices& choices, const QString& table, const QString& words)
+{
+    auto* box = new QCheckBox(words);
+    box->setChecked(choices.value(table, QStringLiteral("use_theme")).toBool());
+    QObject::connect(box, &QCheckBox::toggled, box,
+        [&choices, table](bool on) { choices.set(table, QStringLiteral("use_theme"), on); });
+    return box;
+}
+
+GeneralPane::GeneralPane(Choices& choices, QWidget* parent) : QWidget(parent)
 {
     const QVariantMap words = choices.configTable(QStringLiteral("settings")).value(QStringLiteral("words")).toMap();
     const auto word = [&words](const char* key, const char* fallback) {
@@ -69,16 +87,9 @@ ThemePane::ThemePane(Choices& choices, QWidget* parent) : QWidget(parent)
     }
     desktop->setCurrentIndex(desktop->findData(current));
 
-    // Said under the choice: what changes at once and what does not.
-    // Lines broken here: a label that wraps by itself asks for far more
-    // height than it fills, and the window grows with it.
-    const int note_width = 340;
-    auto* note = new QLabel;
-    note->setText(in_lines_of(
-        word("desktop_note",
-            "The desktop changes at once; windows that are open keep their look until they are opened again."),
-        note->fontMetrics(), note_width));
+    // said under the choice, what changes at once and what does not
     auto* problem = new QLabel;
+    problem->hide();
 
     // [theme_schedule]: another desktop at night (the shell's ThemeSchedule.qml
     // switches, src/session/theme_schedule.py picks at login).
@@ -106,7 +117,7 @@ ThemePane::ThemePane(Choices& choices, QWidget* parent) : QWidget(parent)
         // change: then the choice is only written down.
         if (QProcess::startDetached(switch_command, {name}))
         {
-            problem->clear();
+            problem->hide();
             return;
         }
 
@@ -115,30 +126,36 @@ ThemePane::ThemePane(Choices& choices, QWidget* parent) : QWidget(parent)
         if (file.open(QIODevice::WriteOnly | QIODevice::Truncate))
         {
             file.write(name.toUtf8() + '\n');
-            problem->clear();
+            problem->hide();
         }
         else
         {
             problem->setText(QStringLiteral("Could not write %1: %2").arg(choice_file, file.errorString()));
+            problem->show();
         }
     });
 
     auto* more = new QPushButton(word("theme_more", "Get More Themes…"));
     more->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);
     connect(more, &QPushButton::clicked, this, []() { QProcess::startDetached(installer_command, {}); });
-    auto* more_note = new QLabel;
-    more_note->setText(
-        in_lines_of(word("theme_more_note", "The Theme Installer can make more themes, such as Sea Lion, the look of "
-                                            "OS X 10.9, from Apple's installer files."),
-            more_note->fontMetrics(), note_width));
 
-    auto* form = new QFormLayout(this);
-    form->setLabelAlignment(Qt::AlignRight | Qt::AlignTop);
-    form->setFormAlignment(Qt::AlignHCenter | Qt::AlignTop);
-    form->setVerticalSpacing(14);
-    form->addRow(word("theme_choice", "Theme:"), desktop);
-    form->addRow(QString(), note);
-    form->addRow(QString(), problem);
+    // an item of the menu bar with a home pane is shown there instead
+    const QVariantMap item_names = words.value(QStringLiteral("menu_bar_items")).toMap();
+    auto* items = new QWidget;
+    auto* item_rows = new QGridLayout(items);
+    item_rows->setContentsMargins(0, 0, 0, 0);
+    item_rows->setSpacing(0);
+    item_rows->setHorizontalSpacing(18);
+    const QStringList listed = items_without_a_pane(choices);
+    const int per_column = (int(listed.size()) + 1) / 2;
+    int place = 0;
+    for (const QString& name : listed)
+    {
+        QCheckBox* shown = menu_bar_box(choices, name, item_names.value(name, name).toString());
+        keep_to_pitch(shown);
+        item_rows->addWidget(shown, place % per_column, place / per_column);
+        place++;
+    }
 
     auto* at_night = new QCheckBox(word("theme_night", "At night, use"));
     auto* night = new QComboBox;
@@ -162,7 +179,9 @@ ThemePane::ThemePane(Choices& choices, QWidget* parent) : QWidget(parent)
         }
     }
     night->setCurrentIndex(std::max(0, night->findData(night_name)));
-    auto* night_row = new QHBoxLayout;
+    auto* night_line = new QWidget;
+    auto* night_row = new QHBoxLayout(night_line);
+    night_row->setContentsMargins(0, 0, 0, 0);
     night_row->addWidget(at_night);
     night_row->addWidget(night);
     night_row->addStretch();
@@ -180,7 +199,9 @@ ThemePane::ThemePane(Choices& choices, QWidget* parent) : QWidget(parent)
     };
     auto* night_from = time_box("night_from", "19:00");
     auto* day_from = time_box("day_from", "07:00");
-    auto* hours_row = new QHBoxLayout;
+    auto* hours_line = new QWidget;
+    auto* hours_row = new QHBoxLayout(hours_line);
+    hours_row->setContentsMargins(0, 0, 0, 0);
     hours_row->setSpacing(6);
     hours_row->addWidget(new QLabel(word("theme_night_from", "from")));
     hours_row->addWidget(night_from);
@@ -188,14 +209,8 @@ ThemePane::ThemePane(Choices& choices, QWidget* parent) : QWidget(parent)
     hours_row->addWidget(day_from);
     hours_row->addStretch();
 
-    auto* night_note = new QLabel;
-    night_note->setText(
-        in_lines_of(word("theme_night_note", "A banner says so a few minutes before. A theme you pick in between stays "
-                                             "until the next change."),
-            night_note->fontMetrics(), note_width));
-
-    const auto show_on = [night, night_from, day_from, night_note](bool on) {
-        for (QWidget* part : std::initializer_list<QWidget*>{night, night_from, day_from, night_note})
+    const auto show_on = [night, night_from, day_from](bool on) {
+        for (QWidget* part : std::initializer_list<QWidget*>{night, night_from, day_from})
         {
             part->setEnabled(on);
         }
@@ -223,9 +238,46 @@ ThemePane::ThemePane(Choices& choices, QWidget* parent) : QWidget(parent)
     connect(day_from, &QTimeEdit::timeChanged, this,
         [=](const QTime& time) { save("day_from", time.toString(time_format)); });
 
-    form->addRow(QString(), more);
-    form->addRow(QString(), more_note);
-    form->addRow(word("theme_schedule", "Schedule:"), night_row);
-    form->addRow(QString(), hours_row);
-    form->addRow(QString(), night_note);
+    auto* form = new PaneForm(this);
+    form->addRow(word("theme_choice", "Theme:"),
+        with_note_under(desktop,
+            word("desktop_note",
+                "The desktop changes at once; windows that are open keep their look until they are opened again."),
+            0));
+    form->addCheck(problem);
+    form->addRow(QString(),
+        with_note_under(more,
+            word("theme_more_note",
+                "The Theme Installer can make more themes, such as Sea Lion, the look of "
+                "OS X 10.9, from Apple's installer files."),
+            0));
+    form->addRow(word("theme_schedule", "Schedule:"), night_line);
+    form->addRow(QString(),
+        with_note_under(hours_line,
+            word("theme_night_note",
+                "A banner says so a few minutes before. A theme you pick in between stays until the next change."),
+            0));
+    form->addDivider();
+    form->addRow(word("toolkits_gtk", "GTK programs:"),
+        with_note(use_theme_box(choices, gtk_table, word("toolkits_gtk_theme", "Drawn in the desktop's look")),
+            word("toolkits_gtk_theme_note", "")));
+    form->addRow(word("toolkits_qt", "Qt programs:"),
+        with_note(use_theme_box(choices, qt_table, word("toolkits_qt_theme", "Drawn in the desktop's look")),
+            word("toolkits_qt_theme_note", "")));
+    const QList<QComboBox*> icon_boxes = icon_theme_boxes(
+        choices, {word("toolkits_icons_own", "The theme's own"), word("toolkits_icons_plasma", "used by Plasma"),
+                     word("toolkits_icons_gnome", "used by GNOME")});
+    form->addRow(word("toolkits_icons", "Icons in programs:"),
+        with_note_under(icon_boxes[0],
+            word("toolkits_icons_note",
+                "GTK, Qt and KDE programs. Programs that are open keep theirs until they start again."),
+            0));
+    form->addRow(word("toolkits_icons_desktop", "Icons in the Dock\nand menu bar:"),
+        with_note_under(icon_boxes[1],
+            word("toolkits_icons_desktop_note", "Also the app grid, the program switcher and the search."), 0));
+    if (!listed.isEmpty())
+    {
+        form->addDivider();
+        form->addRow(word("menu_bar_show", "Show in the menu bar:"), items);
+    }
 }

@@ -4,14 +4,16 @@
 #include <QComboBox>
 #include <QDir>
 #include <QFileInfo>
-#include <QFormLayout>
 #include <QProcess>
 #include <QPushButton>
 #include <QSignalBlocker>
 #include <QSlider>
 #include <QStandardPaths>
+#include <QTabWidget>
+#include <QVBoxLayout>
 
 #include "choices.hpp"
+#include "menu-bar-box.hpp"
 #include "pane-parts.hpp"
 #include "sound-devices.hpp"
 
@@ -171,16 +173,49 @@ SoundPane::SoundPane(Choices& choices, QWidget* parent) : QWidget(parent)
         return with_end_words(slider, quiet_word, loud_word);
     };
 
-    auto* form = new QFormLayout(this);
-    form->setLabelAlignment(Qt::AlignRight | Qt::AlignTop);
-    form->setFormAlignment(Qt::AlignHCenter | Qt::AlignTop);
-    form->addRow(word("sound_output", "Output:"), device_chooser(SoundDevices::Kind::Output));
-    form->addRow(word("sound_output_volume", "Output volume:"), volume_slider(QStringLiteral("@DEFAULT_AUDIO_SINK@")));
-    form->addRow(word("sound_input", "Input:"), device_chooser(SoundDevices::Kind::Input));
-    form->addRow(word("sound_input_volume", "Input volume:"), volume_slider(QStringLiteral("@DEFAULT_AUDIO_SOURCE@")));
-    form->addRow(word("sound_alert", "Alert sound:"), alert);
-    form->addRow(word("sound_pack", "Sound pack:"), pack);
-    form->addRow(QString(), try_it);
-    form->addRow(QString(), enabled);
-    form->addRow(QString(), feedback);
+    // a tab for each subject and the volume below them, as on the original
+    const int tab_axis_px = 190;
+    auto* effects = new QWidget;
+    auto* effects_form = new PaneForm(effects, tab_axis_px);
+    effects_form->addRow(word("sound_alert", "Alert sound:"), alert);
+    effects_form->addRow(word("sound_pack", "Sound pack:"), pack);
+    effects_form->addCheck(try_it);
+    effects_form->addDivider();
+    effects_form->addCheck(enabled);
+    effects_form->addCheck(feedback);
+
+    auto* output = new QWidget;
+    auto* output_form = new PaneForm(output, tab_axis_px);
+    output_form->addRow(word("sound_output", "Output:"), device_chooser(SoundDevices::Kind::Output));
+
+    auto* input = new QWidget;
+    auto* input_form = new PaneForm(input, tab_axis_px);
+    input_form->addRow(word("sound_input", "Input:"), device_chooser(SoundDevices::Kind::Input));
+    input_form->addRow(
+        word("sound_input_volume", "Input volume:"), volume_slider(QStringLiteral("@DEFAULT_AUDIO_SOURCE@")));
+
+    const int tab_margin_px = 12;
+    for (PaneForm* form : {effects_form, output_form, input_form})
+    {
+        form->setContentsMargins(0, tab_margin_px, 0, tab_margin_px);
+    }
+
+    auto* tabs = new QTabWidget;
+    tabs->addTab(effects, word("sound_tab_effects", "Sound Effects"));
+    tabs->addTab(output, word("sound_tab_output", "Output"));
+    tabs->addTab(input, word("sound_tab_input", "Input"));
+
+    auto* below = new PaneForm(nullptr);
+    below->addRow(
+        word("sound_output_volume", "Output volume:"), volume_slider(QStringLiteral("@DEFAULT_AUDIO_SINK@")));
+    if (QCheckBox* volume = menu_bar_box(choices, QStringLiteral("volume"), word("sound_in_menu_bar", "Show volume in menu bar")))
+    {
+        below->addCheck(volume);
+    }
+
+    auto* rows = new QVBoxLayout(this);
+    rows->setContentsMargins(0, 0, 0, 0);
+    rows->setSpacing(pane_spacing_px);
+    rows->addWidget(tabs);
+    rows->addLayout(below);
 }

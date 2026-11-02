@@ -1,19 +1,12 @@
 #include "dock-pane.hpp"
 
 #include <QCheckBox>
-#include <QComboBox>
 #include <QFileInfo>
 #include <QFileSystemWatcher>
-#include <QFormLayout>
-#include <QGridLayout>
 #include <QGuiApplication>
-#include <QHBoxLayout>
-#include <QLabel>
-#include <QRegularExpression>
 #include <QScreen>
 #include <QSignalBlocker>
 #include <QSlider>
-#include <QVBoxLayout>
 
 #include "choices.hpp"
 #include "pane-parts.hpp"
@@ -29,7 +22,7 @@ DockPane::DockPane(Choices& choices, QWidget* parent) : QWidget(parent), choices
     const int smallest = dock_looks.value(QStringLiteral("smallest_icon_size"), 16).toInt();
     const int largest = dock_looks.value(QStringLiteral("largest_icon_size"), 128).toInt();
     // Wide enough to be set finely.
-    const int slider_width = 200;
+    const int slider_width = 208;
 
     size = new QSlider(Qt::Horizontal);
     size->setRange(smallest, largest);
@@ -59,15 +52,13 @@ DockPane::DockPane(Choices& choices, QWidget* parent) : QWidget(parent), choices
     connect(hides, &QCheckBox::toggled, this,
         [this](bool on) { this->choices.set(QStringLiteral("dock"), QStringLiteral("autohide"), on); });
 
-    // Labels in one column, ending where the controls begin.
-    auto* form = new QFormLayout(this);
-    form->setLabelAlignment(Qt::AlignRight | Qt::AlignTop);
-    form->setFormAlignment(Qt::AlignHCenter | Qt::AlignTop);
+    // the axis of the original's Dock pane, measured from the window's side
+    auto* form = new PaneForm(this, 245);
     form->addRow(word("dock_size", "Size:"),
         with_end_words(size, word("dock_size_small", "Small"), word("dock_size_large", "Large")));
     form->addRow(magnification,
         with_end_words(magnified_size, word("dock_magnification_min", "Min"), word("dock_magnification_max", "Max")));
-    form->addRow(QString(), hides);
+    form->addCheck(hides);
 
     auto* click_minimizes =
         new QCheckBox(word("dock_click_minimizes", "Click the front program's icon to minimize its window"));
@@ -82,7 +73,7 @@ DockPane::DockPane(Choices& choices, QWidget* parent) : QWidget(parent), choices
     reflections->setChecked(choices.value(QStringLiteral("dock"), QStringLiteral("window_reflections")).toBool());
     connect(reflections, &QCheckBox::toggled, this,
         [this](bool on) { this->choices.set(QStringLiteral("dock"), QStringLiteral("window_reflections"), on); });
-    form->addRow(QString(), reflections);
+    form->addCheck(reflections);
 
     // How strongly windows show in the glass ([dock] window_reflection_opacity); the shell follows.
     const QVariant chosen_reflection =
@@ -101,96 +92,7 @@ DockPane::DockPane(Choices& choices, QWidget* parent) : QWidget(parent), choices
     dock_blur->setChecked(choices.value(QStringLiteral("blur"), QStringLiteral("dock_shelf")).toBool());
     connect(dock_blur, &QCheckBox::toggled, this,
         [this](bool on) { this->choices.set(QStringLiteral("blur"), QStringLiteral("dock_shelf"), on); });
-    form->addRow(QString(), dock_blur);
-
-    // The menu bar: which items show at its right end, and the clock's hours.
-    // The shell follows at once.
-    const QVariantMap item_names = words.value(QStringLiteral("menu_bar_items")).toMap();
-    const QStringList listed = choices.value(QStringLiteral("panel"), QStringLiteral("right")).toStringList();
-    // In two columns, so that the list stays short.
-    auto* items = new QWidget;
-    auto* item_rows = new QGridLayout(items);
-    item_rows->setContentsMargins(0, 0, 0, 0);
-    item_rows->setVerticalSpacing(2);
-    item_rows->setHorizontalSpacing(18);
-    const int per_column = (listed.size() + 1) / 2;
-    int place = 0;
-    for (const QString& name : listed)
-    {
-        // Items without a friendly name (a custom one) keep their own.
-        auto* shown = new QCheckBox(item_names.value(name, name).toString());
-        shown->setChecked(
-            !choices.value(QStringLiteral("panel"), QStringLiteral("hidden")).toStringList().contains(name));
-        connect(shown, &QCheckBox::toggled, this, [this, name](bool on) {
-            QStringList hidden = this->choices.value(QStringLiteral("panel"), QStringLiteral("hidden")).toStringList();
-            hidden.removeAll(name);
-            if (!on)
-            {
-                hidden.append(name);
-            }
-            this->choices.set(QStringLiteral("panel"), QStringLiteral("hidden"), hidden);
-        });
-        item_rows->addWidget(shown, place % per_column, place / per_column);
-        place++;
-    }
-    form->addRow(word("menu_bar_show", "Show in the menu bar:"), items);
-
-    auto* every_screen = new QCheckBox(word("menu_bar_every_screen", "Show the menu bar on every display"));
-    every_screen->setChecked(choices.value(QStringLiteral("panel"), QStringLiteral("every_screen")).toBool());
-    connect(every_screen, &QCheckBox::toggled, this,
-        [this](bool on) { this->choices.set(QStringLiteral("panel"), QStringLiteral("every_screen"), on); });
-    form->addRow(QString(), every_screen);
-
-    auto* own_menus = new QCheckBox(word("menu_bar_own_menus", "Give each display the menus of its own window"));
-    own_menus->setChecked(choices.value(QStringLiteral("panel"), QStringLiteral("menus_per_screen")).toBool());
-    own_menus->setEnabled(every_screen->isChecked());
-    connect(every_screen, &QCheckBox::toggled, own_menus, &QCheckBox::setEnabled);
-    connect(own_menus, &QCheckBox::toggled, this,
-        [this](bool on) { this->choices.set(QStringLiteral("panel"), QStringLiteral("menus_per_screen"), on); });
-    form->addRow(QString(), own_menus);
-
-    // Hours as 13:00 or as 1:00 PM; the rest of the theme's format stays.
-    const QString format = choices.value(QStringLiteral("panel"), QStringLiteral("clock_format")).toString();
-    auto* day_hours = new QCheckBox(word("menu_bar_24_hours", "Show the time with 24 hours"));
-    day_hours->setChecked(!format.contains(QLatin1String("AP"), Qt::CaseInsensitive));
-    connect(day_hours, &QCheckBox::toggled, this, [this](bool on) {
-        QString changed = this->choices.value(QStringLiteral("panel"), QStringLiteral("clock_format")).toString();
-        if (on)
-        {
-            changed.replace(QRegularExpression(QStringLiteral(" ?[Aa][Pp]")), QString());
-            changed.replace(QRegularExpression(QStringLiteral("\\bh{1,2}\\b")), QStringLiteral("HH"));
-        }
-        else
-        {
-            changed.replace(QRegularExpression(QStringLiteral("\\bH{1,2}\\b")), QStringLiteral("h"));
-            changed += QStringLiteral(" AP");
-        }
-        this->choices.set(QStringLiteral("panel"), QStringLiteral("clock_format"), changed);
-    });
-    form->addRow(QString(), day_hours);
-
-    // Seconds after the minutes ("HH:mm:ss"), as on OS X; the clock then
-    // ticks every second.
-    const QRegularExpression seconds_part(QStringLiteral(":ss?\\b"));
-    auto* seconds = new QCheckBox(word("menu_bar_seconds", "Show seconds"));
-    seconds->setChecked(format.contains(seconds_part));
-    connect(seconds, &QCheckBox::toggled, this, [this, seconds_part](bool on) {
-        QString changed = this->choices.value(QStringLiteral("panel"), QStringLiteral("clock_format")).toString();
-        changed.remove(seconds_part);
-        if (on)
-        {
-            changed.replace(QRegularExpression(QStringLiteral("\\bmm\\b")), QStringLiteral("mm:ss"));
-        }
-        this->choices.set(QStringLiteral("panel"), QStringLiteral("clock_format"), changed);
-    });
-    form->addRow(QString(), seconds);
-
-    // Only a translucent menu bar (the Desktop pane's checkbox) shows it.
-    auto* menu_bar_blur = new QCheckBox(word("menu_bar_blur", "Blur menu bar"));
-    menu_bar_blur->setChecked(choices.value(QStringLiteral("blur"), QStringLiteral("menu_bar")).toBool());
-    connect(menu_bar_blur, &QCheckBox::toggled, this,
-        [this](bool on) { this->choices.set(QStringLiteral("blur"), QStringLiteral("menu_bar"), on); });
-    form->addRow(QString(), menu_bar_blur);
+    form->addCheck(dock_blur);
 
     // How far both blurs reach ([blur] offset); the theme's until chosen.
     const QVariant chosen_blur = choices.value(QStringLiteral("blur"), QStringLiteral("offset"));
@@ -201,18 +103,18 @@ DockPane::DockPane(Choices& choices, QWidget* parent) : QWidget(parent), choices
     auto* blur_amount = stops_slider({0.5, 1.0, 1.7, 2.5, 3.5, 5.0, 7.0}, blur_reach,
         [this](double value) { this->choices.set(QStringLiteral("blur"), QStringLiteral("offset"), value); });
     auto* blur_row = with_end_words(blur_amount, word("blur_light", "Light"), word("blur_strong", "Strong"));
-    const auto show_blur_row = [blur_row, dock_blur, menu_bar_blur]() {
-        blur_row->setEnabled(dock_blur->isChecked() || menu_bar_blur->isChecked());
+    // the menu bar's blur box is in the Desktop pane
+    const auto show_blur_row = [this, blur_row, dock_blur]() {
+        blur_row->setEnabled(
+            dock_blur->isChecked() || this->choices.value(QStringLiteral("blur"), QStringLiteral("menu_bar")).toBool());
     };
     show_blur_row();
     connect(dock_blur, &QCheckBox::toggled, blur_row, show_blur_row);
-    connect(menu_bar_blur, &QCheckBox::toggled, blur_row, show_blur_row);
     form->addRow(word("blur_amount", "Blur:"), blur_row);
     // Only where the desktop lets that surface blur ([blur] panel and dock,
     // Sea Lion's); elsewhere the boxes would change nothing.
     const bool panel_can_blur = choices.value(QStringLiteral("blur"), QStringLiteral("panel")).toBool();
     const bool dock_can_blur = choices.value(QStringLiteral("blur"), QStringLiteral("dock")).toBool();
-    form->setRowVisible(menu_bar_blur, panel_can_blur);
     form->setRowVisible(dock_blur, dock_can_blur);
     form->setRowVisible(blur_row, panel_can_blur || dock_can_blur);
 
