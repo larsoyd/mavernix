@@ -1,5 +1,7 @@
 #include "icon-files.hpp"
 
+#include "icon-fit.hpp"
+
 #include <QFileInfo>
 #include <QGuiApplication>
 #include <QIcon>
@@ -351,54 +353,27 @@ QImage SvgIconProvider::requestImage(const QString& path, QSize* size, const QSi
 
 FittedIconProvider::FittedIconProvider() : QQuickImageProvider(QQuickImageProvider::Image) {}
 
-// The side of the smallest square around the parts at least this opaque.
-static const int shape_alpha = 24;
-
-static int shape_side(const QImage& image)
-{
-    int left = image.width(), right = -1, top = image.height(), bottom = -1;
-    for (int y = 0; y < image.height(); y++)
-    {
-        const QRgb* row = reinterpret_cast<const QRgb*>(image.constScanLine(y));
-        for (int x = 0; x < image.width(); x++)
-        {
-            if (qAlpha(row[x]) >= shape_alpha)
-            {
-                left = qMin(left, x);
-                right = qMax(right, x);
-                top = qMin(top, y);
-                bottom = qMax(bottom, y);
-            }
-        }
-    }
-    return right < 0 ? 0 : qMax(right - left + 1, bottom - top + 1);
-}
-
 QImage FittedIconProvider::requestImage(const QString& address, QSize* size, const QSize& requested_size)
 {
-    // "<fill>/<revision>/<name>"; a name may be a file's path, with slashes.
-    const double fill = address.section(QLatin1Char('/'), 0, 0).toDouble();
-    const QString name = address.section(QLatin1Char('/'), 2);
+    // a name may be a file's path, with slashes
+    const QString name = address.section(QLatin1Char('/'), 1);
     const int side = qMax(requested_size.width(), requested_size.height()) > 0
                          ? qMax(requested_size.width(), requested_size.height())
                          : default_side;
-    QImage drawn =
-        ThemeIconProvider::picture(name, QSize(side, side)).convertToFormat(QImage::Format_ARGB32_Premultiplied);
+    QImage drawn = ThemeIconProvider::picture(name, QSize(side, side));
 
-    const int shape = shape_side(drawn);
-    const int square = qMax(drawn.width(), drawn.height());
-    if ((fill > 0) && (shape > 0) && (square > 0) && (double(shape) / square > fill))
+    const IconFit fit = fit_icon(drawn, side);
+    if (fit.scale > 0)
     {
-        const double shrink = fill * square / shape;
-        QImage fitted(drawn.size(), QImage::Format_ARGB32_Premultiplied);
-        fitted.fill(Qt::transparent);
-        QPainter painter(&fitted);
-        painter.setRenderHint(QPainter::SmoothPixmapTransform);
-        const QSizeF smaller = QSizeF(drawn.size()) * shrink;
-        const QPointF corner((drawn.width() - smaller.width()) / 2, (drawn.height() - smaller.height()) / 2);
-        painter.drawImage(QRectF(corner, smaller), drawn);
+        // drawn anew at the final size, so small art stays sharp
+        const int scaled_side = qRound(side * fit.scale);
+        const QImage scaled = ThemeIconProvider::picture(name, QSize(scaled_side, scaled_side));
+        QImage placed(side, side, QImage::Format_ARGB32_Premultiplied);
+        placed.fill(Qt::transparent);
+        QPainter painter(&placed);
+        painter.drawImage(fit.corner.toPoint(), scaled);
         painter.end();
-        drawn = fitted;
+        drawn = placed;
     }
     if (size != nullptr)
     {

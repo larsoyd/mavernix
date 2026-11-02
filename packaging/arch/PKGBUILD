@@ -20,7 +20,7 @@ depends=(
   'adwaita-icon-theme' 'adwaita-icon-theme-legacy' 'adwaita-cursors' 'ttf-dejavu'
   '7zip' 'cpio' 'bzip2' 'lbzip2' 'libicns' 'ffmpeg' 'poppler' 'bubblewrap'
 )
-makedepends=('meson' 'ninja' 'glm' 'vulkan-headers')
+makedepends=('meson' 'ninja' 'glm' 'vulkan-headers' 'qt6-shadertools')
 checkdepends=('python-gobject' 'xorg-xwayland' 'dbus')
 optdepends=(
   'foot: the terminal the dock and Super+Enter open'

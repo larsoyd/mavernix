@@ -41,13 +41,13 @@ Fedora 44 and 45 have an older Wayfire and Quickshell than Mavernix needs, so `p
 | Adwaita icons, DejaVu fonts | | `adwaita-icon-theme` `adwaita-icon-theme-legacy` `ttf-dejavu` | the plain theme's icons and fonts. Without the icons, the desktop falls back to Breeze, Papirus or hicolor. |
 | foot (optional) | | `foot` | the terminal that the dock and Super+Enter open. Prefer another terminal? Name it in the config instead. |
 | 7-Zip, cpio, bzip2 and lbzip2, libicns, FFmpeg, Poppler, bubblewrap | | `7zip` `cpio` `bzip2` `lbzip2` `libicns` `ffmpeg` `poppler` `bubblewrap` | the Theme Installer: reading the installer, converting icons, sounds and drawings, and its sandbox |
-| Meson, Ninja, a C++17 compiler, GLM, Vulkan headers | Meson 1.12.1 | `base-devel` `meson` `ninja` `glm` `vulkan-headers` | building (Wayfire's own headers need GLM and the Vulkan headers) |
+| Meson, Ninja, a C++17 compiler, GLM, Vulkan headers, Qt Shader Tools | Meson 1.12.1, Qt 6.12.0 | `base-devel` `meson` `ninja` `glm` `vulkan-headers` `qt6-shadertools` | building (Wayfire's own headers need GLM and the Vulkan headers, and the dock's shader is compiled with `qsb`) |
 
 On Arch, you can grab all of it at once:
 
 ```sh
 # to build
-sudo pacman -S --needed base-devel meson ninja wayfire glm vulkan-headers tomlplusplus \
+sudo pacman -S --needed base-devel meson ninja wayfire glm vulkan-headers qt6-shadertools tomlplusplus \
     qt6-base qt6-declarative qt6-multimedia qt6-wayland librsvg glib2
 
 # to run

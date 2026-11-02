@@ -6,7 +6,7 @@ FROM docker.io/archlinux:latest
 # Building: the compiler, meson, and the libraries the compiled parts use.
 # (glm and vulkan-headers are needed by Wayfire's own headers.)
 RUN pacman -Syu --noconfirm --needed \
-        base-devel meson ninja \
+        base-devel meson ninja qt6-shadertools \
         wayfire glm vulkan-headers tomlplusplus \
         qt6-base qt6-declarative qt6-multimedia qt6-wayland librsvg glib2 \
     && pacman -Scc --noconfirm
