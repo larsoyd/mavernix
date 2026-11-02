@@ -72,6 +72,7 @@ Requires:       bubblewrap
 
 # The same optional programs as packaging/arch/PKGBUILD.
 Recommends:     foot
+Recommends:     kf6-qqc2-desktop-style
 Recommends:     pipewire
 Recommends:     wireplumber
 Recommends:     NetworkManager

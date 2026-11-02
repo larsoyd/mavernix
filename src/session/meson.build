@@ -47,6 +47,7 @@ install_data(
     'kded5rc',
     install_dir: session_dir,
 )
+install_subdir('quick-style', install_dir: mavernix_libdir / 'qml', strip_directory: true)
 install_data('bin/mavernix-dock-geometry', 'bin/mavernix-switch', 'bin/mavernix-reconfigure', 'bin/mavernix-file-action',
     'bin/mavernix-check-theme', 'bin/mavernix-extensions-changed',
     install_dir: session_dir / 'bin', install_mode: 'rwxr-xr-x')

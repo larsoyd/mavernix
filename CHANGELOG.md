@@ -12,6 +12,10 @@
 - Dock icons are drawn sharper: each is read at the largest size and shrunk with a Lanczos filter, at every size, as on OS X. Building now needs Qt Shader Tools.
 - A program's own icon in the dock is scaled and centred by the proportions of the theme's art, so it no longer looks small, high or heavy beside the others. This replaces `foreign_icon_fill`.
 
+### Fixed
+
+- System Monitor and other programs built on Kirigami open from the desktop's own Qt style instead of running without a window. They need qqc2-desktop-style.
+
 ## 0.6.1 (2026-11-06)
 
 ### Added

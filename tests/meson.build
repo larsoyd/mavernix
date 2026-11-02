@@ -82,6 +82,14 @@ foreach name, test_parts : tests
     test(name, executable_file)
 endforeach
 
+quick_style_test = executable(
+    'test-quick-style',
+    ['test-quick-style.cpp', qt.compile_moc(sources: 'test-quick-style.cpp', dependencies: qt_test)],
+    dependencies: [qt_test, dependency('qt6', modules: ['Core', 'Gui', 'Qml', 'QuickControls2'])],
+    cpp_args: ['-DQUICK_STYLE_DIR="' + (meson.project_source_root() / 'src' / 'session' / 'quick-style') + '"'],
+)
+test('quick-style', quick_style_test, env: {'QT_QPA_PLATFORM': 'offscreen'})
+
 python = find_program('python3')
 test(
     'session-config',
