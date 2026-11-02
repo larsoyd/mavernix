@@ -83,6 +83,7 @@ PanelWindow {
         goingAway.stop()
         if (open) {
             shownItems = items
+            box.forgetMarks()
             shown.opacity = 1
             keys.forceActiveFocus()
         } else if (fades) {

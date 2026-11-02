@@ -202,12 +202,14 @@ PanelWindow {
     }
 
     function openMenu(title) {
+        applicationMenu?.menusClosed()
         title.opening()
         openTitle = title
     }
 
     function closeMenu() {
         openTitle = null
+        applicationMenu?.menusClosed()
     }
 
     // Registered by each PanelTitle, for moving between menus by key.

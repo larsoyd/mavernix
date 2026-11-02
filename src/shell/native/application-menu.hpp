@@ -39,6 +39,7 @@ class ApplicationMenu : public QObject
 
     Q_INVOKABLE void aboutToShow(int id);
     Q_INVOKABLE void activate(int id);
+    Q_INVOKABLE void menusClosed();
 
   signals:
     void addressChanged();
@@ -52,12 +53,21 @@ class ApplicationMenu : public QObject
     void followAddress();
     void fetch();
     void setItems(const QVariantList& newItems);
+    QVariantList withSteadyIds(const QVariantList& items, int parent);
+    void sendEvent(int id, const QString& name);
+    void closeMenusBelow(int parent);
 
     QString currentService;
     QString currentPath;
     QVariantMap currentAddress;
     GMenuReader gmenu;
     QDBusServiceWatcher serviceWatcher;
+    // mozilla renumbers everything on a rebuild so the shell keeps its own ids
+    QHash<QString, int> steadyIds;
+    QHash<int, int> exporterIds;
+    QHash<int, int> parents;
+    QList<int> openMenus;
+    QTimer closeTimer;
     QVariantList currentItems;
 
     // Several change signals often arrive together; one fetch answers all.
