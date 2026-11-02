@@ -76,9 +76,9 @@ class SessionTestCase(unittest.TestCase):
     def tearDown(self):
         self.folder.cleanup()
 
-    def run_script(self, script, *arguments, may_fail=False):
+    def run_script(self, script, *arguments, may_fail=False, environment=None):
         result = subprocess.run([sys.executable, str(SESSION_SOURCE_DIR / script), *map(str, arguments)],
-                                env=self.environment, capture_output=True, text=True)
+                                env={**self.environment, **(environment or {})}, capture_output=True, text=True)
         if may_fail:
             return result
         self.assertEqual(result.returncode, 0, f"{script} failed:\n{result.stderr}")
@@ -1360,6 +1360,8 @@ class TestKdeColours(SessionTestCase):
     def test_mozilla_profiles_link_the_written_theme(self):
         link = self.linked_mozilla_profile()
         self.assertTrue((link / "mozilla/titlebar.css").is_file())
+        self.assertIn("#toolbar-menubar { visibility: collapse !important; }",
+                      (link / "mozilla/global-menu.css").read_text())
 
     def test_mozilla_profiles_lose_the_link_when_gtk_is_left_alone(self):
         link = self.linked_mozilla_profile()
@@ -1815,8 +1817,11 @@ class TestMozillaProfiles(SessionTestCase):
     def link(self, theme="/run/theme"):
         return self.run_script("link_mozilla_style.py", theme)
 
-    IMPORT = '@import url("mavernix/mozilla/titlebar.css");\n'
-    PREF = 'user_pref("toolkit.legacyUserProfileCustomizations.stylesheets", true);\n'
+    MENU_IMPORT = '@import url("mavernix/mozilla/global-menu.css");\n'
+    IMPORT = MENU_IMPORT + '@import url("mavernix/mozilla/titlebar.css");\n'
+    MENU_PREFS = ('user_pref("widget.gtk.global-menu.enabled", {0}); // mavernix\n'
+                  'user_pref("widget.gtk.global-menu.wayland.enabled", {0}); // mavernix\n')
+    PREF = 'user_pref("toolkit.legacyUserProfileCustomizations.stylesheets", true);\n' + MENU_PREFS.format("true")
 
     def test_every_program_folder_gets_the_style(self):
         profiles = [self.profile(root) for root in (".config/mozilla/firefox", ".mozilla/firefox", ".config/thunderbird", ".thunderbird")]
@@ -1855,7 +1860,7 @@ class TestMozillaProfiles(SessionTestCase):
         chosen = 'user_pref("toolkit.legacyUserProfileCustomizations.stylesheets", false);\n'
         profile = self.profile(".config/thunderbird", user_js=chosen)
         self.link()
-        self.assertEqual((profile / "user.js").read_text(), chosen)
+        self.assertEqual((profile / "user.js").read_text(), chosen + self.MENU_PREFS.format("true"))
 
     def test_a_profile_outside_the_folder_is_found(self):
         elsewhere = self.home / "mail/profile"
@@ -1881,6 +1886,39 @@ class TestMozillaProfiles(SessionTestCase):
         self.assertIn("chrome/mavernix", result.stderr)
         self.assertFalse((profile / "chrome/mavernix").is_symlink())
         self.assertFalse((profile / "chrome/userChrome.css").exists())
+
+    def test_menus_turn_off_when_the_theme_goes(self):
+        profile = self.profile(".config/thunderbird")
+        self.link()
+        self.run_script("link_mozilla_style.py")
+        text = (profile / "user.js").read_text()
+        self.assertIn(self.MENU_PREFS.format("false"), text)
+        self.assertNotIn(self.MENU_PREFS.format("true"), text)
+        self.link()
+        self.assertEqual((profile / "user.js").read_text().count("global-menu"), 2)
+        self.assertIn(self.MENU_PREFS.format("true"), (profile / "user.js").read_text())
+
+    def test_a_profile_that_never_had_menus_gets_no_settings_without_a_theme(self):
+        profile = self.profile(".config/thunderbird", user_js='user_pref("a", 1);\n')
+        self.run_script("link_mozilla_style.py")
+        self.assertEqual((profile / "user.js").read_text(), 'user_pref("a", 1);\n')
+
+    def test_the_opt_out_keeps_the_local_menu_bar(self):
+        profile = self.profile(".config/thunderbird")
+        self.link()
+        self.run_script("link_mozilla_style.py", "/run/theme", environment={"MAVERNIX_GLOBAL_MENU": "0"})
+        self.assertNotIn(self.MENU_IMPORT, (profile / "chrome/userChrome.css").read_text())
+        self.assertIn("titlebar.css", (profile / "chrome/userChrome.css").read_text())
+        self.assertIn(self.MENU_PREFS.format("false"), (profile / "user.js").read_text())
+
+    def test_a_menu_setting_the_user_chose_is_left_alone(self):
+        chosen = 'user_pref("widget.gtk.global-menu.enabled", false);\n'
+        profile = self.profile(".config/thunderbird", user_js=chosen)
+        self.link()
+        text = (profile / "user.js").read_text()
+        self.assertIn(chosen, text)
+        self.assertEqual(text.count("widget.gtk.global-menu.enabled"), 1)
+        self.assertIn('user_pref("widget.gtk.global-menu.wayland.enabled", true); // mavernix\n', text)
 
     def test_no_theme_takes_the_link_away_and_nothing_else(self):
         profile = self.profile(".config/thunderbird", user_chrome="#a { color: red; }\n")
