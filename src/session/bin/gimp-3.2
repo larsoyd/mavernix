@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+# gimp ignores the session's menu bar unless this module is loaded
+module="$(dirname "$(readlink -f "$0")")/../../gtk-3.0/libmavernix-global-menu.so"
+[[ -f $module ]] && export GTK3_MODULES="${GTK3_MODULES:+$GTK3_MODULES:}$module"
+exec /usr/bin/gimp-3.2 "$@"
