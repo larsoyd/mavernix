@@ -71,6 +71,8 @@ alpha_threshold = 0.5
 User and desktop preferences take precedence. Opacity applies only to the
 panel background and Dock shelf; foreground text and icons keep their opacity.
 
+`inactive_opacity` sets how far a panel fades when each screen has its own menus and another screen is the active one, 0.6 by default.
+
 The Desktop pane exposes `panel.translucent_menu_bar` (default false). Turning
 it off restores the original theme material at its original opacity and excludes
 the menu bar from compositor blur. Existing transparency in the theme artwork

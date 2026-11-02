@@ -14,6 +14,9 @@ class ActiveWindow : public QObject
     Q_PROPERTY(int windowId READ currentWindowId NOTIFY changed)
     // the compositor picks the window, instead of it being the focused one
     Q_PROPERTY(bool held READ isHeld NOTIFY changed)
+    // empty follows the active output, a name stays with that output's window
+    Q_PROPERTY(QString output READ outputName WRITE setOutputName NOTIFY changed)
+    Q_PROPERTY(bool activeOutput READ isActiveOutput NOTIFY changed)
     Q_PROPERTY(QString menuService READ menuService NOTIFY changed)
     Q_PROPERTY(QString menuPath READ menuPath NOTIFY changed)
     Q_PROPERTY(QVariantMap menuAddress READ menuAddress NOTIFY changed)
@@ -23,6 +26,9 @@ class ActiveWindow : public QObject
     QString appId() const;
     int currentWindowId() const;
     bool isHeld() const;
+    QString outputName() const;
+    void setOutputName(const QString& name);
+    bool isActiveOutput() const;
     QString menuService() const;
     QString menuPath() const;
     QVariantMap menuAddress() const;
@@ -37,6 +43,7 @@ class ActiveWindow : public QObject
     void takeWindow(const QJsonValue& window);
     void takeFocused();
     void followMenuWindow(const QJsonObject& event);
+    void applyMenuEvent();
     void askForMenuAddress();
     void setMenuAddress(const QVariantMap& address);
 
@@ -50,4 +57,6 @@ class ActiveWindow : public QObject
     QTimer askAgain;
     bool asking = false;
     bool held = false;
+    QString output;
+    QJsonObject menuEvent;
 };
