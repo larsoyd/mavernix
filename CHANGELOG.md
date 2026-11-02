@@ -16,6 +16,7 @@
 
 ### Fixed
 
+- Names of desktop icons have the soft dark shadow they have on OS X, so white text stays readable on any picture, and a picked name gets Mavericks' selection colour, shape and dark lower edge. It turns grey while a window is in front of the desktop.
 - Tabs in Qt programs make one control in Sea Lion, as on OS X: a thin line stands between them, the selected tab sits flush with its neighbours, and a tab is as wide around its name as on the original. A new import brings Mavericks' own lines.
 - System Monitor and other programs built on Kirigami open from the desktop's own Qt style instead of running without a window. They need qqc2-desktop-style.
 

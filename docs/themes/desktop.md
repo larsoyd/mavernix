@@ -38,10 +38,20 @@ edge_to_icon_middle = 58
 bottom_room = 90
 picked = { color = "#ffffff30", radius = 4 }    # any fill: the box around a picked file's icon
 picked_reach = 4                                # how far it reaches past the icon
-# The name under the icon: its colour, an optional dark edge under the
-# letters, its line height, how far below the icon it starts, and how wide
-# it can get before it's cut short. picked_background is the plate behind a
-# picked file's name (any fill, `padding` wider than the name at each end).
+# The name under the icon: its colour, its line height, how far below the
+# icon it starts, and how wide it can get before it's cut short.
+# picked_background is the plate behind a picked file's name (any fill,
+# `padding` wider than the name at each end).
+#
+# Optional, a shadow the letters cast on the desktop. shadow_color is what
+# turns it on, shadow_drop how far down it falls (1 if left out) and
+# shadow_blur how soft it is, 0 for a hard edge. shadow_passes paints name and
+# shadow that many times, so the dark builds up and the letters get heavier.
+# A picked name has none.
+#
+# Also optional: picked_edge is a darker copy of the plate, drop lower, showing
+# as an edge under it. away_background and away_color are the plate and the
+# letters of a picked name while a window is in front of the desktop.
 name = { color = "#ffffff", shadow_color = "#000000c0", height = 18, padding = 5, gap = 4, most_width = 96, picked_background = { color = "#3a6ea5", radius = 4 } }
 # Optional: a frame for a picture that's shown as its own icon. It has an
 # edge of one colour and width, and a soft shadow behind it. `share` is how

@@ -2107,9 +2107,9 @@ column_pitch = 112
 top = 8
 edge_to_icon_middle = 62
 bottom_room = 110
-picked = {{ color = "#0000004f", radius = 3, border = {{ color = "#ffffff3b", width = 2 }} }}
+picked = {{ color = "#0000004d", radius = 4, border = {{ color = "#96969682", width = 2 }} }}
 picked_reach = 4
-name = {{ color = "#ffffff", shadow_color = "#000000a0", height = 18, padding = 7, gap = 5, most_width = 110, picked_background = {{ color = "#3a70d7", radius = 9 }} }}
+name = {{ color = "#ffffff", shadow_color = "#000000", shadow_blur = 2.5, shadow_drop = 1, shadow_passes = 3, height = 17, padding = 5, gap = 5, most_width = 110, picked_background = {{ color = "#3875d7", radius = 8.5 }}, picked_edge = {{ color = "#0000004d", drop = 1 }}, away_background = {{ color = "#d0d0d0", radius = 8.5 }}, away_color = "#666666" }}
 preview_frame = {{ color = "#ffffff", width = 3, share = 0.86, shadow_color = "#00000080", shadow_blur = 4, shadow_drop = 1 }}
 band = {{ color = "#ffffff26", border_color = "#ffffff91", border_width = 1 }}
 """
