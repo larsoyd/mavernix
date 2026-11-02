@@ -67,6 +67,7 @@ class SessionTestCase(unittest.TestCase):
             "HOME": str(self.home),
             "XDG_CONFIG_HOME": str(self.home / ".config"),
             "XDG_DATA_HOME": str(self.home / ".local" / "share"),
+            "XDG_RUNTIME_DIR": str(self.home / "runtime"),
             "PYTHONPATH": str(folder),
         }
 
@@ -297,7 +298,6 @@ class TestExtensionPlugins(SessionTestCase):
         self.assertTrue(self.gtk_marker(self.home, {"extensions": {"enabled": ["borderless-maximized"]}}))
 
     def test_another_config_leaves_the_running_sessions_marker_alone(self):
-        self.environment["XDG_RUNTIME_DIR"] = str(self.home / "runtime")
         self.assertTrue(self.gtk_marker(self.home / "runtime" / "mavernix", {}))
 
     def test_an_extension_that_is_gone_loads_nothing(self):
