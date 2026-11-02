@@ -421,7 +421,7 @@ PanelWindow {
         id: windowPictures
         folder: Quickshell.env("XDG_RUNTIME_DIR") + "/mavernix/window-pictures"
         // Large enough for the largest icon in device pixels.
-        side: Math.round(dock.largestIconSize * (dock.screen?.devicePixelRatio ?? 1))
+        side: Math.round(dock.drawnIconSize * (dock.screen?.devicePixelRatio ?? 1))
         badgeShare: dock.minimizedLooks.badge_share ?? 0
         // Taken once the minimise effect is over.
         delayMs: dock.settings.theme.animation?.minimize?.duration_ms ?? 0
@@ -810,6 +810,8 @@ PanelWindow {
     readonly property bool magnifies: magnificationWanted && largestTileSize > tileSize
     readonly property real largestTileSize:
         (choices.value("dock", "largest_icon_size") ?? looks.largest_icon_size) + 2 * tileMargin
+    // magnification may reach past the theme's largest size and pictures are read once
+    readonly property real drawnIconSize: Math.max(largestIconSize, largestTileSize - 2 * tileMargin)
 
     // 0 to 1. Ramps over a + b * ln(1 + change / 2) ms, with [a, b] the theme's
     // magnification_ramp_ms and change the pointed tile's size change in px.
@@ -1060,7 +1062,7 @@ PanelWindow {
     Repeater {
         model: dock.windowReflections ? null : placeModel
         DockIconEffect {
-            drawnWidth: dock.largestIconSize
+            drawnWidth: dock.drawnIconSize
             required property int index
             required property string modelData
             readonly property var place: dock.placeOf(modelData)
@@ -1243,7 +1245,7 @@ PanelWindow {
         Repeater {
             model: reflections.visible ? placeModel : null
             DockIconEffect {
-                drawnWidth: dock.largestIconSize
+                drawnWidth: dock.drawnIconSize
                 required property int index
                 required property string modelData
                 readonly property var place: dock.placeOf(modelData)
@@ -1271,7 +1273,7 @@ PanelWindow {
     Repeater {
         model: dock.looks.floor_shadow !== undefined ? placeModel : null
         DockIconEffect {
-            drawnWidth: dock.largestIconSize
+            drawnWidth: dock.drawnIconSize
             required property int index
             required property string modelData
             readonly property var place: dock.placeOf(modelData)
@@ -1368,7 +1370,7 @@ PanelWindow {
             onFolderWanted: dock.showFolder(index)
             onMinimizedWindowWanted: window => dock.bringBack(window)
             // read anew at each size they kept the shell busy decoding through a resize
-            drawnIconSize: dock.largestIconSize
+            drawnIconSize: dock.drawnIconSize
             name: place.isTrash ? (dock.config.trash_label ?? "") : (custom?.name ?? "")
             command: place.isTrash ? (dock.config.trash_command ?? []) : (custom?.command ?? [])
             shellAction: custom?.shell ?? ""
