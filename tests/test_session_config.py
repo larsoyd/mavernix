@@ -283,19 +283,22 @@ class TestExtensionPlugins(SessionTestCase):
         self.assertIn("borderless-maximized", settings["core"]["plugins"].split())
         self.assertEqual(dict(settings["borderless-maximized"]), {})
 
-    def gtk_marker(self, *choices):
-        marker = self.home / "runtime/mavernix/hide-maximized-titlebars"
+    def gtk_marker(self, folder, *choices):
+        marker = folder / "hide-maximized-titlebars"
         marker.parent.mkdir(parents=True, exist_ok=True)
         marker.touch()
-        self.environment["XDG_RUNTIME_DIR"] = str(self.home / "runtime")
         self.wayfire_settings(*choices)
         return marker.exists()
 
     def test_a_marker_left_by_a_crash_goes_when_the_extension_is_off(self):
-        self.assertFalse(self.gtk_marker({}))
+        self.assertFalse(self.gtk_marker(self.home, {}))
 
     def test_the_marker_stays_while_the_extension_is_on(self):
-        self.assertTrue(self.gtk_marker({"extensions": {"enabled": ["borderless-maximized"]}}))
+        self.assertTrue(self.gtk_marker(self.home, {"extensions": {"enabled": ["borderless-maximized"]}}))
+
+    def test_another_config_leaves_the_running_sessions_marker_alone(self):
+        self.environment["XDG_RUNTIME_DIR"] = str(self.home / "runtime")
+        self.assertTrue(self.gtk_marker(self.home / "runtime" / "mavernix", {}))
 
     def test_an_extension_that_is_gone_loads_nothing(self):
         settings = self.wayfire_settings({"extensions": {"enabled": ["not-here"]}})

@@ -1369,9 +1369,9 @@ def main():
     unfinished = arguments.output.with_name(f"{arguments.output.name}.{os.getpid()}.new")
     unfinished.write_text(text)
     os.replace(unfinished, arguments.output)
-    if "borderless-maximized" not in plugins and "XDG_RUNTIME_DIR" in os.environ:
-        # a compositor that crashed never took this down
-        (Path(os.environ["XDG_RUNTIME_DIR"]) / "mavernix/hide-maximized-titlebars").unlink(missing_ok=True)
+    if "borderless-maximized" not in plugins:
+        # a compositor that crashed never took this down, the session keeps it beside its settings
+        arguments.output.with_name("hide-maximized-titlebars").unlink(missing_ok=True)
     print(f"wrote {arguments.output} (theme: {theme_dir.name}, plugins: {len(plugins)})")
 
 
