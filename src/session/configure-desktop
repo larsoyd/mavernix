@@ -340,10 +340,12 @@ link_reaper_menu() {
     if [[ -n "${DESKTOP_NESTED:-}" ]]; then
         return 0
     fi
+    local arguments=()
     if [[ ${MAVERNIX_GLOBAL_MENU:-1} != 0 && -f $plugin ]]; then
-        python3 "$session_dir/link_reaper_menu.py" "$plugin"
-    else
-        python3 "$session_dir/link_reaper_menu.py"
+        arguments=("$plugin")
+    fi
+    if ! python3 "$session_dir/link_reaper_menu.py" "${arguments[@]}"; then
+        echo "configure-desktop: could not set up REAPER's menus (message above); the desktop starts anyway." >&2
     fi
 }
 

@@ -1286,6 +1286,16 @@ class TestKdeColours(SessionTestCase):
         self.linked_reaper(built=False)
         self.assertFalse(link.is_symlink())
 
+    def test_a_bad_reaper_theme_does_not_stop_the_desktop(self):
+        link = self.linked_reaper()
+        (link.parent.parent / "libSwell-user.colortheme").write_bytes(b"\xff\xfe")
+        library = self.home / "lib"
+        setup = (f"set -e\nsession_dir={shlex.quote(str(SESSION_SOURCE_DIR))}\n"
+                 f"library_dir={shlex.quote(str(library))}\nlink_reaper_menu\necho carried on")
+        result = self.session_functions("link_reaper_menu", setup=setup)
+        self.assertIn("carried on", result.stdout)
+        self.assertIn("configure-desktop", result.stderr)
+
     def test_a_nested_desktop_leaves_reaper_alone(self):
         self.assertFalse(self.linked_reaper(environment={"DESKTOP_NESTED": "1"}).is_symlink())
 
