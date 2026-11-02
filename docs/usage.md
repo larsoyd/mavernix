@@ -119,4 +119,4 @@ Anything that isn't in Settings is in the desktop's config. See [configuration](
 - **The screen is locked and won't take your password:** press Ctrl+Alt+F3 to get a text console and log in there. Then either run `loginctl unlock-session` with the session's number (`loginctl` lists it), or run `pkill wayfire` to end the desktop.
 - **The panel or the dock is gone:** give it a few seconds, they restart on their own. If they keep failing, a notice tells you.
 - **The desktop won't start at all:** a notice tells you why, and a key takes you back to the login screen.
-- **Logs:** `$XDG_RUNTIME_DIR/mavernix/session.log` has the compositor's log. `login.log` next to it has the shell and everything started at login. Please include the end of both when you report a bug.
+- **Logs:** `~/.local/state/mavernix/logs/` keeps the compositor's log from the last five sessions, and `$XDG_RUNTIME_DIR/mavernix/session.log` points at the current one. `login.log` next to it has the shell and everything started at login. Please include the end of both when you report a bug.

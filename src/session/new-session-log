@@ -1,0 +1,20 @@
+#!/usr/bin/env bash
+# Prints where the compositor should log. On disk, a crash trace survives a
+# full runtime dir and the next login.
+#
+#   new-session-log RUNTIME_STATE_DIR
+set -u
+
+state_dir=$1
+kept_logs=5
+log_dir=${XDG_STATE_HOME:-$HOME/.local/state}/mavernix/logs
+log=$log_dir/session-$(date +%F-%H%M%S).log
+
+if ! mkdir -p "$log_dir" 2>/dev/null || ! : 2>/dev/null > "$log"; then
+    echo "$state_dir/session.log"
+    exit 0
+fi
+
+ls -1t "$log_dir"/session-*.log | tail -n +$((kept_logs + 1)) | xargs -r -d '\n' rm -f --
+ln -sfn "$log" "$state_dir/session.log"
+echo "$log"

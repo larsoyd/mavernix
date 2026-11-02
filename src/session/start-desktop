@@ -216,4 +216,5 @@ export XDG_CURRENT_DESKTOP=wayfire
 # The compositor replaces this process (exec below); stopping this PID logs out.
 export DESKTOP_SESSION_PID=$$
 
-exec wayfire -c "$state_dir/session.ini" > "$state_dir/session.log" 2>&1
+session_log=$("$session_dir/new-session-log" "$state_dir")
+exec wayfire -c "$state_dir/session.ini" > "$session_log" 2>&1
