@@ -101,3 +101,29 @@ test(
     python,
     args: [files('test_cursors.py')],
 )
+
+menu_test_sources = files('../src/shell/native/application-menu.cpp', '../src/shell/native/menu-registrar.cpp',
+    '../src/shell/native/gmenu-reader.cpp')
+menu_test_headers = files('../src/shell/native/application-menu.hpp', '../src/shell/native/menu-registrar.hpp',
+    '../src/shell/native/gmenu-reader.hpp')
+menu_test = executable('test-menu-adapters', 'test-menu-adapters.cpp', menu_test_sources,
+    files('../src/shell/native/compositor-socket.cpp'),
+    qt.compile_moc(sources: 'test-menu-adapters.cpp', headers: [menu_test_headers,
+        files('../src/shell/native/compositor-socket.hpp')], dependencies: qt_test),
+    include_directories: include_directories('../src/shell/native'), dependencies: [qt_test, qt_widgets, gio])
+test('menu-adapters', find_program('dbus-run-session'), args: ['--', menu_test], timeout: 30)
+
+menu_probe = executable('menu-probe', 'menu-probe.cpp', menu_test_sources,
+    files('../src/shell/native/active-window.cpp', '../src/shell/native/compositor-socket.cpp',
+        '../src/shell/native/xmenu-properties.cpp'),
+    qt.compile_moc(sources: 'menu-probe.cpp', headers: [menu_test_headers,
+        files('../src/shell/native/active-window.hpp', '../src/shell/native/compositor-socket.hpp',
+            '../src/shell/native/xmenu-properties.hpp')], dependencies: qt_test),
+    include_directories: include_directories('../src/shell/native'),
+    dependencies: [qt_widgets, gio, dependency('xcb')])
+
+test('menu-session', python, args: files('test_menu_session.py'))
+test('gtk-global-menu', python, args: [files('test_gtk_global_menu.py'), gtk_menu_module],
+    timeout: 65, is_parallel: false)
+test('menu-routes', python, args: [files('test_gtk_global_menu.py'), gtk_menu_module, '--routes', menu_probe],
+    depends: menu_discovery_plugin, timeout: 65, is_parallel: false)

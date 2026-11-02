@@ -92,6 +92,39 @@ ApplicationMenu::ApplicationMenu(QObject* parent) : QObject(parent)
     fetchTimer.setSingleShot(true);
     fetchTimer.setInterval(0);
     connect(&fetchTimer, &QTimer::timeout, this, &ApplicationMenu::fetch);
+    connect(&gmenu, &GMenuReader::itemsChanged, this, [this] {
+        if (currentAddress.value("protocol") == "gmenu")
+            setItems(gmenu.items());
+    });
+    serviceWatcher.setConnection(QDBusConnection::sessionBus());
+    serviceWatcher.setWatchMode(QDBusServiceWatcher::WatchForOwnerChange);
+    connect(&serviceWatcher, &QDBusServiceWatcher::serviceOwnerChanged, this,
+        [this](const QString&, const QString&, const QString& owner) {
+        if (!owner.isEmpty())
+            followAddress();
+        else
+        {
+            ++addressGeneration;
+            fetchTimer.stop();
+            gmenu.follow({});
+            setItems({});
+        }
+    });
+}
+
+QVariantMap ApplicationMenu::address() const
+{
+    return currentAddress;
+}
+
+void ApplicationMenu::setAddress(const QVariantMap& address)
+{
+    if (currentAddress == address)
+        return;
+    currentAddress = address;
+    currentService = address.value("service").toString();
+    currentPath = address.value("path").toString();
+    followAddress();
 }
 
 QString ApplicationMenu::service() const
@@ -132,6 +165,7 @@ QVariantList ApplicationMenu::items() const
 void ApplicationMenu::followAddress()
 {
     addressGeneration++;
+    serviceWatcher.setWatchedServices(currentService.isEmpty() ? QStringList{} : QStringList{currentService});
     emit addressChanged();
 
     // Empty service and path remove every match this object made.
@@ -140,6 +174,10 @@ void ApplicationMenu::followAddress()
     bus.disconnect(QString(), QString(), MENU_INTERFACE, "ItemsPropertiesUpdated", this, SLOT(fetchSoon()));
 
     setItems({});
+    fetchTimer.stop();
+    gmenu.follow(currentAddress);
+    if (currentAddress.value("protocol") == "gmenu")
+        return;
     if (currentService.isEmpty() || currentPath.isEmpty())
     {
         return;
@@ -209,6 +247,11 @@ void ApplicationMenu::setItems(const QVariantList& newItems)
 
 void ApplicationMenu::aboutToShow(int id)
 {
+    if (currentAddress.value("protocol") == "gmenu")
+    {
+        gmenu.aboutToShow(id);
+        return;
+    }
     if (currentService.isEmpty())
     {
         return;
@@ -222,6 +265,11 @@ void ApplicationMenu::aboutToShow(int id)
 
 void ApplicationMenu::activate(int id)
 {
+    if (currentAddress.value("protocol") == "gmenu")
+    {
+        gmenu.activate(id);
+        return;
+    }
     if (currentService.isEmpty())
     {
         return;

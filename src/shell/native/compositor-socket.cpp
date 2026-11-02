@@ -26,6 +26,12 @@ CompositorSocket::CompositorSocket(QObject* parent) : QObject(parent)
     });
 }
 
+CompositorSocket::~CompositorSocket()
+{
+    // The socket closes after the buffers and callbacks have been destroyed
+    socket.disconnect(this);
+}
+
 void CompositorSocket::open()
 {
     const QString path = qEnvironmentVariable("WAYFIRE_SOCKET");

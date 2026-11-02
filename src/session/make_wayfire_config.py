@@ -36,7 +36,7 @@ BASE_PLUGINS = [
     "themed-decoration",
     # Blur is opt-in below, with a matcher limited to selected shell surfaces.
     "animate", "scale", "expo", "vswitch",
-    "foreign-toplevel", "gtk-shell", "kde-appmenu", "session-lock",
+    "foreign-toplevel", "gtk-shell", "kde-appmenu", "global-menu", "session-lock",
     "autostart", "command",
     "idle",
     "fast-switcher",
