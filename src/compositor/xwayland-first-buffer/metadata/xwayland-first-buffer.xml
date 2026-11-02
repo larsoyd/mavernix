@@ -1,0 +1,8 @@
+<?xml version="1.0"?>
+<wayfire>
+	<plugin name="xwayland-first-buffer">
+		<_short>XWayland First Buffer</_short>
+		<_long>Maps an X11 window whose first buffer reached the compositor before its surface was paired, which would otherwise stay invisible for as long as it is open.</_long>
+		<category>Utility</category>
+	</plugin>
+</wayfire>
