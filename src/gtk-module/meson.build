@@ -10,7 +10,8 @@ appmenu_code = custom_target('appmenu-code', input: appmenu_xml, output: 'appmen
     command: [wayland_scanner, 'private-code', '@INPUT@', '@OUTPUT@'])
 
 gtk_menu_module = shared_module('mavernix-global-menu', 'global-menu.c', appmenu_header, appmenu_code,
-    dependencies: [dependency('gtk+-wayland-3.0'), dependency('gtk+-3.0'), dependency('dbusmenu-gtk3-0.4'),
+    dependencies: [dependency('gtk+-wayland-3.0'), dependency('gtk+-x11-3.0'), dependency('gtk+-3.0'),
+        dependency('dbusmenu-gtk3-0.4'),
         dependency('wayland-client')],
     install: true,
     install_dir: mavernix_libdir / 'gtk-3.0',

@@ -133,6 +133,24 @@ def run(helper):
             stop(fixture)
             wait(lambda: not entry("X11 Run"))
             print(f"[menu-routes] PASS X11 {mode} association and activation", flush=True)
+
+        report = runtime / "bar.activated"
+        steps = runtime / "bar.steps"
+        fixture_env = dict(env, GDK_BACKEND="x11")
+        fixture_env.pop("WAYLAND_DISPLAY", None)
+        bar = subprocess.Popen([sys.executable, __file__, "--fixture", "bar", str(report), str(steps)],
+                               env=fixture_env, stdout=log, stderr=log, start_new_session=True)
+        fixtures.append(bar)
+        wait(lambda: entry("X11 Bar Run"))
+        assert state()["address"]["protocol"] == "dbusmenu", state()
+        assert entry("X11 Bar Run")["shortcut"] == ["Control", "r"], entry("X11 Bar Run")
+        probe_call("Activate", GLib.Variant("(i)", (entry("X11 Bar Run")["id"],)))
+        wait(lambda: report.exists())
+        steps.write_text("activated")
+        wait(lambda: bar.poll() is not None, seconds=20)
+        assert bar.returncode == 0, f"X11 bar fixture exited {bar.returncode}"
+        print("[menu-routes] PASS X11 GtkMenuBar export, shortcut, activation", flush=True)
+
         window.destroy()
         wait(lambda: not state()["items"])
         if "--apps" in sys.argv:
@@ -234,6 +252,113 @@ def run(helper):
         log.close()
 
 
+def bar_fixture(report, steps):
+    gi.require_version("Gdk", "3.0")
+    gi.require_version("GdkX11", "3.0")
+    from gi.repository import Gdk, GdkX11
+    Gtk.init([])
+    bus = Gio.bus_get_sync(Gio.BusType.SESSION)
+
+    def registered():
+        return {menu[0]: menu[1:] for menu in call(bus, "com.canonical.AppMenu.Registrar",
+                                                   "/com/canonical/AppMenu/Registrar",
+                                                   "com.canonical.AppMenu.Registrar", "GetMenus")[0]}
+
+    window = Gtk.Window(title="X11 bar fixture")
+    window.set_default_size(400, 250)
+    box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
+    window.add(box)
+    group = Gtk.AccelGroup()
+    window.add_accel_group(group)
+    pressed = []
+
+    def make_bar(top_label, label):
+        bar = Gtk.MenuBar()
+        top = Gtk.MenuItem.new_with_mnemonic(top_label)
+        submenu = Gtk.Menu()
+        item = Gtk.MenuItem.new_with_label(label)
+        item.connect("activate", lambda *_: (pressed.append(label), Path(report).write_text("activated")))
+        submenu.append(item)
+        top.set_submenu(submenu)
+        bar.append(top)
+        box.pack_start(bar, False, False, 0)
+        bar.show_all()
+        return bar, item
+
+    def height(widget):
+        return widget.get_preferred_height().natural_height
+
+    bar, item = make_bar("_File", "X11 Bar Run")
+    item.add_accelerator("activate", group, Gdk.KEY_r, Gdk.ModifierType.CONTROL_MASK, Gtk.AccelFlags.VISIBLE)
+    box.pack_end(Gtk.Label(label="Content"), True, True, 0)
+    window.show_all()
+    xid = GdkX11.X11Window.get_xid(window.get_window())
+
+    wait(lambda: xid in registered())
+    wait(lambda: height(bar) == 0)
+    assert registered()[xid][0] == bus.get_unique_name(), registered()
+    assert bar.get_visible() and bar.get_mapped(), "export must keep the bar mapped for accelerators"
+    wait(lambda: Path(steps).exists())
+    assert pressed == ["X11 Bar Run"], pressed
+    assert Gtk.accel_groups_activate(window, Gdk.KEY_r, Gdk.ModifierType.CONTROL_MASK)
+    assert len(pressed) == 2, pressed
+
+    window.hide()
+    wait(lambda: xid not in registered())
+    wait(lambda: height(bar) > 0)
+    window.show()
+    wait(lambda: xid in registered() and height(bar) == 0)
+
+    second, _ = make_bar("_Second", "Second")
+    wait(lambda: xid not in registered() and height(bar) > 0 and height(second) > 0)
+    second.destroy()
+    wait(lambda: xid in registered() and height(bar) == 0)
+
+    bar.destroy()
+    wait(lambda: xid not in registered())
+    replacement, _ = make_bar("_Replacement", "Replacement")
+    wait(lambda: xid in registered() and height(replacement) == 0)
+    path = registered()[xid][1]
+    labels = str(call(bus, bus.get_unique_name(), path, "com.canonical.dbusmenu", "GetLayout",
+                      GLib.Variant("(iias)", (0, -1, []))))
+    assert "_Replacement" in labels, labels
+
+    window.destroy()
+    wait(lambda: xid not in registered())
+
+    taken = Gtk.Window(title="X11 taken fixture")
+    column = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
+    taken.add(column)
+    taken.realize()
+    taken_xid = GdkX11.X11Window.get_xid(taken.get_window())
+    other = Gio.DBusConnection.new_for_address_sync(
+        os.environ["DBUS_SESSION_BUS_ADDRESS"],
+        Gio.DBusConnectionFlags.AUTHENTICATION_CLIENT | Gio.DBusConnectionFlags.MESSAGE_BUS_CONNECTION)
+    call(other, "com.canonical.AppMenu.Registrar", "/com/canonical/AppMenu/Registrar",
+         "com.canonical.AppMenu.Registrar", "RegisterWindow", GLib.Variant("(uo)", (taken_xid, "/other/menu")))
+    local = Gtk.MenuBar()
+    local.append(Gtk.MenuItem(label="Local"))
+    column.pack_start(local, False, False, 0)
+    taken.show_all()
+    end = time.monotonic() + 1
+    wait(lambda: time.monotonic() > end)
+    assert height(local) > 0, "a refused registration must keep the local bar"
+    assert registered()[taken_xid][1] == "/other/menu", registered()
+    taken.destroy()
+
+    marker = Path(os.environ["XDG_RUNTIME_DIR"]) / "mavernix/hide-maximized-titlebars"
+    marker.parent.mkdir(exist_ok=True)
+    marker.touch()
+    framed = Gtk.Window(title="X11 framed fixture")
+    framed.show_all()
+    framed.maximize()
+    wait(framed.is_maximized)
+    assert not framed.get_hide_titlebar_when_maximized(), "X11 windows keep their title bar setting"
+    marker.unlink()
+    framed.destroy()
+    print("[menu-routes] PASS X11 bar withdraw, remap, multiple bars, replacement", flush=True)
+
+
 def fixture(mode, report):
     gi.require_version("GdkX11", "3.0")
     from gi.repository import GdkX11
@@ -291,4 +416,7 @@ def fixture(mode, report):
 
 
 if __name__ == "__main__":
-    fixture(sys.argv[2], sys.argv[3])
+    if sys.argv[2] == "bar":
+        bar_fixture(sys.argv[3], sys.argv[4])
+    else:
+        fixture(sys.argv[2], sys.argv[3])

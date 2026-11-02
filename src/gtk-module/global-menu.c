@@ -1,4 +1,5 @@
 #include <gdk/gdkwayland.h>
+#include <gdk/gdkx.h>
 #include <gtk/gtk.h>
 #include <libdbusmenu-glib/server.h>
 #include <libdbusmenu-gtk/parser.h>
@@ -6,6 +7,7 @@
 #include "appmenu-client-protocol.h"
 
 #define REGISTRAR "com.canonical.AppMenu.Registrar"
+#define REGISTRAR_PATH "/com/canonical/AppMenu/Registrar"
 #define WINDOW_MENU "mavernix-global-menu"
 #define EXPORTED_BAR "mavernix-exported-bar"
 #define HIDES_TITLEBAR "mavernix-hides-titlebar"
@@ -17,6 +19,7 @@ typedef struct
     DbusmenuServer* server;
     struct org_kde_kwin_appmenu* appmenu;
     struct wl_callback* acknowledgement;
+    guint32 xid;
     gchar* path;
     guint generation;
     guint retries;
@@ -118,6 +121,10 @@ static void withdraw(WindowMenu* menu)
     if (menu->appmenu)
         org_kde_kwin_appmenu_set_address(menu->appmenu, "", "");
     g_clear_pointer(&menu->appmenu, org_kde_kwin_appmenu_release);
+    if (menu->xid)
+        g_dbus_connection_call(session_bus, REGISTRAR, REGISTRAR_PATH, REGISTRAR, "UnregisterWindow",
+            g_variant_new("(u)", menu->xid), NULL, G_DBUS_CALL_FLAGS_NO_AUTO_START, 1000, NULL, NULL, NULL);
+    menu->xid = 0;
     g_clear_object(&menu->server);
     g_clear_object(&menu->bar);
 }
@@ -152,6 +159,46 @@ static gboolean retry_export(gpointer data)
     return G_SOURCE_REMOVE;
 }
 
+static void finish_pending(PendingExport* pending)
+{
+    g_weak_ref_clear(&pending->window);
+    g_free(pending);
+}
+
+static void window_registered(GObject* object, GAsyncResult* result, gpointer data)
+{
+    PendingExport* pending = data;
+    GError* error = NULL;
+    GVariant* reply = g_dbus_connection_call_finish(G_DBUS_CONNECTION(object), result, &error);
+    GtkWidget* window = g_weak_ref_get(&pending->window);
+    WindowMenu* menu = window ? g_object_get_data(G_OBJECT(window), WINDOW_MENU) : NULL;
+    if (menu && menu->generation == pending->generation)
+    {
+        if (reply)
+            set_exported(menu->bar, TRUE);
+        else
+        {
+            g_warning("[global-menu] register refused xid=%u path=%s error=%s", menu->xid, menu->path, error->message);
+            withdraw(menu);
+        }
+    }
+    g_clear_error(&error);
+    g_clear_pointer(&reply, g_variant_unref);
+    g_clear_object(&window);
+    finish_pending(pending);
+}
+
+static void register_window(WindowMenu* menu, GdkWindow* gdk_window)
+{
+    PendingExport* pending = g_new0(PendingExport, 1);
+    g_weak_ref_init(&pending->window, menu->window);
+    pending->generation = menu->generation;
+    menu->xid = gdk_x11_window_get_xid(gdk_window);
+    g_dbus_connection_call(session_bus, REGISTRAR, REGISTRAR_PATH, REGISTRAR, "RegisterWindow",
+        g_variant_new("(uo)", menu->xid, menu->path), NULL, G_DBUS_CALL_FLAGS_NO_AUTO_START, 1000, NULL,
+        window_registered, pending);
+}
+
 static void export_ready(GObject* object, GAsyncResult* result, gpointer data)
 {
     PendingExport* pending = data;
@@ -175,8 +222,11 @@ static void export_ready(GObject* object, GAsyncResult* result, gpointer data)
         else
         {
             GdkWindow* gdk_window = gtk_widget_get_window(window);
-            struct wl_surface* surface = gdk_wayland_window_get_wl_surface(gdk_window);
-            if (surface)
+            struct wl_surface* surface =
+                GDK_IS_WAYLAND_WINDOW(gdk_window) ? gdk_wayland_window_get_wl_surface(gdk_window) : NULL;
+            if (GDK_IS_X11_WINDOW(gdk_window))
+                register_window(menu, gdk_window);
+            else if (surface)
             {
                 menu->appmenu = org_kde_kwin_appmenu_manager_create(manager, surface);
                 org_kde_kwin_appmenu_set_address(
@@ -191,8 +241,7 @@ static void export_ready(GObject* object, GAsyncResult* result, gpointer data)
     g_clear_error(&error);
     g_clear_pointer(&reply, g_variant_unref);
     g_clear_object(&window);
-    g_weak_ref_clear(&pending->window);
-    g_free(pending);
+    finish_pending(pending);
 }
 
 static void verify_export(WindowMenu* menu)
@@ -227,7 +276,8 @@ static void refresh_window(GtkWidget* window)
 {
     WindowMenu* menu = g_object_get_data(G_OBJECT(window), WINDOW_MENU);
     GdkWindow* gdk_window = gtk_widget_get_window(window);
-    if (!registrar_present || !gtk_widget_get_mapped(window) || !GDK_IS_WAYLAND_WINDOW(gdk_window))
+    if (!registrar_present || !gtk_widget_get_mapped(window) ||
+        !(GDK_IS_WAYLAND_WINDOW(gdk_window) || GDK_IS_X11_WINDOW(gdk_window)))
     {
         if (menu)
             withdraw(menu);
@@ -369,21 +419,27 @@ G_MODULE_EXPORT void gtk_module_init(gint* argc, gchar*** argv)
     (void)argv;
     static gboolean initialized;
     GdkDisplay* display = gdk_display_get_default();
-    if (initialized || !GDK_IS_WAYLAND_DISPLAY(display))
+    gboolean on_wayland = GDK_IS_WAYLAND_DISPLAY(display);
+    if (initialized || !(on_wayland || GDK_IS_X11_DISPLAY(display)))
         return;
     initialized = TRUE;
     // Signals cannot be looked up until the class exists
     g_type_class_ref(GTK_TYPE_WINDOW);
-    g_signal_add_emission_hook(g_signal_lookup("window-state-event", GTK_TYPE_WIDGET), 0, update_titlebar, NULL, NULL);
+    if (on_wayland)
+        g_signal_add_emission_hook(
+            g_signal_lookup("window-state-event", GTK_TYPE_WIDGET), 0, update_titlebar, NULL, NULL);
     if (g_strcmp0(g_getenv("MAVERNIX_GLOBAL_MENU"), "0") == 0)
         return;
-    struct wl_display* wayland = gdk_wayland_display_get_wl_display(display);
-    struct wl_registry* registry = wl_display_get_registry(wayland);
-    wl_registry_add_listener(registry, &registry_listener, NULL);
-    wl_display_roundtrip(wayland);
-    wl_registry_destroy(registry);
-    if (!manager)
-        return;
+    if (on_wayland)
+    {
+        struct wl_display* wayland = gdk_wayland_display_get_wl_display(display);
+        struct wl_registry* registry = wl_display_get_registry(wayland);
+        wl_registry_add_listener(registry, &registry_listener, NULL);
+        wl_display_roundtrip(wayland);
+        wl_registry_destroy(registry);
+        if (!manager)
+            return;
+    }
     GtkWidgetClass* bar_class = g_type_class_ref(GTK_TYPE_MENU_BAR);
     original_bar = *bar_class;
     bar_class->get_preferred_width = preferred_width;
