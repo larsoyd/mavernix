@@ -68,6 +68,9 @@ use_theme = true
 # Desktop settings: let wallpaper show through the menu bar. Off at first,
 # so the menu bar shows its picture as it is.
 translucent_menu_bar = false
+# Dock & Menu Bar settings: a menu bar on every display, all with the same
+# menus, instead of on the main one only.
+every_screen = false
 position = "top"
 left = ["app_name", "menus"]
 # Status items (docs/panel-items.md); one with nothing to show takes no room.
@@ -632,6 +635,7 @@ reset_all_question = "Reset all settings?"
 reset_all_note = "Every choice you made is replaced by the desktop's own, including the Dock's contents, app icons and names, and keyboard shortcuts. A copy is kept as %1. Some changes take effect the next time you log in."
 reset_all_button = "Reset All"
 cancel = "Cancel"
+menu_bar_every_screen = "Show the menu bar on every display"
 menu_bar_items = { tray = "Icons of running programs", load = "Computer load", bluetooth = "Bluetooth", network = "Wi-Fi", volume = "Volume", battery = "Battery", clock = "Clock", search = "Search", notifications = "Notifications", session = "Session menu" }
 dock_size = "Icon size:"
 dock_size_small = "Small"

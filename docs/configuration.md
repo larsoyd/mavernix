@@ -71,7 +71,7 @@ Settings, Displays also picks each screen's resolution and refresh rate. It save
 
 A screen built into the computer (eDP, LVDS, DSI) often reports only its own size. For those, Settings also offers the usual smaller sizes of the same shape, at the screen's own refresh rates. The graphics card stretches them to fill the screen, so they look a bit less sharp, but programs and games have fewer pixels to draw. Wayfire sets such a size from timings the session writes next to it (`custom_mode`, the way `cvt -r` makes them).
 
-With more than one screen, the panel and dock go on the screen named in `[display] main_screen`, or on the first one if that isn't set.
+With more than one screen, the panel and dock go on the screen named in `[display] main_screen`, or on the first one if that isn't set. With `[panel] every_screen = true` every screen gets a panel, all showing the same menus, and the dock stays on the main screen.
 
 On a screen drawn at more than 100%, X11 programs look blurry by default: they draw at 100% and the compositor stretches the result. With `[display] sharp_x11 = true` (Settings, Displays), they're drawn at the screen's own pixels instead, and told the main screen's scale through `Xft.dpi` so they can size themselves. Qt, Chromium, Electron and GTK's text follow it, but only in programs started after the change. Some programs, games among them, ignore it and look small.
 

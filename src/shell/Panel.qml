@@ -33,6 +33,8 @@ PanelWindow {
     }
     // The native ApplicationMenu for the "menus" item; null for no menus.
     property var applicationMenu: null
+    // the native ActiveWindow those menus belong to
+    property var menuWindow: null
 
     readonly property var looks: settings.theme.panel
     readonly property var font: settings.theme.fonts.panel
@@ -185,7 +187,22 @@ PanelWindow {
     Connections {
         target: ToplevelManager
         function onActiveToplevelChanged() {
-            panel.closeMenu()
+            // opening a held window's menu gives it the keyboard
+            if (!(panel.menuWindow?.held ?? false)) {
+                panel.closeMenu()
+            }
+        }
+    }
+    readonly property int menuWindowId: menuWindow?.windowId ?? -1
+    onMenuWindowIdChanged: closeMenu()
+
+    // one menu at a time, whichever screen's panel opened it
+    Connections {
+        target: panel.shell
+        function onMenuOpening(opener) {
+            if (opener !== panel && panel.openTitle !== null) {
+                panel.closeMenu()
+            }
         }
     }
 
@@ -202,6 +219,7 @@ PanelWindow {
     }
 
     function openMenu(title) {
+        panel.shell?.menuOpening(panel)
         applicationMenu?.menusClosed()
         title.opening()
         openTitle = title

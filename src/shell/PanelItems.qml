@@ -7,7 +7,6 @@
 import QtQuick
 import Quickshell
 import Quickshell.Wayland
-import "ApplicationEntry.js" as ApplicationEntry
 import "ApplicationName.js" as ApplicationName
 import "ThemeValues.js" as ThemeValues
 
@@ -36,22 +35,25 @@ Row {
         return index === lastShownIndex ? 0 : statusSpacing - spacing
     }
 
+    // the menus belong to the focused window unless the compositor holds another
+    readonly property bool held: panel.menuWindow?.held ?? false
+    readonly property bool hasWindow:
+        held ? panel.menuWindow.windowId >= 0 : ToplevelManager.activeToplevel !== null
+    readonly property string windowAppId:
+        held ? panel.menuWindow.appId : ToplevelManager.activeToplevel?.appId ?? ""
+
     // The active window's desktop entry, or null.
-    readonly property var activeEntry: {
-        const window = ToplevelManager.activeToplevel
-        return window !== null ? ApplicationEntry.of(DesktopEntries, window.appId) : null
-    }
+    readonly property var activeEntry: hasWindow ? WindowPrograms.entry(windowAppId) : null
 
     // The active window's application name, from its desktop entry if any.
     readonly property string activeApplicationName: {
         if (showsDesktopMenus) {
             return panel.shell?.desktopName ?? desktopMenus.name ?? ""
         }
-        const window = ToplevelManager.activeToplevel
-        if (window === null) {
+        if (!hasWindow) {
             return ""
         }
-        return ApplicationName.of(WindowPrograms.entry(window.appId), panel.choices) ?? WindowPrograms.name(window.appId)
+        return ApplicationName.of(WindowPrograms.entry(windowAppId), panel.choices) ?? WindowPrograms.name(windowAppId)
     }
 
     // While no window is active, the panel shows the desktop's own menus, from
@@ -60,7 +62,7 @@ Row {
     // actions (shell.qml, run()); one with neither is shown disabled.
     readonly property var desktopMenus: panel.settings.config.desktop_menus ?? null
     readonly property bool showsDesktopMenus:
-        desktopMenus !== null && ToplevelManager.activeToplevel === null
+        desktopMenus !== null && !hasWindow
 
     // Entry ids start at a multiple of this per menu, so an id tells its menu.
     readonly property int entriesPerMenu: 1000
@@ -107,6 +109,7 @@ Row {
     }
     function menuAboutToShow(id) {
         if (!showsDesktopMenus) {
+            panel.menuWindow?.focusWindow()
             panel.applicationMenu.aboutToShow(id)
         }
     }
@@ -253,7 +256,7 @@ Row {
                     if (row.panel.choices?.value("window", "quit_closes_app") ?? false) {
                         row.panel.shell.quitActiveApp()
                     } else {
-                        ToplevelManager.activeToplevel?.close()
+                        row.panel.menuWindow?.closeWindow()
                     }
                 } else {
                     row.chooseMenuEntry(id)

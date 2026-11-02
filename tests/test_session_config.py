@@ -286,14 +286,14 @@ class TestExtensionPlugins(SessionTestCase):
     def test_on_loads_its_plugin_with_the_default_settings(self):
         settings = self.wayfire_settings({"extensions": {"enabled": ["focus-follows-mouse"]}})
         self.assertIn("focus-follows-mouse", settings["core"]["plugins"].split())
-        self.assertEqual(dict(settings["focus-follows-mouse"]), {"delay_ms": "100", "raise": "false"})
+        self.assertEqual(dict(settings["focus-follows-mouse"]), {"delay_ms": "100", "raise": "false", "menu_on_click": "false"})
 
     def test_the_users_settings_reach_the_plugin(self):
         settings = self.wayfire_settings({"extensions": {
             "enabled": ["focus-follows-mouse"],
-            "focus-follows-mouse": {"delay_ms": 250, "raise": True},
+            "focus-follows-mouse": {"delay_ms": 250, "raise": True, "menu_on_click": True},
         }})
-        self.assertEqual(dict(settings["focus-follows-mouse"]), {"delay_ms": "250", "raise": "true"})
+        self.assertEqual(dict(settings["focus-follows-mouse"]), {"delay_ms": "250", "raise": "true", "menu_on_click": "true"})
 
     def test_a_plugin_with_no_settings_loads_with_an_empty_section(self):
         settings = self.wayfire_settings({"extensions": {"enabled": ["borderless-maximized"]}})

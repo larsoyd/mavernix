@@ -12,5 +12,9 @@
 			<_short>Bring the focused window to the front</_short>
 			<default>false</default>
 		</option>
+		<option name="menu_on_click" type="bool">
+			<_short>Keep the menu bar on the window last clicked</_short>
+			<default>false</default>
+		</option>
 	</plugin>
 </wayfire>
