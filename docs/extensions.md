@@ -97,7 +97,7 @@ An extension can't see the pointer over other programs' windows or move the keyb
 
 `focus-follows-mouse` ships with the desktop and works this way. The window the pointer enters takes the keyboard after `delay_ms`, without coming to the front unless `raise` is on. The focus stays put on an empty desktop or screen, and moving inside a window never takes it from one you picked with the keyboard.
 
-`borderless-maximized` ships the same way. A window maximized both ways loses its title bar and frame, and gets them back when it's restored. Half and quarter tiles keep theirs, and a program that draws its own title bar keeps it. Super+Down or a drag with Super held brings a maximized window back.
+`borderless-maximized` ships the same way. A window maximized both ways loses its title bar and frame, and gets them back when it's restored. Half and quarter tiles keep theirs, and a program that draws its own title bar keeps it. GTK 3 programs with GTK's plain title bar lose that bar too, dialogs don't. Super+Down or a drag with Super held brings a maximized window back.
 
 ## Trying one
 

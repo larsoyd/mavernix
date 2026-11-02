@@ -124,6 +124,6 @@ menu_probe = executable('menu-probe', 'menu-probe.cpp', menu_test_sources,
 
 test('menu-session', python, args: files('test_menu_session.py'))
 test('gtk-global-menu', python, args: [files('test_gtk_global_menu.py'), gtk_menu_module],
-    timeout: 65, is_parallel: false)
+    depends: borderless_maximized_plugin, timeout: 65, is_parallel: false)
 test('menu-routes', python, args: [files('test_gtk_global_menu.py'), gtk_menu_module, '--routes', menu_probe],
     depends: menu_discovery_plugin, timeout: 65, is_parallel: false)
