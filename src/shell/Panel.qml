@@ -5,6 +5,7 @@
 import QtQuick
 import Quickshell
 import Quickshell.Wayland
+import Shell.Native
 import "ThemeValues.js" as ThemeValues
 
 PanelWindow {
@@ -32,9 +33,29 @@ PanelWindow {
         return end === "right" ? added.concat(listed) : listed.concat(added)
     }
     // The native ApplicationMenu for the "menus" item; null for no menus.
-    property var applicationMenu: null
+    property var sharedMenu: null
     // the native ActiveWindow those menus belong to
-    property var menuWindow: null
+    property var sharedWindow: null
+    // a screen's own window and menus instead of the shared ones
+    property bool ownMenus: false
+    Loader {
+        id: own
+        active: panel.ownMenus
+        sourceComponent: Item {
+            readonly property alias window: ownWindow
+            readonly property alias menu: ownMenu
+            ActiveWindow {
+                id: ownWindow
+                output: panel.screen?.name ?? ""
+            }
+            ApplicationMenu {
+                id: ownMenu
+                address: ownWindow.menuAddress
+            }
+        }
+    }
+    readonly property var applicationMenu: own.item?.menu ?? sharedMenu
+    readonly property var menuWindow: own.item?.window ?? sharedWindow
 
     readonly property var looks: settings.theme.panel
     readonly property var font: settings.theme.fonts.panel
@@ -68,7 +89,9 @@ PanelWindow {
     // Hides the panel's contents and input but keeps its reserved strip, so
     // windows do not move (for full-screen overlays such as the app grid).
     property bool concealed: false
-    contentItem.opacity: concealed ? 0 : 1
+    // a screen that is not the active one has its bar faded, as a Mac's
+    readonly property bool faded: ownMenus && (menuWindow?.held ?? false) && !(menuWindow?.activeOutput ?? true)
+    contentItem.opacity: concealed ? 0 : faded ? (looks.inactive_opacity ?? 0.6) : 1
     Region {
         id: nothing
     }

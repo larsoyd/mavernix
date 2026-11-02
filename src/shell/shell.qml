@@ -179,8 +179,9 @@ ShellRoot {
             required property var modelData
             screen: modelData
             settings: panelParts.shell.settings
-            applicationMenu: panelParts.applicationMenu
-            menuWindow: activeWindow
+            sharedMenu: panelParts.applicationMenu
+            sharedWindow: activeWindow
+            ownMenus: userChoices.value("panel", "menus_per_screen") ?? false
             confirmDialog: panelParts.confirmDialog
             outputVolume: panelParts.outputVolume
             shell: panelParts.shell

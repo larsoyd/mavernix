@@ -4,7 +4,7 @@
 
 ### Added
 
-- The menu bar can be on every display: Settings, Dock & Menu Bar, Show the menu bar on every display. All of them show the same menus.
+- The menu bar can be on every display: Settings, Dock & Menu Bar, Show the menu bar on every display. All of them show the same menus, or each display's own window with Give each display the menus of its own window, as on OS X, where the bars of the other displays fade.
 - Focus follows mouse can leave the menu bar alone until you click a window: Settings, Extensions, Focus follows mouse.
 
 ## 0.6.2 (2026-11-08)
