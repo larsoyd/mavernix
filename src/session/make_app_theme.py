@@ -9,6 +9,7 @@ gtk.css for GTK 3 and 4, plus KDE and GTK settings, written to:
     OUTPUT/share/themes/DesktopTheme/gtk-3.0/gtk.css
     OUTPUT/share/themes/DesktopTheme/gtk-4.0/gtk.css
     OUTPUT/share/themes/DesktopTheme/mozilla/titlebar.css
+    OUTPUT/share/themes/DesktopTheme/mozilla/global-menu.css
     OUTPUT/xdg/Kvantum/kvantum.kvconfig      (names the Kvantum theme)
     OUTPUT/xdg/gtk-3.0/settings.ini          (names the icon theme, if any)
     OUTPUT/xdg/kdeglobals                    (the same, and the colours, for KDE's programs)
@@ -938,6 +939,8 @@ def write_mozilla_style(theme, output_directory):
     folder = output_directory / "share" / "themes" / APP_THEME_NAME / "mozilla"
     folder.mkdir(parents=True, exist_ok=True)
     (folder / "titlebar.css").write_text(mozilla_titlebar_css(theme))
+    # the bar is hidden until a menu opens, then it stays and pushes the tabs down
+    (folder / "global-menu.css").write_text("#toolbar-menubar { visibility: collapse !important; }\n")
 
 
 def gimp_titlebar_css(theme):
