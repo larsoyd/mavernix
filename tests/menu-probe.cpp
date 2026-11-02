@@ -29,6 +29,8 @@ class MenuProbe : public QObject
                 .toJson(QJsonDocument::Compact));
     }
     void Activate(int id) { menu.activate(id); }
+    void AboutToShow(int id) { menu.aboutToShow(id); }
+    void MenusClosed() { menu.menusClosed(); }
     void Quit() { QCoreApplication::quit(); }
 };
 

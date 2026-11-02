@@ -122,6 +122,11 @@ menu_probe = executable('menu-probe', 'menu-probe.cpp', menu_test_sources,
     include_directories: include_directories('../src/shell/native'),
     dependencies: [qt_widgets, gio, dependency('xcb')])
 
+reaper_menu_test = executable('test-reaper-menu-text', 'test-reaper-menu-text.cpp',
+    qt.compile_moc(sources: 'test-reaper-menu-text.cpp', dependencies: qt_test),
+    include_directories: include_directories('../src/reaper-menu'), dependencies: [qt_test])
+test('reaper-menu-text', reaper_menu_test)
+
 test('menu-session', python, args: files('test_menu_session.py'))
 test('gtk-global-menu', python, args: [files('test_gtk_global_menu.py'), gtk_menu_module],
     depends: borderless_maximized_plugin, timeout: 65, is_parallel: false)

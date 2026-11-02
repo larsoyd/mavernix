@@ -1261,6 +1261,34 @@ class TestKdeColours(SessionTestCase):
         self.linked_mozilla_profile(qt_theme="no")
         self.assertFalse(link.is_symlink())
 
+    def linked_reaper(self, built=True, **options):
+        folder = self.home / ".config/REAPER"
+        folder.mkdir(parents=True, exist_ok=True)
+        library = self.home / "lib"
+        (library / "reaper").mkdir(parents=True, exist_ok=True)
+        plugin = library / "reaper/reaper_mavernix_menu.so"
+        plugin.touch() if built else plugin.unlink(missing_ok=True)
+        setup = (f"session_dir={shlex.quote(str(SESSION_SOURCE_DIR))}\n"
+                 f"library_dir={shlex.quote(str(library))}\nlink_reaper_menu")
+        self.session_functions("link_reaper_menu", setup=setup, **options)
+        return folder / "UserPlugins/reaper_mavernix_menu.so"
+
+    def test_reaper_gets_the_built_plugin(self):
+        self.assertTrue(self.linked_reaper().is_symlink())
+
+    def test_the_menu_opt_out_reaches_reaper(self):
+        link = self.linked_reaper()
+        self.linked_reaper(environment={"MAVERNIX_GLOBAL_MENU": "0"})
+        self.assertFalse(link.is_symlink())
+
+    def test_a_missing_plugin_gives_reaper_its_bar_back(self):
+        link = self.linked_reaper()
+        self.linked_reaper(built=False)
+        self.assertFalse(link.is_symlink())
+
+    def test_a_nested_desktop_leaves_reaper_alone(self):
+        self.assertFalse(self.linked_reaper(environment={"DESKTOP_NESTED": "1"}).is_symlink())
+
     def test_a_nested_desktop_leaves_mozilla_profiles_alone(self):
         link = self.linked_mozilla_profile(environment={"DESKTOP_NESTED": "1"})
         self.assertFalse(link.exists())
@@ -1644,6 +1672,75 @@ class TestGimpTitlebar(SessionTestCase):
         (folder / "mavernix").mkdir()
         self.link("/run/theme")
         self.assertFalse((folder / "gimp.css").exists())
+
+
+class TestReaperMenu(SessionTestCase):
+    PLUGIN = "/lib/mavernix/reaper/reaper_mavernix_menu.so"
+    LINE = "menubar_height 0\n"
+
+    def config(self, theme=None):
+        folder = self.home / ".config/REAPER"
+        folder.mkdir(parents=True)
+        if theme is not None:
+            (folder / "libSwell-user.colortheme").write_text(theme)
+        return folder
+
+    def link(self, *arguments):
+        return self.run_script("link_reaper_menu.py", *arguments)
+
+    def test_the_plugin_and_the_empty_bar_come_together(self):
+        folder = self.config()
+        self.link(self.PLUGIN)
+        self.assertEqual(os.readlink(folder / "UserPlugins/reaper_mavernix_menu.so"), self.PLUGIN)
+        self.assertEqual((folder / "libSwell-user.colortheme").read_text(), self.LINE)
+
+    def test_the_users_theme_lines_stay(self):
+        folder = self.config("default_font_face Inter\n")
+        self.link(self.PLUGIN)
+        self.assertEqual((folder / "libSwell-user.colortheme").read_text(), "default_font_face Inter\n" + self.LINE)
+        self.link()
+        self.assertEqual((folder / "libSwell-user.colortheme").read_text(), "default_font_face Inter\n")
+
+    def test_a_theme_without_a_last_newline_stays_readable(self):
+        folder = self.config("default_font_face Inter")
+        self.link(self.PLUGIN)
+        self.assertEqual((folder / "libSwell-user.colortheme").read_text(), "default_font_face Inter\n" + self.LINE)
+
+    def test_a_height_the_user_chose_is_left_alone(self):
+        folder = self.config("menubar_height 30\n")
+        self.link(self.PLUGIN)
+        self.assertEqual((folder / "libSwell-user.colortheme").read_text(), "menubar_height 30\n")
+        self.assertFalse((folder / "UserPlugins/reaper_mavernix_menu.so").is_symlink())
+        self.link()
+        self.assertEqual((folder / "libSwell-user.colortheme").read_text(), "menubar_height 30\n")
+
+    def test_without_the_plugin_reaper_gets_its_bar_back(self):
+        folder = self.config()
+        self.link(self.PLUGIN)
+        self.link()
+        self.assertFalse((folder / "UserPlugins/reaper_mavernix_menu.so").is_symlink())
+        self.assertFalse((folder / "libSwell-user.colortheme").exists())
+
+    def test_a_second_run_changes_nothing(self):
+        folder = self.config()
+        self.link(self.PLUGIN)
+        self.link(self.PLUGIN)
+        self.assertEqual((folder / "libSwell-user.colortheme").read_text(), self.LINE)
+
+    def test_a_file_of_the_users_own_is_not_replaced(self):
+        folder = self.config()
+        (folder / "UserPlugins").mkdir()
+        (folder / "UserPlugins/reaper_mavernix_menu.so").write_text("mine")
+        result = self.run_script("link_reaper_menu.py", self.PLUGIN, may_fail=True)
+        self.assertEqual(result.returncode, 0)
+        self.assertIn("reaper_mavernix_menu.so", result.stderr)
+        self.assertEqual((folder / "UserPlugins/reaper_mavernix_menu.so").read_text(), "mine")
+        self.assertFalse((folder / "libSwell-user.colortheme").exists())
+
+    def test_reaper_never_started_is_fine(self):
+        self.home.mkdir(parents=True)
+        self.link(self.PLUGIN)
+        self.assertFalse((self.home / ".config/REAPER").exists())
 
 
 class TestMozillaProfiles(SessionTestCase):
