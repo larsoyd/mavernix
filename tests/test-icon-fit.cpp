@@ -156,6 +156,34 @@ class TestIconFit : public QObject
         expect_centred(fit, box, 128);
     }
 
+    void lone_pixel_grows_only_so_far()
+    {
+        QImage image = canvas(128);
+        const QRect box(90, 20, 1, 1);
+        solid(image, box);
+        const IconFit fit = fit_icon(image, 128);
+        expect_near(fit.scale, 4, "scale");
+        expect_centred(fit, box, 128);
+    }
+
+    void art_just_inside_the_growth_limit_keeps_its_length()
+    {
+        QImage image = canvas(128);
+        const QRect box(49, 49, 30, 30);
+        frame(image, box);
+        expect_near(fit_icon(image, 128).scale, 118.0 / 30, "scale");
+    }
+
+    void large_square_draws_no_more_than_the_pixel_limit()
+    {
+        QImage image = canvas(2048);
+        const QRect box(1000, 1000, 40, 40);
+        frame(image, box);
+        const IconFit fit = fit_icon(image, 2048);
+        expect_near(fit.scale, 2, "scale");
+        expect_centred(fit, box, 2048);
+    }
+
     void nothing_solid_is_left_alone()
     {
         QImage image = canvas(128);
