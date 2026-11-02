@@ -40,6 +40,7 @@ optdepends=(
   'xdg-desktop-portal-gtk: desktop settings and fallback file choosers'
   'xdg-desktop-portal-kde: Dolphin-style file choosers'
   'xdg-desktop-portal-wlr: screen sharing'
+  'qqc2-desktop-style: KDE programs built on Kirigami, such as System Monitor'
 )
 source=("$pkgname-$pkgver.tar.gz::$url/archive/refs/tags/v$pkgver.tar.gz")
 sha256sums=('702840f393ce69ea63369e5d13f59125bece9d4640558316e50dc2097133071b')

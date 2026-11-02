@@ -1,0 +1,3 @@
+# kirigami apps ask qt quick for the widget style by name and show no window without this
+module kvantum
+import org.kde.desktop auto
