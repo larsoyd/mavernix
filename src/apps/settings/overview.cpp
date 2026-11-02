@@ -12,7 +12,7 @@
 
 #include <algorithm>
 
-// SpotlightView's sheet is black at a quarter strength and fades in 0.2 s
+// the sheet over the window is black at a quarter strength and fades in 0.2 s
 static const double spotlight_strength = 0.25;
 static const int spotlight_fade_ms = 200;
 // rows are 100 apart in alphabetical order and 112 less the same 20 in groups
@@ -93,7 +93,7 @@ class OverviewCell : public QAbstractButton
     CellLooks looks;
 };
 
-// a black sheet with a soft hole at each find, as OS X's SpotlightView draws it
+// a black sheet with a soft hole at each find, as OS X dims System Preferences
 class Spotlights : public QWidget
 {
   public:
@@ -135,7 +135,7 @@ class Spotlights : public QWidget
     }
 
   private:
-    // the alpha of spotlight.png and spotlightdim.png from centre to edge
+    // how clear a hole is from centre to edge, the first find fully
     static void punch(QPainter& holes, QPoint centre, bool first)
     {
         const int radius = 55;

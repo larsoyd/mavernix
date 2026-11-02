@@ -16,6 +16,7 @@
 
 ### Fixed
 
+- Tabs in Qt programs make one control in Sea Lion, as on OS X: a thin line stands between them, the selected tab sits flush with its neighbours, and a tab is as wide around its name as on the original. A new import brings Mavericks' own lines.
 - System Monitor and other programs built on Kirigami open from the desktop's own Qt style instead of running without a window. They need qqc2-desktop-style.
 
 ## 0.6.1 (2026-11-06)

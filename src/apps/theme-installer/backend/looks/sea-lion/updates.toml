@@ -319,3 +319,12 @@ revision = 10
 import_brings = [
     "Text boxes sized from the interface font, such as Chrome's find bar, get their full width.",
 ]
+
+[[update]]
+revision = 11
+import_brings = [
+    "Tabs in Qt programs get Mavericks' own lines between them, instead of a stand-in.",
+]
+
+[update.settings."controls.tabs"]
+label_padding = 9

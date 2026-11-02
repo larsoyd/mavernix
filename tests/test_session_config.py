@@ -1173,6 +1173,122 @@ class TestKdeColours(SessionTestCase):
         self.assertNotIn("[General]", text)
         self.assertNotIn("font[", text.lower())
 
+    def themed_with_tabs(self, joined):
+        """The plain theme with one 30x24 tab picture, a line along its edge at x=2."""
+        from PIL import Image
+
+        theme = self.home / ("joined" if joined else "apart")
+        shutil.copytree(THEMES_DIR / "plain", theme)
+        pictures = theme / "images" / "controls"
+        pictures.mkdir(parents=True, exist_ok=True)
+        for name, rim in (("tab", (0, 0, 0, 99)), ("tab-selected", (114, 114, 114, 255))):
+            for suffix, density in (("", 1), ("@2x", 2)):
+                image = Image.new("RGBA", (30 * density, 24 * density), (0, 0, 0, 0))
+                image.paste((240, 240, 240, 255), (3 * density, 2 * density, 27 * density, 21 * density))
+                image.paste(rim, (2 * density, 5 * density, 3 * density, 18 * density))
+                image.save(pictures / f"{name}{suffix}.png")
+        toml = theme / "theme.toml"
+        toml.write_text(toml.read_text() + f"""
+[controls.tabs]
+slice = [5, 6, 6, 6]
+normal = "images/controls/tab.png"
+selected = "images/controls/tab-selected.png"
+joined = {str(joined).lower()}
+""")
+        return theme
+
+    def tab_separators(self, theme):
+        import base64
+        from io import BytesIO
+        from xml.etree import ElementTree
+
+        from PIL import Image
+
+        output = self.home / "app-theme"
+        self.run_script("make_app_theme.py", theme, output)
+        svg = ElementTree.parse(output / "share/themes/DesktopTheme/Kvantum/DesktopTheme.svg")
+        pictures = {}
+        for element in svg.getroot().iter():
+            name = element.get("id", "")
+            if "separator" in name and name.startswith("desktoptab"):
+                data = element.get("{http://www.w3.org/1999/xlink}href").split(",", 1)[1]
+                pictures[name] = Image.open(BytesIO(base64.b64decode(data))).convert("RGBA")
+        return pictures
+
+    def test_joined_tabs_get_a_line_between_them_from_the_tab_pictures_rim(self):
+        pictures = self.tab_separators(self.themed_with_tabs(True))
+        self.assertEqual(sorted(pictures), sorted(
+            f"desktoptab-separator-{state}{part}"
+            for state in ("normal", "toggled") for part in ("", "-top", "-bottom")))
+        for state, rim in (("normal", (0, 0, 0, 99)), ("toggled", (114, 114, 114, 255))):
+            line = pictures[f"desktoptab-separator-{state}"]
+            self.assertEqual(line.size[0], 12)
+            self.assertEqual(line.getpixel((11, 0)), rim)
+            self.assertEqual(line.getpixel((10, 0)), rim)
+            self.assertEqual(line.getpixel((9, 0))[3], 0)
+
+    def test_the_line_reaches_the_tab_pictures_top_and_bottom_edges(self):
+        pictures = self.tab_separators(self.themed_with_tabs(True))
+        top = pictures["desktoptab-separator-normal-top"]
+        bottom = pictures["desktoptab-separator-normal-bottom"]
+        self.assertEqual(top.size, (12, 10))
+        self.assertEqual(top.getpixel((11, 3))[3], 0)
+        self.assertEqual(top.getpixel((11, 4))[3], 99)
+        self.assertEqual(top.getpixel((11, 9))[3], 99)
+        self.assertEqual(bottom.size, (12, 12))
+        self.assertEqual(bottom.getpixel((11, 0))[3], 99)
+        self.assertEqual(bottom.getpixel((11, 5))[3], 99)
+        self.assertEqual(bottom.getpixel((11, 6))[3], 0)
+
+    def with_separator_art(self, theme):
+        """Pictures of a tab with the line in their middle column, grey at the top, darker below."""
+        from PIL import Image
+
+        for name, grey in (("tab-separator", 204), ("tab-selected-separator", 91)):
+            for suffix, density in (("", 1), ("@2x", 2)):
+                image = Image.new("RGBA", (30 * density, 24 * density), (255, 0, 0, 255))
+                for y in range(24 * density):
+                    shade = grey if y < 12 * density else grey - 20
+                    image.paste((shade, shade, shade, 255), (15 * density, y, 16 * density, y + 1))
+                image.save(theme / "images" / "controls" / f"{name}{suffix}.png")
+        toml = theme / "theme.toml"
+        toml.write_text(toml.read_text().replace('joined = true\n', """joined = true
+separator = "images/controls/tab-separator.png"
+selected_separator = "images/controls/tab-selected-separator.png"
+"""))
+        return theme
+
+    def test_the_line_is_the_middle_column_of_the_themes_own_picture(self):
+        pictures = self.tab_separators(self.with_separator_art(self.themed_with_tabs(True)))
+        line = pictures["desktoptab-separator-normal"]
+        # kvantum stretches it over the tab's end strip, so it keeps that width
+        self.assertEqual(line.size[0], 12)
+        self.assertEqual(line.getpixel((11, 0)), (204, 204, 204, 255))
+        self.assertEqual(line.getpixel((10, line.size[1] - 1)), (184, 184, 184, 255))
+        self.assertEqual(line.getpixel((9, 0))[3], 0)
+        self.assertEqual(pictures["desktoptab-separator-toggled"].getpixel((11, 0)), (91, 91, 91, 255))
+
+    def test_the_lines_three_parts_stack_to_the_whole_picture(self):
+        pictures = self.tab_separators(self.with_separator_art(self.themed_with_tabs(True)))
+        heights = [pictures[f"desktoptab-separator-normal{part}"].size[1] for part in ("-top", "", "-bottom")]
+        self.assertEqual(heights, [10, 26, 12])
+        self.assertEqual(pictures["desktoptab-separator-normal-top"].getpixel((11, 0)), (204, 204, 204, 255))
+        self.assertEqual(pictures["desktoptab-separator-normal-bottom"].getpixel((11, 11)), (184, 184, 184, 255))
+
+    def test_a_tabs_label_padding_counts_its_end_strips(self):
+        theme = self.themed_with_tabs(True)
+        toml = theme / "theme.toml"
+        toml.write_text(toml.read_text().replace("joined = true\n", "joined = true\nlabel_padding = 10\n"))
+        output = self.home / "app-theme"
+        self.run_script("make_app_theme.py", theme, output)
+        settings = (output / "share/themes/DesktopTheme/Kvantum/DesktopTheme.kvconfig").read_text()
+        tab = settings[settings.index("[Tab]"):].split("\n[", 1)[0]
+        self.assertIn("text.margin.left=4", tab)
+        self.assertIn("text.margin.right=4", tab)
+
+    def test_tabs_that_are_not_joined_have_no_line(self):
+        self.assertEqual(self.tab_separators(self.themed_with_tabs(False)), {})
+
     def test_a_theme_without_an_interface_font_writes_no_qt6ct_settings(self):
         theme = self.home / "themed"
         shutil.copytree(THEMES_DIR / "plain", theme)
