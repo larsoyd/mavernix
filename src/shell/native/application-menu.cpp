@@ -92,6 +92,10 @@ ApplicationMenu::ApplicationMenu(QObject* parent) : QObject(parent)
     fetchTimer.setSingleShot(true);
     fetchTimer.setInterval(0);
     connect(&fetchTimer, &QTimer::timeout, this, &ApplicationMenu::fetch);
+    // a choice comes right after the closing and has to arrive first
+    closeTimer.setSingleShot(true);
+    closeTimer.setInterval(0);
+    connect(&closeTimer, &QTimer::timeout, this, [this] { closeMenusBelow(ROOT_ITEM); });
     connect(&gmenu, &GMenuReader::itemsChanged, this, [this] {
         if (currentAddress.value("protocol") == "gmenu")
             setItems(gmenu.items());
@@ -106,6 +110,8 @@ ApplicationMenu::ApplicationMenu(QObject* parent) : QObject(parent)
         {
             ++addressGeneration;
             fetchTimer.stop();
+            closeTimer.stop();
+            openMenus.clear();
             gmenu.follow({});
             setItems({});
         }
@@ -121,6 +127,8 @@ void ApplicationMenu::setAddress(const QVariantMap& address)
 {
     if (currentAddress == address)
         return;
+    closeTimer.stop();
+    closeMenusBelow(ROOT_ITEM);
     currentAddress = address;
     currentService = address.value("service").toString();
     currentPath = address.value("path").toString();
@@ -175,6 +183,7 @@ void ApplicationMenu::followAddress()
 
     setItems({});
     fetchTimer.stop();
+    steadyIds.clear();
     gmenu.follow(currentAddress);
     if (currentAddress.value("protocol") == "gmenu")
         return;
@@ -231,8 +240,30 @@ void ApplicationMenu::fetch()
 
         // The answer is a revision number and the root item.
         const QVariantMap root = readItem(answer.arguments().at(1).value<QDBusArgument>());
-        setItems(root.value("children").toList());
+        exporterIds.clear();
+        parents.clear();
+        setItems(withSteadyIds(root.value("children").toList(), ROOT_ITEM));
     });
+}
+
+QVariantList ApplicationMenu::withSteadyIds(const QVariantList& items, int parent)
+{
+    QVariantList result;
+    QHash<QString, int> uses;
+    for (const QVariant& entry : items)
+    {
+        QVariantMap item = entry.toMap();
+        const QString label = item.value("label").toString();
+        const QString key = QStringLiteral("%1/%2/%3").arg(parent).arg(uses[label]++).arg(label);
+        const int id = steadyIds.contains(key) ? steadyIds.value(key) : steadyIds.size() + 1;
+        steadyIds.insert(key, id);
+        exporterIds.insert(id, item.value("id").toInt());
+        parents.insert(id, parent);
+        item.insert("id", id);
+        item.insert("children", withSteadyIds(item.value("children").toList(), id));
+        result.append(item);
+    }
+    return result;
 }
 
 void ApplicationMenu::setItems(const QVariantList& newItems)
@@ -252,15 +283,45 @@ void ApplicationMenu::aboutToShow(int id)
         gmenu.aboutToShow(id);
         return;
     }
-    if (currentService.isEmpty())
+    const auto exporterId = exporterIds.constFind(id);
+    if (currentService.isEmpty() || exporterId == exporterIds.cend())
     {
         return;
     }
 
-    // Any change this causes arrives as LayoutUpdated, so the answer is ignored.
+    closeTimer.stop();
+    closeMenusBelow(parents.value(id, ROOT_ITEM));
+    openMenus.append(id);
+    // mozilla only fills its menus on the event, changes come back as LayoutUpdated
     QDBusMessage call = QDBusMessage::createMethodCall(currentService, currentPath, MENU_INTERFACE, "AboutToShow");
-    call << id;
+    call << *exporterId;
     QDBusConnection::sessionBus().asyncCall(call);
+    sendEvent(id, QStringLiteral("opened"));
+}
+
+void ApplicationMenu::sendEvent(int id, const QString& name)
+{
+    // every event needs a data value even when it means nothing
+    const quint32 timestamp = static_cast<quint32>(QDateTime::currentSecsSinceEpoch());
+    QDBusMessage call = QDBusMessage::createMethodCall(currentService, currentPath, MENU_INTERFACE, "Event");
+    call << exporterIds.value(id) << name << QVariant::fromValue(QDBusVariant(QString())) << timestamp;
+    QDBusConnection::sessionBus().asyncCall(call);
+}
+
+void ApplicationMenu::closeMenusBelow(int parent)
+{
+    while (!openMenus.isEmpty() && openMenus.last() != parent)
+    {
+        sendEvent(openMenus.takeLast(), QStringLiteral("closed"));
+    }
+}
+
+void ApplicationMenu::menusClosed()
+{
+    if (!openMenus.isEmpty())
+    {
+        closeTimer.start();
+    }
 }
 
 void ApplicationMenu::activate(int id)
@@ -270,14 +331,9 @@ void ApplicationMenu::activate(int id)
         gmenu.activate(id);
         return;
     }
-    if (currentService.isEmpty())
+    if (currentService.isEmpty() || !exporterIds.contains(id))
     {
         return;
     }
-
-    // Event(item, name, data, time); "clicked" still needs a data value.
-    const quint32 timestamp = static_cast<quint32>(QDateTime::currentSecsSinceEpoch());
-    QDBusMessage call = QDBusMessage::createMethodCall(currentService, currentPath, MENU_INTERFACE, "Event");
-    call << id << QStringLiteral("clicked") << QVariant::fromValue(QDBusVariant(QString())) << timestamp;
-    QDBusConnection::sessionBus().asyncCall(call);
+    sendEvent(id, QStringLiteral("clicked"));
 }

@@ -57,11 +57,31 @@ Item {
     property bool still: false
     property bool blinking: false
 
+    // a rebuild that only touches an open submenu goes to it, these rows stay
+    property var rowItemsData: []
+    function rowText(item) {
+        return JSON.stringify(Object.assign({}, item, { children: item.children.length > 0 }))
+    }
+    function sameRows(one, other) {
+        return one.length === other.length
+            && one.every((item, index) => rowText(item) === rowText(other[index]))
+    }
+
     onItemsChanged: {
-        hoveredIndex = -1
-        submenuIndex = -1
+        if (sameRows(items, rowItemsData)) {
+            if (openSubmenu !== null) {
+                openSubmenu.items = items[submenuIndex].children
+            }
+            return
+        }
+        rowItemsData = items
+        forgetMarks()
         forgetCrossing()
         Qt.callLater(scrollToStart)
+    }
+    function forgetMarks() {
+        hoveredIndex = -1
+        submenuIndex = -1
     }
 
     // --- Moving through the menu by key -----------------------------------------
@@ -365,7 +385,7 @@ Item {
 
             Repeater {
                 id: rowItems
-                model: menu.items
+                model: menu.rowItemsData
                 onItemAdded: menu.measureRows()
                 onItemRemoved: menu.measureRows()
 
@@ -685,7 +705,7 @@ Item {
                 looks: menu.looks,
                 parentMenu: menu,
                 mostHeight: menu.mostHeight,
-                items: row.modelData.children
+                items: menu.items[menu.submenuIndex].children
             })
         }
         // In window coordinates (`null`).
