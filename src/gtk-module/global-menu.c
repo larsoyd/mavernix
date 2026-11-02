@@ -93,6 +93,9 @@ static void allocate_bar(GtkWidget* bar, GtkAllocation* allocation)
         GtkAllocation empty = {allocation->x, allocation->y, 1, 1};
         gtk_widget_set_allocation(bar, &empty);
         gtk_widget_set_clip(bar, &empty);
+        // The bar has its own window and only the stock allocation moves it, left alone it eats clicks
+        if (gtk_widget_get_realized(bar))
+            gdk_window_move_resize(gtk_widget_get_window(bar), empty.x, empty.y, empty.width, empty.height);
     }
     else
         original_bar.size_allocate(bar, allocation);
