@@ -195,6 +195,8 @@ Item {
     // --- What is picked ---------------------------------------------------------------
 
     property var pickedPaths: []
+    // picked files dim while a window is in front of the desktop
+    readonly property bool frontmost: Window.active
 
     function isPicked(path) {
         return pickedPaths.includes(path)
@@ -370,6 +372,8 @@ Item {
             required property int index
             readonly property bool picked: icons.isPicked(modelData.path)
             readonly property var name: icons.looks?.name ?? ({})
+            readonly property var plate: (icons.frontmost ? undefined : name.away_background)
+                                         ?? name.picked_background ?? ({ color: "#3a6ea5", radius: 4 })
 
             x: icons.iconX(index)
             y: icons.iconY(index)
@@ -411,27 +415,52 @@ Item {
                 anchors.horizontalCenter: parent.horizontalCenter
                 y: parent.height + (fileItem.name.gap ?? 4)
 
+                // the same plate a little lower shows as a dark edge under it
+                Fill {
+                    readonly property var edge: fileItem.name.picked_edge
+                    visible: fileItem.picked && edge !== undefined
+                    width: parent.width
+                    height: parent.height
+                    y: edge?.drop ?? 0
+                    fill: ({ color: edge?.color ?? "#00000000", radius: fileItem.plate.radius })
+                    themeDirectory: icons.themeDirectory
+                }
                 Fill {
                     visible: fileItem.picked
                     anchors.fill: parent
-                    fill: fileItem.name.picked_background ?? ({ color: "#3a6ea5", radius: 4 })
+                    fill: fileItem.plate
                     themeDirectory: icons.themeDirectory
                 }
-                Text {
-                    id: label
-                    visible: icons.renamingPath !== fileItem.modelData.path
+                Item {
+                    id: letters
+                    readonly property real room: Math.ceil(fileItem.name.shadow_blur ?? 0) + (fileItem.name.shadow_drop ?? 1)
                     anchors.centerIn: parent
-                    width: Math.min(implicitWidth, fileItem.name.most_width ?? 110)
-                    elide: Text.ElideMiddle
-                    text: fileItem.modelData.name
-                    color: ThemeValues.color(fileItem.name.color ?? "#ffffff")
-                    // A dark edge under the letters, readable on any picture.
-                    style: fileItem.name.shadow_color !== undefined ? Text.Raised : Text.Normal
-                    styleColor: ThemeValues.color(fileItem.name.shadow_color ?? "#00000000")
-                    readonly property var face: icons.fonts.desktop_icon ?? icons.fonts.interface
-                    font.family: face.family
-                    font.pixelSize: face.size
-                    font.bold: face.bold ?? false
+                    // whole pixels, or the layer stretches the letters
+                    width: Math.ceil(label.width) + 2 * room
+                    height: Math.ceil(label.implicitHeight) + 2 * room
+                    layer.enabled: true
+                    // a picked name loses its shadow
+                    layer.effect: CastShadow {
+                        look: fileItem.picked ? null : fileItem.name
+                        ink: ThemeValues.color(fileItem.picked && !icons.frontmost
+                                               ? fileItem.name.away_color ?? fileItem.name.color ?? "#ffffff"
+                                               : fileItem.name.color ?? "#ffffff")
+                    }
+
+                    Text {
+                        id: label
+                        visible: icons.renamingPath !== fileItem.modelData.path
+                        x: letters.room
+                        y: letters.room
+                        width: Math.min(implicitWidth, fileItem.name.most_width ?? 110)
+                        elide: Text.ElideMiddle
+                        text: fileItem.modelData.name
+                        color: "white"
+                        readonly property var face: icons.fonts.desktop_icon ?? icons.fonts.interface
+                        font.family: face.family
+                        font.pixelSize: face.size
+                        font.bold: face.bold ?? false
+                    }
                 }
             }
 

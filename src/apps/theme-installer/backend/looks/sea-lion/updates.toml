@@ -328,3 +328,18 @@ import_brings = [
 
 [update.settings."controls.tabs"]
 label_padding = 9
+
+[[update]]
+revision = 12
+
+[[update.corrections]]
+table = "desktop.icons"
+key = "name"
+was = { color = "#ffffff", shadow_color = "#000000a0", height = 18, padding = 7, gap = 5, most_width = 110, picked_background = { color = "#3a70d7", radius = 9 } }
+now = { color = "#ffffff", shadow_color = "#000000", shadow_blur = 2.5, shadow_drop = 1, shadow_passes = 3, height = 17, padding = 5, gap = 5, most_width = 110, picked_background = { color = "#3875d7", radius = 8.5 }, picked_edge = { color = "#0000004d", drop = 1 }, away_background = { color = "#d0d0d0", radius = 8.5 }, away_color = "#666666" }
+
+[[update.corrections]]
+table = "desktop.icons"
+key = "picked"
+was = { color = "#0000004f", radius = 3, border = { color = "#ffffff3b", width = 2 } }
+now = { color = "#0000004d", radius = 4, border = { color = "#96969682", width = 2 } }
