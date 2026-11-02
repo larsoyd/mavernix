@@ -1721,5 +1721,27 @@ class TestMozillaProfiles(SessionTestCase):
         self.link()
 
 
+class ShellStart(unittest.TestCase):
+    def test_shell_starts_when_runtime_dir_is_full(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            shutil.copy(SESSION_SOURCE_DIR / "run-shell", root)
+            (root / "paths.sh").write_text("shell_dir=/nowhere\n")
+            (root / "desktop.env").write_text("")
+            (root / "shell.pid").symlink_to("/dev/full")
+            fake = root / "qs"
+            fake.write_text('#!/bin/sh\necho started > "$STARTED"\n')
+            fake.chmod(0o755)
+            started = root / "started"
+            result = subprocess.run(
+                ["bash", str(root / "run-shell")],
+                env={**os.environ, "PATH": f"{root}:{os.environ['PATH']}",
+                     "STARTED": str(started),
+                     "DESKTOP_SHELL_SETTINGS": str(root / "shell.json")},
+                capture_output=True, text=True, timeout=10,
+            )
+            self.assertTrue(started.exists(), f"rc={result.returncode} stderr={result.stderr}")
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -16,5 +16,6 @@ source "$state_dir/desktop.env"
 # was started with, so env restores the default, or the shell would never end.
 # Quickshell's crash handler restarts in place while the dying copy still holds
 # the bus, and the new shell loses its names. keep-running restarts it cleanly.
-echo $$ > "$state_dir/shell.pid"
+# a full runtime dir must not stop the shell, only a switch needs this
+echo $$ > "$state_dir/shell.pid" || echo "run-shell: could not write shell.pid" >&2
 exec env --default-signal=HUP QS_DISABLE_CRASH_HANDLER=1 qs -p "$shell_dir"
