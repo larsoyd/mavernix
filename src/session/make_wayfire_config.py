@@ -56,6 +56,7 @@ BASE_PLUGINS = [
     "game-keys",
     "x11-settings",
     "x11-windows",
+    "xwayland-first-buffer",
 ]
 
 

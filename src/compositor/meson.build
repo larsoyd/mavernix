@@ -27,5 +27,6 @@ subdir('window-attention')
 subdir('window-pictures')
 subdir('x11-settings')
 subdir('x11-windows')
+subdir('xwayland-first-buffer')
 
 subdir('dock-window-reflections')
