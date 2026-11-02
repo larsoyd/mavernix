@@ -14,6 +14,7 @@ configure_file(input: 'paths.py.in', output: 'paths.py', configuration: paths,
 install_data(
     'start-desktop',
     'configure-desktop',
+    'new-session-log',
     'run-shell',
     'keep-running',
     'after-session',

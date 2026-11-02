@@ -1877,6 +1877,54 @@ class TestMozillaProfiles(SessionTestCase):
         self.link()
 
 
+class SessionLog(unittest.TestCase):
+    def setUp(self):
+        folder = tempfile.TemporaryDirectory()
+        self.addCleanup(folder.cleanup)
+        self.root = Path(folder.name)
+        self.runtime = self.root / "runtime"
+        self.runtime.mkdir()
+        self.state = self.root / "state"
+
+    def new_log(self, state=None):
+        result = subprocess.run(
+            ["bash", str(SESSION_SOURCE_DIR / "new-session-log"), str(self.runtime)],
+            env={**os.environ, "XDG_STATE_HOME": str(state or self.state)},
+            capture_output=True, text=True, timeout=10, check=True,
+        )
+        return Path(result.stdout.strip())
+
+    def test_log_is_on_disk_and_linked_from_runtime(self):
+        log = self.new_log()
+        self.assertTrue(log.exists())
+        self.assertTrue(log.is_relative_to(self.state))
+        self.assertEqual((self.runtime / "session.log").resolve(), log.resolve())
+
+    def test_replaces_a_plain_runtime_log(self):
+        (self.runtime / "session.log").write_text("old")
+        self.new_log()
+        self.assertTrue((self.runtime / "session.log").is_symlink())
+
+    def test_keeps_the_last_five(self):
+        logs = self.state / "mavernix" / "logs"
+        logs.mkdir(parents=True)
+        for day in range(1, 9):
+            old = logs / f"session-2026-01-0{day}-000000.log"
+            old.write_text("x")
+            os.utime(old, (day * 86400, day * 86400))
+        newest = self.new_log()
+        kept = sorted(p.name for p in logs.iterdir())
+        self.assertEqual(len(kept), 5, kept)
+        self.assertIn(newest.name, kept)
+        self.assertIn("session-2026-01-08-000000.log", kept)
+        self.assertNotIn("session-2026-01-04-000000.log", kept)
+
+    def test_falls_back_to_runtime_when_disk_cannot_be_written(self):
+        blocked = self.root / "file"
+        blocked.write_text("")
+        self.assertEqual(self.new_log(state=blocked), self.runtime / "session.log")
+
+
 class ShellStart(unittest.TestCase):
     def test_shell_starts_when_runtime_dir_is_full(self):
         with tempfile.TemporaryDirectory() as folder:
