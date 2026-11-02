@@ -109,6 +109,7 @@ write_application_themes() {
     link_kvantum_theme
     link_qt6ct_settings
     link_mozilla_style
+    link_gimp_style
 }
 
 # The theme's values into the session's dconf database; open GTK programs
@@ -330,6 +331,19 @@ link_mozilla_style() {
         python3 "$session_dir/link_mozilla_style.py" "$theme"
     else
         python3 "$session_dir/link_mozilla_style.py"
+    fi
+}
+
+# GIMP's stylesheet hides the GTK theme's window buttons, so it gets them from its own.
+link_gimp_style() {
+    local theme="$app_theme/share/themes/DesktopTheme"
+    if [[ -n "${DESKTOP_NESTED:-}" ]]; then
+        return 0
+    fi
+    if [[ -f "$theme/gimp/titlebar.css" && $(config_flag gtk use_theme yes) == yes ]]; then
+        python3 "$session_dir/link_gimp_style.py" "$theme"
+    else
+        python3 "$session_dir/link_gimp_style.py"
     fi
 }
 

@@ -1578,6 +1578,53 @@ normal   = { image = "dot.png" }
     def test_no_buttons_in_the_theme_writes_no_style(self):
         output = self.picture_theme("")
         self.assertFalse((output / self.STYLE).exists())
+        self.assertFalse((output / "share/themes/DesktopTheme/gimp/titlebar.css").exists())
+
+    def test_gimp_style_reaches_the_gtk_pictures(self):
+        css = (self.picture_theme(self.PICTURE_BUTTONS) / "share/themes/DesktopTheme/gimp/titlebar.css").read_text()
+        self.assertIn('url("../gtk-3.0/assets/', css)
+        self.assertNotIn('url("assets/', css)
+        self.assertIn("padding: 0", self.rule(css, "button.titlebutton.close"))
+
+
+class TestGimpTitlebar(SessionTestCase):
+    IMPORT = '@import url("mavernix/gimp/titlebar.css");\n'
+
+    def config(self, version="3.2", style=None):
+        folder = self.home / ".config/GIMP" / version
+        folder.mkdir(parents=True)
+        if style is not None:
+            (folder / "gimp.css").write_text(style)
+        return folder
+
+    def link(self, *theme):
+        return self.run_script("link_gimp_style.py", *theme)
+
+    def test_each_version_gets_the_link_and_import(self):
+        folders = [self.config("3.0"), self.config("3.2")]
+        self.link("/run/theme")
+        for folder in folders:
+            self.assertEqual(os.readlink(folder / "mavernix"), "/run/theme")
+            self.assertEqual((folder / "gimp.css").read_text(), self.IMPORT)
+
+    def test_the_users_rules_stay_and_the_import_is_not_repeated(self):
+        folder = self.config(style="#a { color: red; }\n")
+        self.link("/run/theme")
+        self.link("/run/theme")
+        self.assertEqual((folder / "gimp.css").read_text(), self.IMPORT + "#a { color: red; }\n")
+
+    def test_leaving_the_theme_removes_link_and_import(self):
+        folder = self.config(style="#a { color: red; }\n")
+        self.link("/run/theme")
+        self.link()
+        self.assertFalse((folder / "mavernix").is_symlink())
+        self.assertEqual((folder / "gimp.css").read_text(), "#a { color: red; }\n")
+
+    def test_a_folder_of_the_users_own_is_left_alone(self):
+        folder = self.config()
+        (folder / "mavernix").mkdir()
+        self.link("/run/theme")
+        self.assertFalse((folder / "gimp.css").exists())
 
 
 class TestMozillaProfiles(SessionTestCase):

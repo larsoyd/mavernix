@@ -25,6 +25,7 @@ install_data(
     'at_login.py',
     'check_theme.py',
     'extensions.py',
+    'link_gimp_style.py',
     'link_mozilla_style.py',
     'log_guard.py',
     'make_app_theme.py',

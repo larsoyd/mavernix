@@ -940,6 +940,20 @@ def write_mozilla_style(theme, output_directory):
     (folder / "titlebar.css").write_text(mozilla_titlebar_css(theme))
 
 
+def gimp_titlebar_css(theme):
+    """GIMP's own stylesheet outranks the GTK theme and leaves its title bar buttons blank."""
+    rules = "\n".join(gtk_window_buttons(theme, "gtk-3.0"))
+    return rules.replace('url("assets/', 'url("../gtk-3.0/assets/') + "\n"
+
+
+def write_gimp_style(theme, output_directory):
+    if not theme.get("window", {}).get("buttons"):
+        return
+    folder = output_directory / "share" / "themes" / APP_THEME_NAME / "gimp"
+    folder.mkdir(parents=True, exist_ok=True)
+    (folder / "titlebar.css").write_text(gimp_titlebar_css(theme))
+
+
 def kde_color(text):
     """ "#rrggbb" as KDE's settings write a colour: "red,green,blue"."""
     red, green, blue, alpha = color_tuple(text)
@@ -1099,6 +1113,7 @@ def main():
     write_gtk_themes(theme, arguments.theme, arguments.output)
     write_gtk_settings(theme, arguments.output)
     write_mozilla_style(theme, arguments.output)
+    write_gimp_style(theme, arguments.output)
     write_kde_settings(theme, arguments.output)
     write_qt6ct_settings(theme, arguments.output)
     toolkits = "Qt and GTK" if wrote_qt else "GTK only"
