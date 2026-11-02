@@ -8,6 +8,7 @@
 #define REGISTRAR "com.canonical.AppMenu.Registrar"
 #define WINDOW_MENU "mavernix-global-menu"
 #define EXPORTED_BAR "mavernix-exported-bar"
+#define HIDES_TITLEBAR "mavernix-hides-titlebar"
 
 typedef struct
 {
@@ -295,6 +296,26 @@ static gboolean on_widget_change(GSignalInvocationHint* hint, guint count, const
     return TRUE;
 }
 
+static gboolean update_titlebar(GSignalInvocationHint* hint, guint count, const GValue* values, gpointer data)
+{
+    (void)hint;
+    (void)count;
+    (void)data;
+    GtkWidget* widget = g_value_get_object(values);
+    if (!GTK_IS_WINDOW(widget))
+        return TRUE;
+    g_autofree gchar* marker = g_build_filename(g_get_user_runtime_dir(), "mavernix/hide-maximized-titlebars", NULL);
+    // GTK leaves a window's custom title bar alone, only its stock bar goes
+    gboolean hide = gtk_window_get_type_hint(GTK_WINDOW(widget)) == GDK_WINDOW_TYPE_HINT_NORMAL &&
+                    g_file_test(marker, G_FILE_TEST_EXISTS);
+    if (hide != (g_object_get_data(G_OBJECT(widget), HIDES_TITLEBAR) != NULL))
+    {
+        g_object_set_data(G_OBJECT(widget), HIDES_TITLEBAR, GINT_TO_POINTER(hide));
+        gtk_window_set_hide_titlebar_when_maximized(GTK_WINDOW(widget), hide);
+    }
+    return TRUE;
+}
+
 static void on_registrar(GDBusConnection* bus, const gchar* name, const gchar* owner, gpointer data)
 {
     (void)name;
@@ -345,9 +366,14 @@ G_MODULE_EXPORT void gtk_module_init(gint* argc, gchar*** argv)
     (void)argv;
     static gboolean initialized;
     GdkDisplay* display = gdk_display_get_default();
-    if (initialized || !GDK_IS_WAYLAND_DISPLAY(display) || g_strcmp0(g_getenv("MAVERNIX_GLOBAL_MENU"), "0") == 0)
+    if (initialized || !GDK_IS_WAYLAND_DISPLAY(display))
         return;
     initialized = TRUE;
+    // Signals cannot be looked up until the class exists
+    g_type_class_ref(GTK_TYPE_WINDOW);
+    g_signal_add_emission_hook(g_signal_lookup("window-state-event", GTK_TYPE_WIDGET), 0, update_titlebar, NULL, NULL);
+    if (g_strcmp0(g_getenv("MAVERNIX_GLOBAL_MENU"), "0") == 0)
+        return;
     struct wl_display* wayland = gdk_wayland_display_get_wl_display(display);
     struct wl_registry* registry = wl_display_get_registry(wayland);
     wl_registry_add_listener(registry, &registry_listener, NULL);

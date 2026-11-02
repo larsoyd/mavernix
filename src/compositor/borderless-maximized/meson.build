@@ -2,7 +2,7 @@
 
 # Wayfire looks for lib<name>.so, so the name must match the plugin's
 # name in metadata/borderless-maximized.xml.
-shared_module(
+borderless_maximized_plugin = shared_module(
     'borderless-maximized',
     ['borderless-maximized.cpp'],
     dependencies: [wayfire],

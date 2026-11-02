@@ -185,6 +185,83 @@ def run_session(module):
     registrar(False)
     print("[gtk-menu] PASS remap and destruction", flush=True)
 
+    def settle():
+        end = time.monotonic() + .4
+        wait(lambda: time.monotonic() > end)
+
+    def maximized_look(subject, child, look):
+        subject.show_all()
+        wait(subject.get_mapped)
+        subject.maximize()
+        wait(subject.is_maximized)
+        settle()
+        seen = look(child)
+        subject.unmaximize()
+        wait(lambda: not subject.is_maximized())
+        settle()
+        return seen
+
+    def content_top(child):
+        return child.translate_coordinates(child.get_toplevel(), 0, 0)[1]
+
+    def stock():
+        subject = Gtk.Window(title="Stock")
+        subject.set_default_size(400, 300)
+        child = Gtk.Label(label="Content")
+        subject.add(child)
+        return subject, child
+
+    marker = Path(os.environ["XDG_RUNTIME_DIR"]) / "mavernix/hide-maximized-titlebars"
+    wait(marker.exists)
+    subject, child = stock()
+    top = maximized_look(subject, child, content_top)
+    assert top == 0, f"stock bar stayed maximized top={top}"
+    assert content_top(child) > 0, "stock bar did not come back on restore"
+    subject.destroy()
+
+    subject, child = stock()
+    custom = Gtk.HeaderBar(title="Custom")
+    subject.set_titlebar(custom)
+    assert maximized_look(subject, custom, Gtk.Widget.get_child_visible), "custom title bar was hidden"
+    subject.destroy()
+
+    subject, child = stock()
+    late = Gtk.HeaderBar(title="Late")
+    subject.show_all()
+    subject.set_titlebar(late)
+    assert maximized_look(subject, late, Gtk.Widget.get_child_visible), "title bar set after showing was hidden"
+    subject.destroy()
+
+    dialog = Gtk.Dialog(title="Dialog")
+    label = Gtk.Label(label="Content")
+    dialog.get_content_area().add(label)
+    top = maximized_look(dialog, label, content_top)
+    assert top > 0, f"dialog lost its bar top={top}"
+    dialog.destroy()
+
+    subject, child = stock()
+    subject.set_type_hint(Gdk.WindowTypeHint.UTILITY)
+    top = maximized_look(subject, child, content_top)
+    assert top > 0, f"utility window lost its bar top={top}"
+    subject.destroy()
+
+    config = Path(os.environ["XDG_RUNTIME_DIR"]) / "wayfire.ini"
+    pending = config.with_suffix(".new")
+    pending.write_text(config.read_text().replace(" borderless-maximized", ""))
+    pending.replace(config)
+    wait(lambda: not marker.exists())
+    subject, child = stock()
+    top = maximized_look(subject, child, content_top)
+    assert top > 0, f"bar hidden with the extension off top={top}"
+    subject.destroy()
+
+    subject, child = stock()
+    subject.set_hide_titlebar_when_maximized(True)
+    top = maximized_look(subject, child, content_top)
+    assert top == 0, f"program's own hide request lost top={top}"
+    subject.destroy()
+    print("[gtk-menu] PASS stock title bars follow the extension", flush=True)
+
 
 def session(module):
     runtime = Path(os.environ["XDG_RUNTIME_DIR"])
@@ -193,6 +270,8 @@ def session(module):
     plugins = "ipc ipc-rules stipc window-rules kde-appmenu"
     if routes:
         plugins += " global-menu gtk-shell"
+    else:
+        plugins += " borderless-maximized"
     config.write_text(f"[core]\nplugins = {plugins}\nxwayland = {'true' if routes else 'false'}\n")
     with (runtime / "wayfire.log").open("w+") as log:
         compositor = subprocess.Popen(["wayfire", "-c", str(config)], stdout=log, stderr=log,
@@ -247,6 +326,9 @@ if __name__ == "__main__":
             if "--routes" in sys.argv:
                 environment["WAYFIRE_PLUGIN_PATH"] = str(Path(module).parent.parent / "compositor/global-menu")
                 environment["WAYFIRE_PLUGIN_XML_PATH"] = str(Path(__file__).resolve().parent.parent / "src/compositor/global-menu/metadata")
+            else:
+                environment["WAYFIRE_PLUGIN_PATH"] = str(Path(module).parent.parent / "compositor/borderless-maximized")
+                environment["WAYFIRE_PLUGIN_XML_PATH"] = str(Path(__file__).resolve().parent.parent / "src/compositor/borderless-maximized/metadata")
             bus_config = root / "bus.conf"
             bus_config.write_text('<busconfig><type>session</type><listen>unix:tmpdir=/tmp</listen>'
                                   '<policy context="default"><allow send_destination="*"/>'
