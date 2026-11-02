@@ -60,7 +60,7 @@ class GameFactsTest : public QObject
 {
 	"0"
 	{
-		"path"		"/home/lars/.local/share/Steam"
+		"path"		"/home/you/.local/share/Steam"
 		"label"		""
 		"apps"
 		{
@@ -73,7 +73,7 @@ class GameFactsTest : public QObject
 	}
 })";
         QCOMPARE(steamLibraries(file),
-                 QStringList({"/home/lars/.local/share/Steam", "/mnt/games/My \"Steam\" Library"}));
+                 QStringList({"/home/you/.local/share/Steam", "/mnt/games/My \"Steam\" Library"}));
         QCOMPARE(steamLibraries(""), QStringList());
     }
 
