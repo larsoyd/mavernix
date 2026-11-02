@@ -25,7 +25,7 @@
 class Choices;
 class DisplayModes;
 class QCheckBox;
-class QFormLayout;
+class PaneForm;
 class QLabel;
 class QRadioButton;
 class QScreen;
@@ -69,7 +69,7 @@ class DisplayPane : public QWidget
     // With one screen: where the arrangement shows up.
     QLabel* one_screen_note;
     QLabel* picked_title;
-    QFormLayout* form;
+    PaneForm* form;
     DisplayModes* modes;
     QString picked;
     // The picked screen's size, in its own pixels.

@@ -1953,5 +1953,17 @@ class ShellStart(unittest.TestCase):
             self.assertTrue(started.exists(), f"rc={result.returncode} stderr={result.stderr}")
 
 
+
+class SettingsPanesTest(unittest.TestCase):
+    def test_every_group_names_a_pane_the_program_has(self):
+        window = (SESSION_SOURCE_DIR.parent / "apps" / "settings" / "settings-window.cpp").read_text()
+        known = set(re.findall(r'^    \{"([a-z]+)", "', window, re.M))
+        self.assertIn("datetime", known)
+        config = tomllib.loads((CONFIG_DIR / "plain.toml").read_text())
+        named = [name for group in config["settings"]["groups"] for name in group]
+        self.assertEqual(sorted(set(named) - known), [])
+        self.assertEqual(sorted(known - set(named)), [])
+        self.assertEqual(len(named), len(set(named)))
+
 if __name__ == "__main__":
     unittest.main()

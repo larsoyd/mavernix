@@ -2,9 +2,9 @@
 # the session makes Qt programs follow the desktop's theme.
 
 moc_sources = qt.compile_moc(
-    headers: ['settings-window.hpp', 'overview.hpp', 'dock-pane.hpp', 'desktop-pane.hpp', 'theme-pane.hpp', 'sound-pane.hpp',
+    headers: ['settings-window.hpp', 'overview.hpp', 'dock-pane.hpp', 'desktop-pane.hpp', 'general-pane.hpp', 'datetime-pane.hpp', 'sound-pane.hpp',
         'trackpad-pane.hpp', 'mouse-pane.hpp', 'network-pane.hpp', 'picture-chooser.hpp', 'energy-pane.hpp', 'display-pane.hpp',
-        'desktops-pane.hpp', 'windows-pane.hpp', 'toolkits-pane.hpp', 'extensions-pane.hpp', 'source-list-delegate.hpp', 'bluetooth-pane.hpp',
+        'desktops-pane.hpp', 'windows-pane.hpp', 'extensions-pane.hpp', 'source-list-delegate.hpp', 'bluetooth-pane.hpp',
         'icons-pane.hpp', 'keyboard-pane.hpp', 'defaults-pane.hpp', 'shortcut-editor.hpp', 'program-shortcut-dialog.hpp',
         'shortcut-recorder.hpp', 'compositor-link.hpp', 'input-sources-pane.hpp', 'icon-chooser.hpp', 'startup-pane.hpp', 'display-modes.hpp', 'screen-arrangement.hpp'],
     dependencies: qt_widgets,
@@ -19,7 +19,9 @@ executable(
         'overview.cpp',
         'dock-pane.cpp',
         'desktop-pane.cpp',
-        'theme-pane.cpp',
+        'general-pane.cpp',
+        'datetime-pane.cpp',
+        'menu-bar-box.cpp',
         'sound-pane.cpp',
         'trackpad-pane.cpp',
         'mouse-pane.cpp',
@@ -30,7 +32,6 @@ executable(
         'panel-modes.cpp',
         'desktops-pane.cpp',
         'windows-pane.cpp',
-        'toolkits-pane.cpp',
         'extensions-pane.cpp',
         'source-list-delegate.cpp',
         'bluetooth-pane.cpp',

@@ -1,7 +1,6 @@
 #include "desktop-pane.hpp"
 
 #include <QCheckBox>
-#include <QFormLayout>
 #include <QLabel>
 #include <QLineEdit>
 #include <QSlider>
@@ -17,14 +16,12 @@ DesktopPane::DesktopPane(Choices& choices, QWidget* parent) : QWidget(parent)
 {
     const QVariantMap words = choices.configTable(QStringLiteral("settings")).value(QStringLiteral("words")).toMap();
 
-    auto* form = new QFormLayout(this);
-    form->setLabelAlignment(Qt::AlignRight | Qt::AlignTop);
-    form->setFormAlignment(Qt::AlignHCenter | Qt::AlignTop);
-    form->setVerticalSpacing(14);
+    auto* form = new PaneForm(this);
     // The pictures take the pane's whole width, under their label: beside a
     // label they would not fit the window.
-    form->addRow(new QLabel(words.value(QStringLiteral("desktop_picture"), QStringLiteral("Picture:")).toString()));
-    form->addRow(new PictureChooser(choices));
+    form->addWide(new QLabel(words.value(QStringLiteral("desktop_picture"), QStringLiteral("Picture:")).toString()));
+    form->addWide(new PictureChooser(choices));
+    form->addDivider();
 
     auto* translucent = new QCheckBox(
         words.value(QStringLiteral("translucent_menu_bar"), QStringLiteral("Translucent menu bar")).toString());
@@ -33,7 +30,17 @@ DesktopPane::DesktopPane(Choices& choices, QWidget* parent) : QWidget(parent)
     translucent->setChecked(translucency.toBool());
     connect(translucent, &QCheckBox::toggled, this,
         [&choices](bool on) { choices.set(QStringLiteral("panel"), QStringLiteral("translucent_menu_bar"), on); });
-    form->addRow(QString(), translucent);
+    form->addCheck(translucent);
+
+    // Only a translucent menu bar shows it.
+    auto* menu_bar_blur =
+        new QCheckBox(words.value(QStringLiteral("menu_bar_blur"), QStringLiteral("Blur menu bar")).toString());
+    menu_bar_blur->setChecked(choices.value(QStringLiteral("blur"), QStringLiteral("menu_bar")).toBool());
+    connect(menu_bar_blur, &QCheckBox::toggled, this,
+        [&choices](bool on) { choices.set(QStringLiteral("blur"), QStringLiteral("menu_bar"), on); });
+    form->addCheck(menu_bar_blur);
+    // only where the desktop lets the menu bar blur
+    form->setRowVisible(menu_bar_blur, choices.value(QStringLiteral("blur"), QStringLiteral("panel")).toBool());
 
     // How much of the desktop shows through the translucent menu bar ([blur]
     // panel_opacity); the theme's, else opaque, until chosen.
@@ -59,7 +66,7 @@ DesktopPane::DesktopPane(Choices& choices, QWidget* parent) : QWidget(parent)
     files->setChecked(choices.value(QStringLiteral("desktop_files"), QStringLiteral("show")).toBool());
     connect(files, &QCheckBox::toggled, this,
         [&choices](bool on) { choices.set(QStringLiteral("desktop_files"), QStringLiteral("show"), on); });
-    form->addRow(QString(), files);
+    form->addCheck(files);
 
     // The name the menu bar shows while no window is active, over the
     // desktop's own first menu ([desktop_menus] name). A desktop without

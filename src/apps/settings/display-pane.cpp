@@ -6,7 +6,6 @@
 #include <QDBusPendingCall>
 #include <QDir>
 #include <QFile>
-#include <QFormLayout>
 #include <QGuiApplication>
 #include <QHBoxLayout>
 #include <QLabel>
@@ -137,7 +136,9 @@ DisplayPane::DisplayPane(Choices& choices, QWidget* parent) : QWidget(parent), c
     auto* choice = new QWidget;
     auto* choice_rows = new QVBoxLayout(choice);
     choice_rows->setContentsMargins(0, 0, 0, 0);
-    choice_rows->setSpacing(8);
+    choice_rows->setSpacing(4);
+    keep_to_pitch(automatic);
+    keep_to_pitch(chosen);
     choice_rows->addWidget(automatic);
     choice_rows->addWidget(chosen);
     choice_rows->addWidget(
@@ -193,9 +194,7 @@ DisplayPane::DisplayPane(Choices& choices, QWidget* parent) : QWidget(parent), c
     rows->addWidget(arrangement, 0, Qt::AlignHCenter);
     rows->addWidget(arrangement_note, 0, Qt::AlignHCenter);
     rows->addWidget(picked_title, 0, Qt::AlignHCenter);
-    form = new QFormLayout;
-    form->setLabelAlignment(Qt::AlignRight | Qt::AlignTop);
-    form->setFormAlignment(Qt::AlignHCenter | Qt::AlignTop);
+    form = new PaneForm(nullptr);
     rows->addLayout(form);
     rows->addWidget(one_screen_note, 0, Qt::AlignHCenter);
     rows->addWidget(off_screens, 0, Qt::AlignHCenter);
@@ -214,8 +213,8 @@ DisplayPane::DisplayPane(Choices& choices, QWidget* parent) : QWidget(parent), c
         }
     });
     form->addRow(word("display_size", "Size of text and pictures:"), choice);
-    form->addRow(QString(), main_here);
-    form->addRow(QString(), use_here);
+    form->addCheck(main_here);
+    form->addCheck(use_here);
 
     // Brightness, for a screen with a backlight; the brightness keys change it too.
     backlight = backlight_name();

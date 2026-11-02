@@ -14,13 +14,13 @@
 
 #include "choices.hpp"
 
-static const QSize THUMBNAIL_SIZE(112, 70);
-static const QSize CELL_SIZE(128, 100);
-// Three rows and a bit of the fourth, which says there is more; on a
-// screen too short for that, as little as one row and a bit.
-static const int COLUMNS_SHOWN = 3;
-static const int LIST_HEIGHT_PX = 3 * CELL_SIZE.height() + 35;
-static const int LIST_LEAST_HEIGHT_PX = CELL_SIZE.height() + 35;
+static const QSize THUMBNAIL_SIZE(128, 80);
+static const QSize CELL_SIZE(150, 112);
+// Two rows and a bit of the third, which says there is more; on a screen
+// too short for that, as little as one row and a bit.
+static const int COLUMNS_SHOWN = 4;
+static const int LIST_HEIGHT_PX = 2 * CELL_SIZE.height() + 26;
+static const int LIST_LEAST_HEIGHT_PX = CELL_SIZE.height() + 26;
 // The list wraps a little before a row is really full; this much more
 // width keeps COLUMNS_SHOWN in a row (found by trying).
 static const int ROW_SLACK_PX = 8;

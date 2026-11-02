@@ -2,10 +2,10 @@
 
 #include <QCheckBox>
 #include <QComboBox>
-#include <QFormLayout>
 #include <QSpinBox>
 
 #include "choices.hpp"
+#include "pane-parts.hpp"
 
 // How long a window is held at the screen's side before it goes to the
 // next desktop, when the config names no time.
@@ -65,14 +65,25 @@ DesktopsPane::DesktopsPane(Choices& choices, QWidget* parent) : QWidget(parent),
         this->choices.set(table, QStringLiteral("drag_to_edge_ms"), on ? wait_when_on : never);
     });
 
-    // Labels in one column, ending where the controls begin.
-    auto* form = new QFormLayout(this);
-    form->setLabelAlignment(Qt::AlignRight | Qt::AlignTop);
-    form->setFormAlignment(Qt::AlignHCenter | Qt::AlignTop);
-    form->setVerticalSpacing(14);
-    // A control is as wide as what it shows, not as the window.
-    form->setFieldGrowthPolicy(QFormLayout::FieldsStayAtSizeHint);
+    // the labels are short and the tick box texts long
+    auto* form = new PaneForm(this, 165);
     form->addRow(word("desktops_count", "Desktops:"), count);
     form->addRow(word("desktops_swipe", "Swipe between desktops:"), swipe);
-    form->addRow(QString(), edge);
+    form->addCheck(edge);
+    form->addDivider();
+
+    // the original keeps what several displays do with their desktops here
+    auto* every_screen = new QCheckBox(word("menu_bar_every_screen", "Show the menu bar on every display"));
+    every_screen->setChecked(choices.value(QStringLiteral("panel"), QStringLiteral("every_screen")).toBool());
+    connect(every_screen, &QCheckBox::toggled, this,
+        [this](bool on) { this->choices.set(QStringLiteral("panel"), QStringLiteral("every_screen"), on); });
+    form->addCheck(every_screen);
+
+    auto* own_menus = new QCheckBox(word("menu_bar_own_menus", "Give each display the menus of its own window"));
+    own_menus->setChecked(choices.value(QStringLiteral("panel"), QStringLiteral("menus_per_screen")).toBool());
+    own_menus->setEnabled(every_screen->isChecked());
+    connect(every_screen, &QCheckBox::toggled, own_menus, &QCheckBox::setEnabled);
+    connect(own_menus, &QCheckBox::toggled, this,
+        [this](bool on) { this->choices.set(QStringLiteral("panel"), QStringLiteral("menus_per_screen"), on); });
+    form->addCheck(own_menus);
 }

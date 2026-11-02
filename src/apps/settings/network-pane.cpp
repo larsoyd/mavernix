@@ -1,5 +1,6 @@
 #include "network-pane.hpp"
 
+#include <QCheckBox>
 #include <QDBusArgument>
 #include <QDBusConnection>
 #include <QDBusInterface>
@@ -29,6 +30,7 @@
 #include <algorithm>
 
 #include "choices.hpp"
+#include "menu-bar-box.hpp"
 #include "pane-parts.hpp"
 
 // A connection's settings: setting name -> its properties.
@@ -232,12 +234,20 @@ NetworkPane::NetworkPane(Choices& choices, QWidget* parent) : QWidget(parent)
     box_rows->addLayout(addresses);
     box_rows->addStretch();
 
-    auto* columns = new QHBoxLayout(this);
+    auto* rows = new QVBoxLayout(this);
     // The list and the box fill the pane's width; a margin would push them out of the window.
-    columns->setContentsMargins(0, 0, 0, 0);
+    rows->setContentsMargins(0, 0, 0, 0);
+    rows->setSpacing(pane_spacing_px);
+    auto* columns = new QHBoxLayout;
     columns->setSpacing(list_to_box_px);
     columns->addWidget(services);
     columns->addWidget(box);
+    rows->addLayout(columns);
+    if (QCheckBox* status_item =
+            menu_bar_box(choices, QStringLiteral("network"), word("network_in_menu_bar", "Show Wi-Fi status in menu bar")))
+    {
+        rows->addWidget(status_item);
+    }
 
     reading_soon = new QTimer(this);
     reading_soon->setSingleShot(true);

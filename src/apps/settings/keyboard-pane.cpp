@@ -1,6 +1,7 @@
 #include "keyboard-pane.hpp"
 
 #include <QCheckBox>
+#include <QGridLayout>
 #include <QHBoxLayout>
 #include <QHeaderView>
 #include <QLabel>
@@ -163,15 +164,13 @@ KeyboardPane::KeyboardPane(Choices& choices, QWidget* parent) : QWidget(parent),
     connect(all_x11, &QCheckBox::toggled, this,
         [this](bool on) { this->choices.set(QStringLiteral("game_keys"), QStringLiteral("all_x11"), on); });
 
-    auto* right = new QVBoxLayout;
-    right->addWidget(table);
-    right->addLayout(buttons);
-    right->addWidget(note_label);
-    right->addWidget(all_x11);
-
-    auto* columns = new QHBoxLayout(this);
-    columns->addWidget(category_list, 0, Qt::AlignTop);
-    columns->addLayout(right);
+    // the buttons need the width of both columns
+    auto* lists = new QGridLayout(this);
+    lists->addWidget(category_list, 0, 0);
+    lists->addWidget(table, 0, 1);
+    lists->addLayout(buttons, 1, 0, 1, 2);
+    lists->addWidget(note_label, 2, 0, 1, 2);
+    lists->addWidget(all_x11, 3, 0, 1, 2);
     category_list->setFixedHeight(table_height_px);
 
     connect(category_list, &QListWidget::currentRowChanged, this, &KeyboardPane::showCategory);

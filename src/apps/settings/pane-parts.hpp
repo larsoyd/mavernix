@@ -6,6 +6,7 @@
 #include <QList>
 #include <QFontMetrics>
 #include <QGridLayout>
+#include <QHash>
 #include <QSize>
 #include <QString>
 
@@ -24,14 +25,27 @@ class PaneForm : public QGridLayout
     void addRow(const QString& label, QWidget* control);
     void addRow(QWidget* label, QWidget* control);
     void addCheck(QWidget* box);
+    void addWide(QWidget* whole_row);
     void addDivider();
+    void setRowVisible(QWidget* control, bool visible);
 
   private:
+    struct Row
+    {
+        QWidget* label;
+        int gap_row;
+        int gap_px;
+    };
+
     void leaveRoom(int height_px);
 
     int axis;
     int next_row = 0;
+    QHash<QWidget*, Row> rows;
 };
+
+// kvantum asks 34 px for a tick box or radio button whose mark is 18
+void keep_to_pitch(QWidget* box);
 
 // A slider with a small word under each end ("Small" ... "Large").
 QWidget* with_end_words(QSlider* slider, const QString& low, const QString& high);

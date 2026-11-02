@@ -67,6 +67,22 @@ tests = {
         'include': test_sources / 'apps/settings',
         'dependencies': [],
     },
+    'datetime-pane': {
+        'sources': [
+            test_sources / 'apps/settings/datetime-pane.cpp',
+            test_sources / 'apps/settings/menu-bar-box.cpp',
+            test_sources / 'apps/settings/pane-parts.cpp',
+            test_sources / 'apps/settings/choices.cpp',
+            qt.compile_moc(headers: test_sources / 'apps/settings/datetime-pane.hpp', dependencies: qt_widgets),
+        ],
+        'include': test_sources / 'apps/settings',
+        'dependencies': [qt_widgets],
+    },
+    'menu-bar-box': {
+        'sources': [test_sources / 'apps/settings/menu-bar-box.cpp', test_sources / 'apps/settings/choices.cpp'],
+        'include': test_sources / 'apps/settings',
+        'dependencies': [qt_widgets],
+    },
     'pane-layout': {
         'sources': [test_sources / 'apps/settings/pane-parts.cpp'],
         'include': test_sources / 'apps/settings',

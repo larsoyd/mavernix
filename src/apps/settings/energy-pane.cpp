@@ -7,7 +7,6 @@
 #include <QDBusPendingCallWatcher>
 #include <QDBusPendingReply>
 #include <QDBusVariant>
-#include <QFormLayout>
 #include <QHBoxLayout>
 #include <QLabel>
 #include <QSlider>
@@ -15,6 +14,7 @@
 #include <QVBoxLayout>
 
 #include "choices.hpp"
+#include "menu-bar-box.hpp"
 #include "pane-parts.hpp"
 
 // In minutes; "never" comes after them.
@@ -84,6 +84,7 @@ EnergyPane::EnergyPane(Choices& choices, QWidget* parent) : QWidget(parent), cho
     auto* lock_rows = new QVBoxLayout(lock_group);
     lock_rows->setContentsMargins(0, 0, 0, 0);
     lock_rows->setSpacing(2);
+    keep_to_pitch(locks);
     lock_rows->addWidget(locks);
     const QString meaning = word("energy_lock_note", "");
     if (!meaning.isEmpty())
@@ -103,13 +104,11 @@ EnergyPane::EnergyPane(Choices& choices, QWidget* parent) : QWidget(parent), cho
     connect(sleep, &QSlider::valueChanged, this, &EnergyPane::showLockNote);
     connect(locks, &QCheckBox::toggled, this, &EnergyPane::showLockNote);
 
-    auto* form = new QFormLayout(this);
-    form->setLabelAlignment(Qt::AlignRight | Qt::AlignTop);
-    form->setFormAlignment(Qt::AlignHCenter | Qt::AlignTop);
-    form->setVerticalSpacing(14);
+    auto* form = new PaneForm(this);
     form->addRow(word("energy_screen_off", "Switch the screen off after:"), screen_off_row);
     form->addRow(word("energy_sleep", "Put the computer to sleep after:"), sleep_row);
-    form->addRow(QString(), lock_group);
+    form->addDivider();
+    form->addCheck(lock_group);
     showLockNote();
 
     // What the shell does with it (src/shell/Idle.qml); "sleep" is the
@@ -155,9 +154,15 @@ EnergyPane::EnergyPane(Choices& choices, QWidget* parent) : QWidget(parent), cho
             form->setRowVisible(lid_off, has_lid);
         });
     }
+
+    if (QCheckBox* battery = menu_bar_box(choices, QStringLiteral("battery"),
+            word("energy_in_menu_bar", "Show battery status in menu bar")))
+    {
+        form->addCheck(battery);
+    }
 }
 
-QHBoxLayout* EnergyPane::timeSlider(const QString& key, QSlider*& slider)
+QWidget* EnergyPane::timeSlider(const QString& key, QSlider*& slider)
 {
     const int chosen_seconds = choices.value(QStringLiteral("idle"), key).toInt();
 
@@ -206,11 +211,12 @@ QHBoxLayout* EnergyPane::timeSlider(const QString& key, QSlider*& slider)
         write();
     });
 
-    auto* row = new QHBoxLayout;
-    row->setSpacing(10);
-    row->addWidget(slider);
-    row->addWidget(time);
-    row->addStretch();
+    auto* row = new QWidget;
+    auto* across = new QHBoxLayout(row);
+    across->setContentsMargins(0, 0, 0, 0);
+    across->setSpacing(10);
+    across->addWidget(slider);
+    across->addWidget(time);
     return row;
 }
 

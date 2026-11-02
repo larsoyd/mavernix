@@ -22,7 +22,7 @@
 
 class Choices;
 class QComboBox;
-class QFormLayout;
+class PaneForm;
 class QWidget;
 
 struct ModedScreen
@@ -42,7 +42,7 @@ class DisplayModes : public QObject
     DisplayModes(Choices& choices, QWidget* pane);
 
     // Adds the rows, hidden until the compositor has answered.
-    void addRowsTo(QFormLayout* form);
+    void addRowsTo(PaneForm* form);
     // Top to bottom, for the pane's tab order.
     QList<QWidget*> lists() const;
     // The screen whose modes the rows show.
@@ -74,7 +74,7 @@ class DisplayModes : public QObject
     Choices& choices;
     QWidget* pane;
     QVariantMap words;
-    QFormLayout* form = nullptr;
+    PaneForm* form = nullptr;
     QString shown_name;
     QComboBox* resolution_list;
     QComboBox* refresh_list;

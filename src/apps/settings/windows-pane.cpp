@@ -2,7 +2,6 @@
 
 #include <QCheckBox>
 #include <QComboBox>
-#include <QFormLayout>
 #include <QProcess>
 #include <QSlider>
 
@@ -158,30 +157,22 @@ WindowsPane::WindowsPane(Choices& choices, QWidget* parent) : QWidget(parent), c
         QProcess::startDetached(reconfigure_command, {});
     });
 
-    // Labels in one column, ending where the controls begin.
-    auto* form = new QFormLayout(this);
-    form->setLabelAlignment(Qt::AlignRight | Qt::AlignTop);
-    form->setFormAlignment(Qt::AlignHCenter | Qt::AlignTop);
-    form->setVerticalSpacing(14);
-    // A control is as wide as what it shows, not as the window.
-    form->setFieldGrowthPolicy(QFormLayout::FieldsStayAtSizeHint);
-    form->addRow(QString(),
-        with_note(snap, word("windows_snap_note", "Dragging a window to a side, a corner or the top resizes it, so it "
-                                                  "fills that half, quarter or the whole screen.")));
-    form->addRow(
-        QString(), with_note(quit_all,
-                       word("windows_quit_closes_app_note",
-                           "The Close Window shortcut quits the program too, so all of its windows close at once.")));
-    form->addRow(QString(),
-        with_note(switcher_windows,
-            word("windows_switcher_windows_note", "Press Down on a program in the switcher, so you can pick one of its "
-                                                  "windows instead of the last one used.")));
-    form->addRow(QString(),
-        with_note(borderless, word("windows_borderless_note",
-                                  "Games open full screen on the screen they chose, so borderless ones fill it too.")));
-    form->addRow(word("windows_snap_distance", "Snap when this close:"), snap_row);
-    form->addRow(word("windows_resize_reach", "Edge to resize by:"), reach_row);
+    // room for the longest label on one line
+    auto* form = new PaneForm(this, 245);
     form->addRow(word("windows_drag_key", "Move and resize a window by holding:"), drag_key);
     form->addRow(word("windows_double_click", "A double click on a title bar:"), double_click);
     form->addRow(word("windows_buttons", "Window buttons:"), button_side);
+    form->addDivider();
+    form->addCheck(with_note(snap,
+        word("windows_snap_note",
+            "At the left or right side: that half. In a corner: that quarter. At the top: the whole screen.")));
+    form->addRow(word("windows_snap_distance", "Snap when this close:"), snap_row);
+    form->addRow(word("windows_resize_reach", "Edge to resize by:"), reach_row);
+    form->addDivider();
+    form->addCheck(with_note(quit_all, word("windows_quit_closes_app_note",
+        "The Close Window shortcut quits the program too, so all of its windows close at once.")));
+    form->addCheck(with_note(switcher_windows, word("windows_switcher_windows_note",
+        "Press Down on a program in the switcher, so you can pick one of its windows instead of the last one used.")));
+    form->addCheck(with_note(borderless, word("windows_borderless_note",
+        "Games open full screen on the screen they chose, so borderless ones fill it too.")));
 }

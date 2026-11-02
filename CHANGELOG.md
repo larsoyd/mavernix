@@ -4,11 +4,12 @@
 
 ### Added
 
-- The menu bar can be on every display: Settings, Dock & Menu Bar, Show the menu bar on every display. All of them show the same menus, or each display's own window with Give each display the menus of its own window, as on OS X, where the bars of the other displays fade.
+- The menu bar can be on every display: Settings, Mission Control, Show the menu bar on every display. All of them show the same menus, or each display's own window with Give each display the menus of its own window, as on OS X, where the bars of the other displays fade.
 - Focus follows mouse can leave the menu bar alone until you click a window: Settings, Extensions, Focus follows mouse.
 
 ### Changed
 
+- System Preferences is laid out as on OS X: every pane has one column of labels, rows sit close together and lines part the subjects. General takes in Theme and App Style, Date & Time is new, and each menu bar item is now chosen in the pane about that thing. Sound has tabs, and the buttons in Keyboard are no longer cut off.
 - Dock icons are drawn sharper: each is read at the largest size and shrunk with a Lanczos filter, at every size, as on OS X. Building now needs Qt Shader Tools.
 - A program's own icon in the dock is scaled and centred by the proportions of the theme's art, so it no longer looks small, high or heavy beside the others. This replaces `foreign_icon_fill`.
 
