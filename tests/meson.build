@@ -91,6 +91,12 @@ test(
 )
 
 test(
+    'shell-weak-maps',
+    python,
+    args: [files('test_shell_weak_maps.py')],
+)
+
+test(
     'cursors',
     python,
     args: [files('test_cursors.py')],

@@ -446,16 +446,18 @@ PanelWindow {
     }
 
     // a new title gets here before the native module knows it, the last picture stands in
-    readonly property var lastPictures: new WeakMap()
+    // by number since qt can free strings kept in a WeakMap while it marks
+    readonly property var lastPictures: ({})
     function windowPicture(window, entry) {
         // Read so that bindings follow the pictures.
         windowPictures.revision
         const picture = windowPictures.tileFor(window.appId, window.title, sameNamedBefore(window),
                                                entry !== null ? themeIcons.nameFor(entry) : WindowPrograms.icon(window.appId))
+        const number = windowNumber(window)
         if (picture !== "") {
-            lastPictures.set(window, picture)
+            lastPictures[number] = picture
         }
-        return lastPictures.get(window) ?? ""
+        return lastPictures[number] ?? ""
     }
     // Brings a minimised window back. The native module switches to its
     // desktop first if needed and restores it when the slide is over.
