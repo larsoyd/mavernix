@@ -10,6 +10,8 @@
 #include <QWidget>
 
 class OverviewCell;
+class Spotlights;
+class QVariantAnimation;
 
 class Overview : public QWidget
 {
@@ -29,8 +31,10 @@ class Overview : public QWidget
 
     QSize sizeHint() const override;
 
-    // Pales the panes whose title does not hold `text`.
+    // dims the window but for the panes that hold the text, the first one brightest
     void mark(const QString& text);
+    // the groups in stripes, or all panes by name in one
+    void setAlphabetical(bool alphabetical);
     // Empty if none does.
     QString firstWith(const QString& text) const;
 
@@ -39,8 +43,11 @@ class Overview : public QWidget
 
   protected:
     void paintEvent(QPaintEvent* event) override;
+    void resizeEvent(QResizeEvent* event) override;
 
   private:
+    void arrange();
+
     struct Stripe
     {
         int top;
@@ -53,6 +60,8 @@ class Overview : public QWidget
         QString name;
         QString title;
         QString keywords;
+        int group;
+        int place;
 
         // Whether a search for `text` finds it, by its title or a keyword.
         bool matches(const QString& text) const
@@ -63,6 +72,10 @@ class Overview : public QWidget
     QList<Button> buttons;
 
     QVariantMap looks;
+    Spotlights* spotlights;
+    QVariantAnimation* spotlights_fade;
+    bool alphabetical = false;
+    int spotlight_y = 0;
     int total_width = 0;
     int total_height = 0;
 };

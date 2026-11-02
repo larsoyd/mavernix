@@ -1,5 +1,6 @@
 #include "settings-window.hpp"
 
+#include <QActionGroup>
 #include <QHBoxLayout>
 #include <QIcon>
 #include <QLineEdit>
@@ -432,6 +433,24 @@ void SettingsWindow::makeMenus(const QVariantMap& words)
         this, [this]() { stepInHistory(1); });
     view->addAction(
         word("menu_show_all", "Show All"), QKeySequence(Qt::CTRL | Qt::Key_L), this, &SettingsWindow::showOverview);
+    view->addSeparator();
+    // kept among the user's choices, the original also remembers it
+    const bool alphabetical = choices.value(QStringLiteral("settings"), QStringLiteral("alphabetical")).toBool();
+    auto* order = new QActionGroup(this);
+    const auto add_order = [this, view, order, alphabetical](const QString& title, bool by_name) {
+        QAction* action = view->addAction(title);
+        action->setCheckable(true);
+        action->setChecked(alphabetical == by_name);
+        order->addAction(action);
+        connect(action, &QAction::triggered, this, [this, by_name]() {
+            choices.set(QStringLiteral("settings"), QStringLiteral("alphabetical"), by_name);
+            overview->setAlphabetical(by_name);
+            fitHeight();
+        });
+    };
+    add_order(word("menu_organize_categories", "Organize by Categories"), false);
+    add_order(word("menu_organize_alphabetically", "Organize Alphabetically"), true);
+    overview->setAlphabetical(alphabetical);
     view->addAction(word("menu_search", "Search"), QKeySequence::Find, this, [this]() {
         search->setFocus();
         search->selectAll();
