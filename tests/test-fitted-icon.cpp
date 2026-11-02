@@ -119,6 +119,15 @@ class TestFittedIcon : public QObject
         expect_near(QRectF(art).center().y(), 63, "centre y");
     }
 
+    void speck_of_a_drawing_stays_small_and_centred()
+    {
+        const QString speck = QStringLiteral("<rect x='100' y='10' width='1' height='1' fill='red'/>");
+        const QRect art = art_of(fitted(written_drawing(speck)));
+        expect_near(art.width(), 4, "width");
+        expect_near(QRectF(art).center().x(), 64, "centre x");
+        expect_near(QRectF(art).center().y(), 63, "centre y");
+    }
+
     void picture_file_is_fitted_too()
     {
         QImage source(64, 64, QImage::Format_ARGB32_Premultiplied);

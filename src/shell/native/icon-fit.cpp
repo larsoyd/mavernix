@@ -9,6 +9,10 @@ static const double longest_share = 118.0 / 128;
 static const double middle_height = 63.0 / 128;
 static const double most_cover = 0.66;
 
+// a speck of art would otherwise ask for a picture of gigabytes, real icons need under 4
+static const double most_growth = 4;
+static const double most_drawn_side = 4096;
+
 // anything fainter is a shadow or a glow, not part of the shape
 static const int art_alpha = 128;
 
@@ -40,6 +44,7 @@ IconFit fit_icon(const QImage& drawn, int side)
     {
         scale *= std::sqrt(most_cover / cover);
     }
+    scale = qMin(scale, qMin(most_growth, most_drawn_side / side));
     const double middle_x = art.x() + art.width() / 2.0;
     const double middle_y = art.y() + art.height() / 2.0;
     return {scale, QPointF(side / 2.0 - middle_x * scale, side * middle_height - middle_y * scale)};
