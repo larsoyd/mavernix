@@ -745,6 +745,8 @@ def change_controls(theme, prokit):
     theme.set("controls.popup_button", "slice", str(POPUP_SLICE), note)
     theme.set("controls.popup_button", "text_inset", str(POPUP_TEXT_INSET), "as in the light theme, 10 after the box's border.")
     theme.set("controls.tabs", "slice", str(TAB_SLICE), note + " The pane under them stays the light theme's see-through darkening.")
+    for key in ("separator", "selected_separator"):
+        theme.remove("controls.tabs", key, "pictures of the light tabs, the dark ones have a line of their own colour.")
     theme.set("controls.slider", "track_slice", str(SLIDER_TRACK_SLICE), note)
     theme.set("controls.progress_bar", "track_slice", str(PROGRESS_TRACK_SLICE), note)
     # ProKit has no tool bar button ("tbsegments" in the light theme); its lone

@@ -164,6 +164,38 @@ class KvantumPicture:
             part = image.crop(tuple(edge * density for edge in box))
             self.add(name + ending, part, box[2] - box[0], box[3] - box[1])
 
+    def add_tab_line(self, name, picture_path, line_path, slice_edges):
+        """Adds the line between two joined tabs, along the right edge of the tab's end strip.
+
+        Kvantum stretches it over that strip, in three parts. It is the middle
+        column of `line_path`, a picture of a tab as tall as the tab's own,
+        or without one a line in the colour of the tab picture's rim.
+        """
+        image = Image.open(double_density(picture_path)).convert("RGBA")
+        logical = Image.open(picture_path).size
+        density = image.size[0] // logical[0]
+        top, right, bottom, _ = slice_edges
+
+        width = right * density
+        line = Image.new("RGBA", (width, image.size[1]), (0, 0, 0, 0))
+        if line_path is not None:
+            art = Image.open(double_density(line_path)).convert("RGBA")
+            middle = art.size[0] // 2
+            line.paste(art.crop((middle, 0, middle + density, art.size[1])), (width - density, 0))
+        else:
+            middle_row = image.size[1] // 2
+            rim = next(image.getpixel((x, middle_row)) for x in range(image.size[0])
+                       if image.getpixel((x, middle_row))[3] > 0)
+            # a shadow under the picture is left out
+            rows = [y for y in range(image.size[1])
+                    if image.getpixel((image.size[0] // 2, y))[3] > 64]
+            line.paste(rim, (width - density, rows[0], width, rows[-1] + 1))
+
+        lower_edge = logical[1] - bottom
+        self.add(f"{name}-top", line.crop((0, 0, width, top * density)), right, top)
+        self.add(name, line.crop((0, top * density, width, lower_edge * density)), right, lower_edge - top)
+        self.add(f"{name}-bottom", line.crop((0, lower_edge * density, width, image.size[1])), right, bottom)
+
     def add_whole(self, name, picture_path):
         """Adds a fixed-size element: one picture, shown at its own size."""
         image = Image.open(double_density(picture_path)).convert("RGBA")
@@ -387,6 +419,9 @@ def write_kvantum_theme(theme, theme_directory, output_directory):
         use_stretching_picture(section, KVANTUM_TAB_ELEMENT, tabs["slice"])
         for side in ("top", "bottom"):
             section[f"text.margin.{side}"] = "0"
+        if "label_padding" in tabs:
+            section["text.margin.left"] = str(max(0, tabs["label_padding"] - tabs["slice"][3]))
+            section["text.margin.right"] = str(max(0, tabs["label_padding"] - tabs["slice"][1]))
         text_color = controls.get("text_color", "#000000")
         for state in ("normal", "focus", "press"):
             section[f"text.{state}.color"] = text_color
@@ -395,6 +430,14 @@ def write_kvantum_theme(theme, theme_directory, output_directory):
 
         general = settings["%General"]
         general["joined_inactive_tabs"] = str(tabs.get("joined", False)).lower()
+        # with a line to draw kvantum joins the selected tab to the others too
+        if tabs.get("joined", False):
+            for kvantum_state, our_state, line_key in (("normal", "normal", "separator"),
+                                                       ("toggled", "selected", "selected_separator")):
+                line_path = theme_directory / tabs[line_key] if line_key in tabs else None
+                picture.add_tab_line(f"{KVANTUM_TAB_ELEMENT}-separator-{kvantum_state}",
+                                     theme_directory / tabs.get(our_state, tabs["normal"]), line_path,
+                                     tabs["slice"])
         general["center_normal_tabs"] = str(tabs.get("centered", False)).lower()
         general["embedded_tabs"] = str(tabs.get("on_pane_edge", False)).lower()
         # The selected tab is a picture like the others, not a piece of the pane.

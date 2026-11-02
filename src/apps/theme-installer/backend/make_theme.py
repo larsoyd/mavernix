@@ -513,6 +513,8 @@ CONTROL_PICTURES = {
     "tab-selected": "tab-clear-horizontal-on-regular",
     "tab-selected-pressed": "tab-clear-horizontal-on-pressed-regular",
     "tab-disabled": "tab-clear-disabled-horizontal-regular",
+    "tab-separator": "tab-clear-horizontal-regular-separator",
+    "tab-selected-separator": "tab-clear-horizontal-on-regular-separator",
     "tab-pane": "tabpane-alpha",
     "popup": "popup-clear-regular-rightsidebutton",
     "popup-pressed": "popup-clear-pressed-regular-rightsidebutton",
@@ -2009,6 +2011,9 @@ selected_pressed = "images/controls/tab-selected-pressed.png"
 disabled = "images/controls/tab-disabled.png"
 selected_text_color = "#ffffff"
 joined = true
+separator = "images/controls/tab-separator.png"
+selected_separator = "images/controls/tab-selected-separator.png"
+label_padding = 9
 centered = true
 on_pane_edge = true
 pane = "images/controls/tab-pane.png"
