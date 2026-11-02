@@ -24,6 +24,14 @@ BuildRequires:  pkgconfig(tomlplusplus)
 BuildRequires:  pkgconfig(gio-unix-2.0)
 BuildRequires:  pkgconfig(librsvg-2.0)
 BuildRequires:  pkgconfig(xcb-randr)
+BuildRequires:  pkgconfig(gtk+-wayland-3.0)
+BuildRequires:  pkgconfig(dbusmenu-gtk3-0.4)
+BuildRequires:  pkgconfig(wayland-client)
+BuildRequires:  pkgconfig(xcb)
+BuildRequires:  wayland-devel
+BuildRequires:  python3-gobject
+BuildRequires:  dbus-daemon
+BuildRequires:  xorg-x11-server-Xwayland
 BuildRequires:  qt6-qtbase-devel
 BuildRequires:  qt6-qtbase-private-devel
 BuildRequires:  qt6-qtdeclarative-devel

@@ -1,166 +1,149 @@
 #include "active-window.hpp"
 
+#include <QDBusConnection>
+#include <QDBusMessage>
+#include <QDBusObjectPath>
+#include <QDBusPendingCallWatcher>
 #include <QJsonArray>
-
-#include "menu-registrar.hpp"
-
-namespace
-{
-// Undocumented property names of Wayfire's kde-appmenu plugin (0.11.0).
-const QString SERVICE_PROPERTY = QStringLiteral("kde-appmenu-service-name");
-const QString PATH_PROPERTY = QStringLiteral("kde-appmenu-object-path");
-
-// Qt applications announce their menu within a few hundred milliseconds;
-// the later tries are for slow starts.
-const int ASK_AGAIN_DELAYS_MS[] = {150, 400, 1000, 3000};
-const int ASK_AGAIN_TRIES = sizeof(ASK_AGAIN_DELAYS_MS) / sizeof(ASK_AGAIN_DELAYS_MS[0]);
-} // namespace
 
 ActiveWindow::ActiveWindow(QObject* parent) : QObject(parent)
 {
-    askAgain.setSingleShot(true);
+    askAgain.setInterval(750);
     connect(&askAgain, &QTimer::timeout, this, &ActiveWindow::askForMenuAddress);
-
     connect(&compositor, &CompositorSocket::connected, this, &ActiveWindow::startWatching);
+    connect(&compositor, &CompositorSocket::disconnected, this, [this] {
+        takeWindow(QJsonValue(QJsonValue::Null));
+        asking = false;
+        askAgain.start();
+    });
     connect(&compositor, &CompositorSocket::eventReceived, this, [this](const QJsonObject& event) {
         if (event.value("event").toString() == "view-focused")
-        {
             takeWindow(event.value("view"));
+    });
+    connect(&xproperties, &XMenuProperties::resolved, this, [this](uint window, const QVariantMap& address) {
+        if (window == xwindow && windowId >= 0)
+        {
+            asking = false;
+            setMenuAddress(address);
         }
     });
-
-    // An X11 application registers its menu when it likes.
-    connect(&X11Menus::instance(), &X11Menus::changed, this, &ActiveWindow::askForMenuAddress);
-
     compositor.open();
+    askAgain.start();
 }
 
 QString ActiveWindow::appId() const
 {
     return currentAppId;
 }
-
 QString ActiveWindow::menuService() const
 {
-    return currentMenuService;
+    return currentAddress.value("service").toString();
 }
-
 QString ActiveWindow::menuPath() const
 {
-    return currentMenuPath;
+    return currentAddress.value("path").toString();
+}
+QVariantMap ActiveWindow::menuAddress() const
+{
+    return currentAddress;
 }
 
 void ActiveWindow::startWatching()
 {
-    const QJsonObject wanted{{"events", QJsonArray{"view-focused"}}};
-    compositor.request("window-rules/events/watch", wanted, [](const QJsonObject&) {});
-
+    ++generation;
+    asking = false;
+    windowId = -1;
+    xwindow = 0;
+    currentAppId.clear();
+    setMenuAddress({});
+    compositor.request(
+        "window-rules/events/watch", {{"events", QJsonArray{"view-focused"}}}, [](const QJsonObject&) {});
     compositor.request(
         "window-rules/get-focused-view", {}, [this](const QJsonObject& answer) { takeWindow(answer.value("info")); });
 }
 
 void ActiveWindow::takeWindow(const QJsonValue& window)
 {
-    // Panels and menus take the keyboard too; the menu bar must keep the
-    // application's menu while one of its own menus is open. The desktop
-    // (the background layer) leaves no window active.
     const QJsonObject description = window.toObject();
-    const bool isApplicationWindow = description.value("role").toString() == "toplevel";
-    const bool isDesktop = description.value("layer").toString() == "background";
-    if (!window.isNull() && !isApplicationWindow && !isDesktop)
-    {
+    const bool application = description.value("role").toString() == "toplevel";
+    const bool desktop = description.value("layer").toString() == "background";
+    if (!window.isNull() && !application && !desktop)
         return;
-    }
-
-    const int newId = (window.isNull() || isDesktop) ? -1 : description.value("id").toInt(-1);
-    if (newId == windowId)
-    {
+    const int id = window.isNull() || desktop ? -1 : description.value("id").toInt(-1);
+    if (id == windowId)
         return;
-    }
-
-    windowId = newId;
-    windowPid = uint(qMax(0, description.value("pid").toInt()));
+    ++generation;
+    asking = false;
+    windowId = id;
+    xwindow = 0;
+    xproperties.request(0);
     currentAppId = description.value("app-id").toString();
-    currentMenuService.clear();
-    currentMenuPath.clear();
+    currentAddress.clear();
     emit changed();
-
     askAgain.stop();
-    askAgainCount = 0;
-    askForMenuAddress();
+    if (windowId >= 0)
+    {
+        askAgain.start();
+        askForMenuAddress();
+    }
 }
 
 void ActiveWindow::askForMenuAddress()
 {
-    if (windowId < 0)
+    if (!compositor.isConnected())
     {
+        if (!compositor.isConnecting())
+            compositor.open();
         return;
     }
-
-    const int askedFor = windowId;
-    const QJsonObject serviceQuestion{{"id", askedFor}, {"property", SERVICE_PROPERTY}};
-    const QJsonObject pathQuestion{{"id", askedFor}, {"property", PATH_PROPERTY}};
-
-    compositor.request("window-rules/get-view-property", serviceQuestion,
-        [this, askedFor, pathQuestion](const QJsonObject& serviceAnswer) {
-        const QString service = serviceAnswer.value("value").toString();
-
-        compositor.request(
-            "window-rules/get-view-property", pathQuestion, [this, askedFor, service](const QJsonObject& pathAnswer) {
-            if (askedFor != windowId)
-            {
+    if (windowId < 0 || asking)
+        return;
+    asking = true;
+    const uint requested = generation;
+    compositor.request("global-menu/address", {{"id", windowId}}, [this, requested](const QJsonObject& answer) {
+        if (requested != generation)
+            return;
+        xwindow = answer.value("xid").toInteger();
+        if (!answer.value("service").toString().isEmpty())
+        {
+            asking = false;
+            auto address = answer.toVariantMap();
+            address.remove("result");
+            address.remove("xid");
+            setMenuAddress(address);
+            return;
+        }
+        if (!xwindow)
+        {
+            asking = false;
+            setMenuAddress({});
+            return;
+        }
+        auto call = QDBusMessage::createMethodCall("com.canonical.AppMenu.Registrar",
+            "/com/canonical/AppMenu/Registrar", "com.canonical.AppMenu.Registrar", "GetMenuForWindow");
+        call << xwindow;
+        auto* watcher = new QDBusPendingCallWatcher(QDBusConnection::sessionBus().asyncCall(call, 1000), this);
+        connect(watcher, &QDBusPendingCallWatcher::finished, this, [this, requested](QDBusPendingCallWatcher* done) {
+            done->deleteLater();
+            if (requested != generation)
                 return;
-            }
-            const QString path = pathAnswer.value("value").toString();
-            if (!service.isEmpty() && !path.isEmpty())
+            const auto args = done->reply().arguments();
+            if (done->reply().type() == QDBusMessage::ReplyMessage && args.size() == 2 && !args[0].toString().isEmpty())
             {
-                setMenuAddress(service, path);
-                return;
+                asking = false;
+                setMenuAddress({{"protocol", "dbusmenu"}, {"service", args[0].toString()},
+                    {"path", args[1].value<QDBusObjectPath>().path()}});
             }
-            askForX11Menu(askedFor);
+            else
+                xproperties.request(xwindow);
         });
     });
 }
 
-// An X11 program registers a menu for each of its windows, by the window's
-// X11 ID; the compositor's x11-settings plugin tells it. A program that
-// registered none for this window may have one for another of its windows.
-void ActiveWindow::askForX11Menu(int askedFor)
+void ActiveWindow::setMenuAddress(const QVariantMap& address)
 {
-    compositor.request("x11-settings/window-id", {{"id", askedFor}}, [this, askedFor](const QJsonObject& answer) {
-        if (askedFor != windowId)
-        {
-            return;
-        }
-        const uint x11Window = uint(answer.value("window").toDouble());
-        X11Menu menu = x11Window != 0 ? X11Menus::instance().forWindow(x11Window) : X11Menu{};
-        if (menu.service.isEmpty() && windowPid > 0)
-        {
-            menu = X11Menus::instance().forProcess(windowPid);
-        }
-        setMenuAddress(menu.service, menu.path);
-    });
-}
-
-void ActiveWindow::setMenuAddress(const QString& service, const QString& path)
-{
-    const bool found = !service.isEmpty() && !path.isEmpty();
-    if (!found)
-    {
-        if (askAgainCount < ASK_AGAIN_TRIES)
-        {
-            askAgain.start(ASK_AGAIN_DELAYS_MS[askAgainCount]);
-            askAgainCount++;
-        }
+    if (address == currentAddress)
         return;
-    }
-
-    if ((service == currentMenuService) && (path == currentMenuPath))
-    {
-        return;
-    }
-
-    currentMenuService = service;
-    currentMenuPath = path;
+    currentAddress = address;
     emit changed();
 }

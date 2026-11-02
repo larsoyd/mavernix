@@ -1,95 +1,47 @@
-// Owns com.canonical.AppMenu.Registrar, which makes applications export
-// their menu bar. On Wayland the address goes to the compositor ("kde-appmenu"),
-// so owning the name is all that is needed. X11 applications (Qt on xcb,
-// Electron, Chromium, LibreOffice) instead call RegisterWindow with their X11
-// window's ID; those menus are kept in X11Menus, for ActiveWindow.
-
 #pragma once
 
+#include <QDBusArgument>
 #include <QDBusContext>
 #include <QDBusObjectPath>
 #include <QDBusServiceWatcher>
-#include <QHash>
+#include <QMap>
 #include <QObject>
-#include <QString>
 
-// Where an X11 application's menu can be fetched.
-struct X11Menu
+struct RegisteredMenu
 {
+    uint window;
     QString service;
-    QString path;
+    QDBusObjectPath path;
 };
+using RegisteredMenus = QList<RegisteredMenu>;
+Q_DECLARE_METATYPE(RegisteredMenu)
+Q_DECLARE_METATYPE(RegisteredMenus)
+QDBusArgument& operator<<(QDBusArgument& argument, const RegisteredMenu& menu);
+const QDBusArgument& operator>>(const QDBusArgument& argument, RegisteredMenu& menu);
 
-// The menus X11 applications registered, for the life of the shell.
-class X11Menus : public QObject
-{
-    Q_OBJECT
-
-  public:
-    static X11Menus& instance();
-
-    // By the window's X11 ID, as registered; empty if none.
-    X11Menu forWindow(uint window) const;
-    // The menu the process registered last, for a window that registered
-    // none of its own; empty if none.
-    X11Menu forProcess(uint pid) const;
-
-    void add(uint window, uint pid, const X11Menu& menu);
-    void remove(uint window);
-    // The application left the bus.
-    void removeService(const QString& service);
-
-  signals:
-    void changed();
-
-  private:
-    struct Entry
-    {
-        uint pid = 0;
-        X11Menu menu;
-        // Later registrations win.
-        quint64 order = 0;
-    };
-    QHash<uint, Entry> windows;
-    quint64 registrations = 0;
-};
-
-// The bus object at /com/canonical/AppMenu/Registrar.
-class RegistrarObject : public QObject, protected QDBusContext
+class MenuRegistrar : public QObject, protected QDBusContext
 {
     Q_OBJECT
     Q_CLASSINFO("D-Bus Interface", "com.canonical.AppMenu.Registrar")
-
-  public:
-    explicit RegistrarObject(QObject* parent = nullptr);
-
-  public slots:
-    void RegisterWindow(uint windowId, const QDBusObjectPath& menuObjectPath);
-    void UnregisterWindow(uint windowId);
-    QString GetMenuForWindow(uint windowId, QDBusObjectPath& menuObjectPath);
-
-  signals:
-    void WindowRegistered(uint windowId, const QString& service, const QDBusObjectPath& menuObjectPath);
-    void WindowUnregistered(uint windowId);
-
-  private:
-    // Forgets an application's menus once it leaves the bus.
-    QDBusServiceWatcher leaving;
-};
-
-class MenuRegistrar : public QObject
-{
-    Q_OBJECT
-    // False if another program already owns the name, or there is no bus.
     Q_PROPERTY(bool registered READ isRegistered CONSTANT)
 
   public:
     explicit MenuRegistrar(QObject* parent = nullptr);
     ~MenuRegistrar() override;
-
     bool isRegistered() const;
+
+  public slots:
+    void RegisterWindow(uint window, const QDBusObjectPath& path);
+    void UnregisterWindow(uint window);
+    QString GetMenuForWindow(uint window, QDBusObjectPath& path);
+    RegisteredMenus GetMenus();
+
+  signals:
+    void WindowRegistered(uint window, const QString& service, const QDBusObjectPath& path);
+    void WindowUnregistered(uint window);
 
   private:
     bool registered = false;
-    RegistrarObject object;
+    QMap<uint, RegisteredMenu> menus;
+    QDBusServiceWatcher owners;
 };

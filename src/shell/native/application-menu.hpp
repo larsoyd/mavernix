@@ -12,9 +12,11 @@
 #pragma once
 
 #include <QDBusArgument>
+#include <QDBusServiceWatcher>
 #include <QObject>
 #include <QTimer>
 #include <QVariantList>
+#include "gmenu-reader.hpp"
 
 class ApplicationMenu : public QObject
 {
@@ -22,6 +24,7 @@ class ApplicationMenu : public QObject
     Q_PROPERTY(QString service READ service WRITE setService NOTIFY addressChanged)
     Q_PROPERTY(QString path READ path WRITE setPath NOTIFY addressChanged)
     Q_PROPERTY(QVariantList items READ items NOTIFY itemsChanged)
+    Q_PROPERTY(QVariantMap address READ address WRITE setAddress NOTIFY addressChanged)
 
   public:
     explicit ApplicationMenu(QObject* parent = nullptr);
@@ -31,6 +34,8 @@ class ApplicationMenu : public QObject
     QString path() const;
     void setPath(const QString& path);
     QVariantList items() const;
+    QVariantMap address() const;
+    void setAddress(const QVariantMap& address);
 
     Q_INVOKABLE void aboutToShow(int id);
     Q_INVOKABLE void activate(int id);
@@ -50,6 +55,9 @@ class ApplicationMenu : public QObject
 
     QString currentService;
     QString currentPath;
+    QVariantMap currentAddress;
+    GMenuReader gmenu;
+    QDBusServiceWatcher serviceWatcher;
     QVariantList currentItems;
 
     // Several change signals often arrive together; one fetch answers all.

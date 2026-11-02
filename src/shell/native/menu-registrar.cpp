@@ -1,9 +1,9 @@
 #include "menu-registrar.hpp"
 
 #include <QDBusConnection>
-#include <QDBusConnectionInterface>
 #include <QDBusError>
-#include <QDBusServiceWatcher>
+#include <QDBusMessage>
+#include <QDBusMetaType>
 #include <QDebug>
 
 namespace
@@ -12,109 +12,50 @@ const QString REGISTRAR_NAME = QStringLiteral("com.canonical.AppMenu.Registrar")
 const QString REGISTRAR_PATH = QStringLiteral("/com/canonical/AppMenu/Registrar");
 } // namespace
 
-X11Menus& X11Menus::instance()
+QDBusArgument& operator<<(QDBusArgument& argument, const RegisteredMenu& menu)
 {
-    static X11Menus menus;
-    return menus;
+    argument.beginStructure();
+    argument << menu.window << menu.service << menu.path;
+    argument.endStructure();
+    return argument;
 }
 
-X11Menu X11Menus::forProcess(uint pid) const
+const QDBusArgument& operator>>(const QDBusArgument& argument, RegisteredMenu& menu)
 {
-    const Entry* latest = nullptr;
-    for (const Entry& entry : windows)
-    {
-        if (entry.pid == pid && (latest == nullptr || entry.order > latest->order))
-        {
-            latest = &entry;
-        }
-    }
-    return latest != nullptr ? latest->menu : X11Menu{};
-}
-
-X11Menu X11Menus::forWindow(uint window) const
-{
-    return windows.value(window).menu;
-}
-
-void X11Menus::add(uint window, uint pid, const X11Menu& menu)
-{
-    windows.insert(window, {pid, menu, ++registrations});
-    emit changed();
-}
-
-void X11Menus::remove(uint window)
-{
-    if (windows.remove(window) > 0)
-    {
-        emit changed();
-    }
-}
-
-void X11Menus::removeService(const QString& service)
-{
-    bool removed = false;
-    for (auto entry = windows.begin(); entry != windows.end();)
-    {
-        if (entry->menu.service == service)
-        {
-            entry = windows.erase(entry);
-            removed = true;
-        }
-        else
-        {
-            ++entry;
-        }
-    }
-    if (removed)
-    {
-        emit changed();
-    }
-}
-
-RegistrarObject::RegistrarObject(QObject* parent)
-    : QObject(parent), leaving(QString(), QDBusConnection::sessionBus(), QDBusServiceWatcher::WatchForUnregistration)
-{
-    connect(&leaving, &QDBusServiceWatcher::serviceUnregistered, this, [this](const QString& service) {
-        X11Menus::instance().removeService(service);
-        leaving.removeWatchedService(service);
-    });
-}
-
-void RegistrarObject::RegisterWindow(uint windowId, const QDBusObjectPath& menuObjectPath)
-{
-    const QString service = message().service();
-    const uint pid = connection().interface()->servicePid(service).value();
-    X11Menus::instance().add(windowId, pid, {service, menuObjectPath.path()});
-    leaving.addWatchedService(service);
-    emit WindowRegistered(windowId, service, menuObjectPath);
-}
-
-void RegistrarObject::UnregisterWindow(uint windowId)
-{
-    X11Menus::instance().remove(windowId);
-    emit WindowUnregistered(windowId);
-}
-
-QString RegistrarObject::GetMenuForWindow(uint windowId, QDBusObjectPath& menuObjectPath)
-{
-    const X11Menu menu = X11Menus::instance().forWindow(windowId);
-    menuObjectPath = QDBusObjectPath(menu.path.isEmpty() ? QStringLiteral("/") : menu.path);
-    return menu.service;
+    argument.beginStructure();
+    argument >> menu.window >> menu.service >> menu.path;
+    argument.endStructure();
+    return argument;
 }
 
 MenuRegistrar::MenuRegistrar(QObject* parent) : QObject(parent)
 {
-    QDBusConnection bus = QDBusConnection::sessionBus();
-    // The object first: an application may call it as soon as the name is ours.
-    bus.registerObject(REGISTRAR_PATH, &object, QDBusConnection::ExportAllSlots | QDBusConnection::ExportAllSignals);
+    qDBusRegisterMetaType<RegisteredMenu>();
+    qDBusRegisterMetaType<RegisteredMenus>();
+    auto bus = QDBusConnection::sessionBus();
+    owners.setConnection(bus);
+    owners.setWatchMode(QDBusServiceWatcher::WatchForUnregistration);
+    connect(&owners, &QDBusServiceWatcher::serviceUnregistered, this, [this](const QString& service) {
+        for (auto it = menus.begin(); it != menus.end();)
+        {
+            if (it->service == service)
+            {
+                const uint window = it.key();
+                it = menus.erase(it);
+                emit WindowUnregistered(window);
+            }
+            else
+                ++it;
+        }
+        owners.removeWatchedService(service);
+    });
+    if (!bus.registerObject(REGISTRAR_PATH, this, QDBusConnection::ExportAllSlots | QDBusConnection::ExportAllSignals))
+        return;
     registered = bus.registerService(REGISTRAR_NAME);
     if (!registered)
     {
         bus.unregisterObject(REGISTRAR_PATH);
-        qWarning().noquote() << "Shell.Native: could not take the bus name" << REGISTRAR_NAME << "-"
-                             << bus.lastError().message()
-                             << "(applications started now will keep their menus in their windows;"
-                             << "check that no other menu bar is running)";
+        qWarning().noquote() << "Shell.Native: could not take" << REGISTRAR_NAME << bus.lastError().message();
     }
 }
 
@@ -122,12 +63,54 @@ MenuRegistrar::~MenuRegistrar()
 {
     if (registered)
     {
-        QDBusConnection::sessionBus().unregisterService(REGISTRAR_NAME);
-        QDBusConnection::sessionBus().unregisterObject(REGISTRAR_PATH);
+        auto bus = QDBusConnection::sessionBus();
+        bus.unregisterService(REGISTRAR_NAME);
+        bus.unregisterObject(REGISTRAR_PATH);
     }
 }
 
 bool MenuRegistrar::isRegistered() const
 {
     return registered;
+}
+
+void MenuRegistrar::RegisterWindow(uint window, const QDBusObjectPath& path)
+{
+    if (!calledFromDBus() || !window || path.path() == "/")
+        return;
+    const QString service = message().service();
+    if (menus.contains(window) && menus[window].service != service)
+    {
+        sendErrorReply(QDBusError::AccessDenied, "Window already registered by another connection");
+        return;
+    }
+    menus.insert(window, {window, service, path});
+    owners.addWatchedService(service);
+    emit WindowRegistered(window, service, path);
+}
+
+void MenuRegistrar::UnregisterWindow(uint window)
+{
+    auto found = menus.find(window);
+    if (found == menus.end() || !calledFromDBus())
+        return;
+    if (found->service != message().service())
+    {
+        sendErrorReply(QDBusError::AccessDenied, "Only the registering connection may remove this window");
+        return;
+    }
+    menus.erase(found);
+    emit WindowUnregistered(window);
+}
+
+QString MenuRegistrar::GetMenuForWindow(uint window, QDBusObjectPath& path)
+{
+    const auto found = menus.constFind(window);
+    path = found == menus.cend() ? QDBusObjectPath("/") : found->path;
+    return found == menus.cend() ? QString{} : found->service;
+}
+
+RegisteredMenus MenuRegistrar::GetMenus()
+{
+    return menus.values();
 }

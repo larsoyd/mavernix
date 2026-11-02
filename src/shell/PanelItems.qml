@@ -123,7 +123,8 @@ Row {
             return null
         }
         const label = applicationMenus[0].label
-        if (showsDesktopMenus || label === activeApplicationName || label === activeEntry?.name) {
+        if (showsDesktopMenus || applicationMenus[0].application === true
+            || label === activeApplicationName || label === activeEntry?.name) {
             return applicationMenus[0]
         }
         return null

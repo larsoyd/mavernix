@@ -142,6 +142,7 @@ done
 "$session_dir/configure-desktop" all "$state_dir"
 # shellcheck source=/dev/null
 source "$state_dir/desktop.env"
+source "$session_dir/global-menu.sh"
 
 # The session's programs find the state folder through this.
 export DESKTOP_SHELL_SETTINGS="$state_dir/shell.json"

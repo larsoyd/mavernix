@@ -21,6 +21,7 @@ jobs:
           git base-devel meson ninja python
           wayfire glm vulkan-headers tomlplusplus
           qt6-base qt6-declarative qt6-multimedia qt6-wayland librsvg glib2 python-pillow
+          libdbusmenu-gtk3 python-gobject xorg-xwayland dbus libxcb
 
       - uses: actions/checkout@v4
 

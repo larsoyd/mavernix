@@ -19,6 +19,7 @@ class CompositorSocket : public QObject
     using AnswerHandler = std::function<void(const QJsonObject& answer)>;
 
     explicit CompositorSocket(QObject* parent = nullptr);
+    ~CompositorSocket() override;
 
     // Separate from the constructor: a local socket may connect at once,
     // before the caller listens for `connected`.

@@ -21,6 +21,7 @@ depends=(
   '7zip' 'cpio' 'bzip2' 'lbzip2' 'libicns' 'ffmpeg' 'poppler' 'bubblewrap'
 )
 makedepends=('meson' 'ninja' 'glm' 'vulkan-headers')
+checkdepends=('python-gobject' 'xorg-xwayland' 'dbus')
 optdepends=(
   'foot: the terminal the dock and Super+Enter open'
   "pipewire: sound, and the panel's volume item"

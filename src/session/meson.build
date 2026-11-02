@@ -24,6 +24,7 @@ install_data(
 )
 install_data(
     'at_login.py',
+    'global-menu.sh',
     'check_theme.py',
     'extensions.py',
     'link_gimp_style.py',
@@ -46,7 +47,7 @@ install_data(
     install_dir: session_dir,
 )
 install_data('bin/mavernix-dock-geometry', 'bin/mavernix-switch', 'bin/mavernix-reconfigure', 'bin/mavernix-file-action',
-    'bin/mavernix-check-theme', 'bin/mavernix-extensions-changed', 'bin/gimp-3.2',
+    'bin/mavernix-check-theme', 'bin/mavernix-extensions-changed',
     install_dir: session_dir / 'bin', install_mode: 'rwxr-xr-x')
 install_data('notice/shell.qml', install_dir: session_dir / 'notice')
 install_data('portals/wayfire-portals.conf', install_dir: session_dir / 'portals')

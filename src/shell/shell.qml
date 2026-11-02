@@ -75,8 +75,7 @@ ShellRoot {
 
     ApplicationMenu {
         id: applicationMenu
-        service: activeWindow.menuService
-        path: activeWindow.menuPath
+        address: activeWindow.menuAddress
     }
 
     ConfirmDialog {

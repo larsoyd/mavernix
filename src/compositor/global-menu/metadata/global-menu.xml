@@ -1,0 +1,8 @@
+<?xml version="1.0"?>
+<wayfire>
+  <plugin name="global-menu">
+    <_short>Global menu discovery</_short>
+    <_long>Associates toolkit menu exports and X11 windows with compositor views.</_long>
+    <category>Utility</category>
+  </plugin>
+</wayfire>
