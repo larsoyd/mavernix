@@ -12,13 +12,17 @@ ActiveWindow::ActiveWindow(QObject* parent) : QObject(parent)
     connect(&askAgain, &QTimer::timeout, this, &ActiveWindow::askForMenuAddress);
     connect(&compositor, &CompositorSocket::connected, this, &ActiveWindow::startWatching);
     connect(&compositor, &CompositorSocket::disconnected, this, [this] {
+        held = false;
         takeWindow(QJsonValue(QJsonValue::Null));
         asking = false;
         askAgain.start();
     });
     connect(&compositor, &CompositorSocket::eventReceived, this, [this](const QJsonObject& event) {
-        if (event.value("event").toString() == "view-focused")
+        const QString name = event.value("event").toString();
+        if (name == "view-focused" && !held)
             takeWindow(event.value("view"));
+        else if (name == "menu-window")
+            followMenuWindow(event);
     });
     connect(&xproperties, &XMenuProperties::resolved, this, [this](uint window, const QVariantMap& address) {
         if (window == xwindow && windowId >= 0)
@@ -34,6 +38,14 @@ ActiveWindow::ActiveWindow(QObject* parent) : QObject(parent)
 QString ActiveWindow::appId() const
 {
     return currentAppId;
+}
+int ActiveWindow::currentWindowId() const
+{
+    return windowId;
+}
+bool ActiveWindow::isHeld() const
+{
+    return held;
 }
 QString ActiveWindow::menuService() const
 {
@@ -52,14 +64,50 @@ void ActiveWindow::startWatching()
 {
     ++generation;
     asking = false;
+    held = false;
     windowId = -1;
     xwindow = 0;
     currentAppId.clear();
     setMenuAddress({});
     compositor.request(
         "window-rules/events/watch", {{"events", QJsonArray{"view-focused"}}}, [](const QJsonObject&) {});
-    compositor.request(
-        "window-rules/get-focused-view", {}, [this](const QJsonObject& answer) { takeWindow(answer.value("info")); });
+    compositor.request("focus-follows-mouse/watch-menu-window", {}, [](const QJsonObject&) {});
+    takeFocused();
+}
+
+void ActiveWindow::takeFocused()
+{
+    compositor.request("window-rules/get-focused-view", {}, [this](const QJsonObject& answer) {
+        if (!held)
+            takeWindow(answer.value("info"));
+    });
+}
+
+void ActiveWindow::followMenuWindow(const QJsonObject& event)
+{
+    const bool wasHeld = held;
+    held = event.value("held").toBool();
+    if (held)
+    {
+        const QJsonValue view = event.value("view");
+        takeWindow(view.isObject() ? view : QJsonValue(QJsonValue::Null));
+    }
+    else if (wasHeld)
+        takeFocused();
+    if (held != wasHeld)
+        emit changed();
+}
+
+void ActiveWindow::focusWindow()
+{
+    if (held)
+        compositor.request("focus-follows-mouse/focus-menu-window", {}, [](const QJsonObject&) {});
+}
+
+void ActiveWindow::closeWindow()
+{
+    if (windowId >= 0)
+        compositor.request("window-rules/close-view", {{"id", windowId}}, [](const QJsonObject&) {});
 }
 
 void ActiveWindow::takeWindow(const QJsonValue& window)

@@ -6,7 +6,9 @@ compositor_plugin = "focus-follows-mouse"
 [settings]
 delay_ms = 100
 raise = false
+menu_on_click = false
 
 [settings_labels]
 delay_ms = "Delay after the pointer enters a window (ms)"
 raise = "Bring the focused window to the front"
+menu_on_click = "Change the menu bar only when a window is clicked"

@@ -135,6 +135,12 @@ DockPane::DockPane(Choices& choices, QWidget* parent) : QWidget(parent), choices
     }
     form->addRow(word("menu_bar_show", "Show in the menu bar:"), items);
 
+    auto* every_screen = new QCheckBox(word("menu_bar_every_screen", "Show the menu bar on every display"));
+    every_screen->setChecked(choices.value(QStringLiteral("panel"), QStringLiteral("every_screen")).toBool());
+    connect(every_screen, &QCheckBox::toggled, this,
+        [this](bool on) { this->choices.set(QStringLiteral("panel"), QStringLiteral("every_screen"), on); });
+    form->addRow(QString(), every_screen);
+
     // Hours as 13:00 or as 1:00 PM; the rest of the theme's format stays.
     const QString format = choices.value(QStringLiteral("panel"), QStringLiteral("clock_format")).toString();
     auto* day_hours = new QCheckBox(word("menu_bar_24_hours", "Show the time with 24 hours"));

@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+### Added
+
+- The menu bar can be on every display: Settings, Dock & Menu Bar, Show the menu bar on every display. All of them show the same menus.
+- Focus follows mouse can leave the menu bar alone until you click a window: Settings, Extensions, Focus follows mouse.
+
 ## 0.6.1 (2026-11-06)
 
 ### Added

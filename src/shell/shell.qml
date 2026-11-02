@@ -163,17 +163,32 @@ ShellRoot {
         outputVolume: outputVolume
     }
 
-    Panel {
-        screen: shell.mainScreen
-        settings: shell.settings
-        applicationMenu: applicationMenu
-        confirmDialog: confirmDialog
-        outputVolume: outputVolume
-        shell: shell
-        extensions: extensions
-        choices: userChoices
-        // Out of sight while a full-screen overlay covers the screen.
-        concealed: appGrid.open || windowOverview.showing
+    // a panel about to open a menu, so the others close theirs
+    signal menuOpening(var opener)
+
+    // [panel] every_screen: every panel shows the same menus
+    readonly property var panelScreens: (userChoices.value("panel", "every_screen") ?? false)
+        ? Quickshell.screens : [mainScreen].filter(screen => screen !== null)
+
+    // in a delegate a panel's own properties of these names hide the ids
+    readonly property var panelParts: ({ shell, applicationMenu, confirmDialog, outputVolume, extensions })
+
+    Variants {
+        model: shell.panelScreens
+        Panel {
+            required property var modelData
+            screen: modelData
+            settings: panelParts.shell.settings
+            applicationMenu: panelParts.applicationMenu
+            menuWindow: activeWindow
+            confirmDialog: panelParts.confirmDialog
+            outputVolume: panelParts.outputVolume
+            shell: panelParts.shell
+            extensions: panelParts.extensions
+            choices: userChoices
+            // out of sight while a full-screen overlay covers the screen
+            concealed: modelData === panelParts.shell.mainScreen && (appGrid.open || windowOverview.showing)
+        }
     }
 
     AppGrid {
