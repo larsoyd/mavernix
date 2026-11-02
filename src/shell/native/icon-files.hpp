@@ -66,10 +66,8 @@ class ThemeIconProvider : public QQuickImageProvider
     static QImage picture(const QString& name, const QSize& wanted);
 };
 
-// "image://fitted-icon/<fill>/<revision>/<name>": the icon, shrunk around its
-// middle if its shape spans more than `fill` (0 to 1) of its square. Icons
-// that fill their whole square look bigger next to a theme's, which leave a
-// margin.
+// "image://fitted-icon/<revision>/<name>": a program's own icon, moved and
+// scaled to the proportions of the theme's art
 class FittedIconProvider : public QQuickImageProvider
 {
   public:

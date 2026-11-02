@@ -19,9 +19,6 @@ Item {
     // The shell's UserChoices, or null.
     property var choices: null
     required property var entry
-    // An icon that is not the icon theme's own (0 to 1, 0 for any size) spans
-    // at most this share of its square, as the theme's leave a margin.
-    property real foreignIconFill: 0
     // For a running program that has no desktop entry: its windows' app ID.
     property string appId: ""
     property var minimizedWindow: null
@@ -73,7 +70,7 @@ Item {
         if (entry === null && appId === "") {
             return ""
         }
-        return themeIcons.fitted(name, foreignIconFill, "application-x-executable")
+        return themeIcons.fitted(name, "application-x-executable")
     }
     readonly property real iconSize: width - 2 * margin
     readonly property real iconX: x + margin
@@ -158,23 +155,26 @@ Item {
     }
 
     Image {
+        id: fullSize
+        visible: false
+        source: tile.iconSource
+        // read once and shrunk from there, reloading at every size stalls the dock
+        readonly property real drawnSide: Math.max(tile.drawnIconSize, tile.iconSize)
+        sourceSize.width: drawnSide * Screen.devicePixelRatio
+        sourceSize.height: drawnSide * Screen.devicePixelRatio
+    }
+
+    ShaderEffect {
         id: icon
         visible: tile.iconSource !== ""
         x: tile.margin
         y: tile.height - height
         width: tile.iconSize
         height: tile.iconSize
-        source: tile.iconSource
         scale: tile.smallestAppearScale + (1 - tile.smallestAppearScale) * tile.appeared
         opacity: tile.shownShare
-
-        // With magnification the picture is made once at the largest size
-        // and scaled; reloading it at every step stalls the dock.
-        readonly property real drawnSide: tile.drawnIconSize > 0 ? tile.drawnIconSize : width
-        sourceSize.width: drawnSide * Screen.devicePixelRatio
-        sourceSize.height: drawnSide * Screen.devicePixelRatio
-        // Avoids shimmering when scaled far down.
-        mipmap: tile.drawnIconSize > 0
+        fragmentShader: "lanczos.frag.qsb"
+        property var source: fullSize
 
         // Mixing with black by (1 - pressedDarken) multiplies by pressedDarken.
         layer.enabled: press.pressed
@@ -233,7 +233,7 @@ Item {
     // are reported through dragMoved; the dock detects the drag's end itself.
     property bool draggable: false
     property bool lifted: false
-    // 0 to load the picture at the size it is shown.
+    // side the picture is read at
     property real drawnIconSize: 0
     signal minimizedWindowWanted(var window)
     signal dragMoved(real windowX, real windowY)

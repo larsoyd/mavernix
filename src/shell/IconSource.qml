@@ -62,11 +62,10 @@ IconFiles {
         return own !== "" ? own : path(file.genericIcon, "text-x-generic")
     }
 
-    // The icon of this name, shrunk to span at most `fill` of its square
-    // unless the icon theme has it itself; else as path() gives it.
-    function fitted(name, fill, fallback) {
-        if (fill > 0 && find(name) !== "" && !source.isThemeOwn(name, source.revision)) {
-            return "image://fitted-icon/" + fill + "/" + source.revision + "/" + name
+    // fitted to the theme's proportions unless the icon theme has it itself
+    function fitted(name, fallback) {
+        if (find(name) !== "" && !source.isThemeOwn(name, source.revision)) {
+            return "image://fitted-icon/" + source.revision + "/" + name
         }
         return path(name, fallback)
     }

@@ -7,6 +7,11 @@
 - The menu bar can be on every display: Settings, Dock & Menu Bar, Show the menu bar on every display. All of them show the same menus, or each display's own window with Give each display the menus of its own window, as on OS X, where the bars of the other displays fade.
 - Focus follows mouse can leave the menu bar alone until you click a window: Settings, Extensions, Focus follows mouse.
 
+### Changed
+
+- Dock icons are drawn sharper: each is read at the largest size and shrunk with a Lanczos filter, at every size, as on OS X. Building now needs Qt Shader Tools.
+- A program's own icon in the dock is scaled and centred by the proportions of the theme's art, so it no longer looks small, high or heavy beside the others. This replaces `foreign_icon_fill`.
+
 ## 0.6.1 (2026-11-06)
 
 ### Added

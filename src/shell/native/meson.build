@@ -54,6 +54,7 @@ shared_module(
         'gmenu-reader.cpp',
         'held-keys.cpp',
         'icon-files.cpp',
+        'icon-fit.cpp',
         'lid-watch.cpp',
         'main-screen.cpp',
         'menu-registrar.cpp',

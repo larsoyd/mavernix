@@ -1340,7 +1340,6 @@ PanelWindow {
 
             entry: place.entry
             appId: place.appId ?? ""
-            foreignIconFill: dock.looks.foreign_icon_fill ?? 0.9
             choices: dock.choices
             minimizedWindow: place.window
             readonly property var custom: place.custom ?? null
@@ -1368,11 +1367,8 @@ PanelWindow {
             opensFolder: custom?.folder !== undefined || folders.isProgramFolder(custom)
             onFolderWanted: dock.showFolder(index)
             onMinimizedWindowWanted: window => dock.bringBack(window)
-            // Read once at the largest size while icons change size by the
-            // frame (magnified, or resized by hand) and scaled from that:
-            // read anew at each size, they kept the shell busy decoding
-            // pictures through the whole of a resize.
-            drawnIconSize: dock.magnificationRamp > 0 || dock.draggedIconSize > 0 ? dock.largestIconSize : 0
+            // read anew at each size they kept the shell busy decoding through a resize
+            drawnIconSize: dock.largestIconSize
             name: place.isTrash ? (dock.config.trash_label ?? "") : (custom?.name ?? "")
             command: place.isTrash ? (dock.config.trash_command ?? []) : (custom?.command ?? [])
             shellAction: custom?.shell ?? ""

@@ -48,6 +48,20 @@ tests = {
         'include': test_sources / 'shell/native',
         'dependencies': [],
     },
+    'icon-fit': {
+        'sources': [test_sources / 'shell/native/icon-fit.cpp'],
+        'include': test_sources / 'shell/native',
+        'dependencies': [],
+    },
+    'fitted-icon': {
+        'sources': [
+            test_sources / 'shell/native/icon-fit.cpp',
+            test_sources / 'shell/native/icon-files.cpp',
+            qt.compile_moc(headers: test_sources / 'shell/native/icon-files.hpp', dependencies: qt_native),
+        ],
+        'include': test_sources / 'shell/native',
+        'dependencies': [qt_native, librsvg],
+    },
     'screen-layout': {
         'sources': [test_sources / 'apps/settings/screen-layout.cpp'],
         'include': test_sources / 'apps/settings',

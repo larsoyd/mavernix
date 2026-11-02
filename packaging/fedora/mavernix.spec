@@ -37,6 +37,7 @@ BuildRequires:  xorg-x11-server-Xwayland
 BuildRequires:  qt6-qtbase-devel
 BuildRequires:  qt6-qtbase-private-devel
 BuildRequires:  qt6-qtdeclarative-devel
+BuildRequires:  qt6-qtshadertools-devel
 
 Requires:       wayfire%{?_isa} = %{wayfire_version}
 Requires:       quickshell >= 0.3.2
