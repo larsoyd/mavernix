@@ -1,13 +1,92 @@
 #include "pane-parts.hpp"
 
+#include <QAbstractButton>
 #include <QCheckBox>
 #include <QHBoxLayout>
 #include <QFontMetrics>
+#include <QFrame>
 #include <QLabel>
 #include <QStringList>
 #include <QSlider>
 #include <QTimer>
 #include <QVBoxLayout>
+
+// height of a control's first line, its label sits level with that
+static int first_line_height(QWidget* control)
+{
+    QLayout* rows = control->layout();
+    const int natural =
+        rows != nullptr && rows->count() > 0 ? rows->itemAt(0)->sizeHint().height() : control->sizeHint().height();
+    return qBound(control->minimumHeight(), natural, control->maximumHeight());
+}
+
+// kvantum asks 34 px for a tick box whose mark is 18
+static void keep_to_pitch(QWidget* box)
+{
+    if (qobject_cast<QAbstractButton*>(box) != nullptr)
+    {
+        box->setFixedHeight(check_pitch_px);
+    }
+}
+
+PaneForm::PaneForm(QWidget* pane, int axis_px) : QGridLayout(pane), axis(axis_px)
+{
+    setContentsMargins(0, 0, 0, 0);
+    // a margin on each label, since a row without one would lose any spacing
+    setHorizontalSpacing(0);
+    setVerticalSpacing(0);
+    setColumnMinimumWidth(0, axis);
+    setColumnStretch(1, 1);
+}
+
+void PaneForm::leaveRoom(int height_px)
+{
+    setRowMinimumHeight(next_row++, height_px);
+}
+
+void PaneForm::addRow(const QString& label, QWidget* control)
+{
+    auto* words = new QLabel;
+    words->setText(in_lines_of(label, words->fontMetrics(), axis - label_gap_px));
+    words->setAlignment(Qt::AlignRight | Qt::AlignTop);
+    addRow(words, control);
+}
+
+void PaneForm::addRow(QWidget* label, QWidget* control)
+{
+    label->setContentsMargins(0, qMax(0, (first_line_height(control) - first_line_height(label)) / 2), label_gap_px, 0);
+    addWidget(label, next_row, 0, Qt::AlignRight | Qt::AlignTop);
+    addWidget(control, next_row++, 1, Qt::AlignLeft | Qt::AlignTop);
+    leaveRoom(row_gap_px);
+}
+
+void PaneForm::addCheck(QWidget* box)
+{
+    keep_to_pitch(box);
+    addWidget(box, next_row++, 1, Qt::AlignLeft | Qt::AlignTop);
+    // a box with a note needs air before the next one
+    if (qobject_cast<QAbstractButton*>(box) == nullptr)
+    {
+        leaveRoom(row_gap_px);
+    }
+}
+
+void PaneForm::addDivider()
+{
+    auto* line = new QFrame;
+    line->setObjectName(QStringLiteral("divider"));
+    line->setFrameShape(QFrame::HLine);
+    line->setFrameShadow(QFrame::Sunken);
+    line->setFixedHeight(2);
+    auto* inset = new QWidget;
+    auto* across = new QHBoxLayout(inset);
+    across->setContentsMargins(divider_inset_px, 0, divider_inset_px, 0);
+    across->addWidget(line);
+
+    leaveRoom(divider_room_px);
+    addWidget(inset, next_row++, 0, 1, 2);
+    leaveRoom(divider_room_px);
+}
 
 QFont scaled_font(const QFont& font, double scale)
 {
@@ -144,6 +223,7 @@ QWidget* with_note_under(QWidget* control, const QString& note, int indent_px)
     auto* rows = new QVBoxLayout(group);
     rows->setContentsMargins(0, 0, 0, 0);
     rows->setSpacing(2);
+    keep_to_pitch(control);
     // The control keeps its own width; the note's line may be wider.
     rows->addWidget(control, 0, Qt::AlignLeft);
 

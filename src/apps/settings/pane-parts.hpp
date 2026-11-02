@@ -5,6 +5,7 @@
 #include <QFont>
 #include <QList>
 #include <QFontMetrics>
+#include <QGridLayout>
 #include <QSize>
 #include <QString>
 
@@ -13,6 +14,24 @@
 class QCheckBox;
 class QSlider;
 class QWidget;
+
+// labels ending where the controls begin, one axis for the whole pane
+class PaneForm : public QGridLayout
+{
+  public:
+    explicit PaneForm(QWidget* pane, int axis_px = 229);
+
+    void addRow(const QString& label, QWidget* control);
+    void addRow(QWidget* label, QWidget* control);
+    void addCheck(QWidget* box);
+    void addDivider();
+
+  private:
+    void leaveRoom(int height_px);
+
+    int axis;
+    int next_row = 0;
+};
 
 // A slider with a small word under each end ("Small" ... "Large").
 QWidget* with_end_words(QSlider* slider, const QString& low, const QString& high);
@@ -53,3 +72,9 @@ inline constexpr int intro_width_px = 628;
 // Notes are 11 pt where the rest is 13 pt.
 inline constexpr double small_words_scale = 11.0 / 13.0;
 inline constexpr int pane_spacing_px = 14;
+// labels stop 3 short of the controls and tick boxes stand 20 apart, as on OS X
+inline constexpr int label_gap_px = 3;
+inline constexpr int check_pitch_px = 20;
+inline constexpr int row_gap_px = 8;
+inline constexpr int divider_inset_px = 17;
+inline constexpr int divider_room_px = 12;
