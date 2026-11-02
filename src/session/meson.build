@@ -29,6 +29,7 @@ install_data(
     'extensions.py',
     'link_gimp_style.py',
     'link_mozilla_style.py',
+    'link_reaper_menu.py',
     'log_guard.py',
     'make_app_theme.py',
     'make_default_programs.py',

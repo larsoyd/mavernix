@@ -336,6 +336,19 @@ link_mozilla_style() {
     fi
 }
 
+# REAPER's menus reach the menu bar through a plugin, and its own bar goes with it.
+link_reaper_menu() {
+    local plugin="$library_dir/reaper/reaper_mavernix_menu.so"
+    if [[ -n "${DESKTOP_NESTED:-}" ]]; then
+        return 0
+    fi
+    if [[ ${MAVERNIX_GLOBAL_MENU:-1} != 0 && -f $plugin ]]; then
+        python3 "$session_dir/link_reaper_menu.py" "$plugin"
+    else
+        python3 "$session_dir/link_reaper_menu.py"
+    fi
+}
+
 # GIMP's stylesheet hides the GTK theme's window buttons, so it gets them from its own.
 link_gimp_style() {
     local theme="$app_theme/share/themes/DesktopTheme"
@@ -383,6 +396,7 @@ configure_everything() {
     write_shell_settings
     write_compositor_settings
     write_application_themes
+    link_reaper_menu
     write_interface_settings
     write_default_programs
     write_program_entries
