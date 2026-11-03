@@ -2,11 +2,11 @@
 <wayfire>
 	<plugin name="shared-edges">
 		<_short>Shared Edges</_short>
-		<_long>Dragging the edge two tiled windows share makes one grow as the other shrinks.</_long>
+		<_long>Dragging the edge two tiled windows share makes one grow as the other shrinks, also with the resize binding held, and a new tile takes the room the tiles beside it leave.</_long>
 		<category>Window Management</category>
 		<option name="enabled" type="bool">
 			<_short>Enabled</_short>
-			<_long>Whether dragging the edge between tiled windows resizes both. If not, only the dragged window is resized, and it stops being tiled.</_long>
+			<_long>Whether dragging the edge between tiled windows resizes both and a new tile meets the tiles beside it. If not, only the dragged window is resized, it stops being tiled, and new tiles take plain halves and quarters.</_long>
 			<default>true</default>
 		</option>
 		<option name="tolerance" type="int">
