@@ -55,6 +55,10 @@ install_data('bin/mavernix-dock-geometry', 'bin/mavernix-switch', 'bin/mavernix-
     install_dir: session_dir / 'bin', install_mode: 'rwxr-xr-x')
 install_data('notice/shell.qml', install_dir: session_dir / 'notice')
 install_data('portals/wayfire-portals.conf', install_dir: session_dir / 'portals')
+# with the session's qt6ct the kde helper calls the portal while starting and both wait 25 s
+install_data('portals' / 'plasma-xdg-desktop-portal-kde.conf',
+    install_dir: get_option('prefix') / 'lib' / 'systemd' / 'user' / 'plasma-xdg-desktop-portal-kde.service.d',
+    rename: 'mavernix.conf')
 
 # The login screen's entry.
 configure_file(

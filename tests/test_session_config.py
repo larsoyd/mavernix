@@ -1791,8 +1791,29 @@ class TestAutostartWaitsForTray(unittest.TestCase):
         with unittest.mock.patch("at_login.subprocess.run", record):
             self.at_login.restart_early_portals()
         restart = next(command for command in calls if "try-restart" in command)
-        # a restarted helper with the session's qt6ct settings deadlocks the portal for 25 seconds
         self.assertNotIn("plasma-xdg-desktop-portal-kde.service", restart)
+
+    def test_early_file_dialog_portal_is_stopped_before_the_portal_restarts(self):
+        calls = []
+        def record(command, **kwargs):
+            calls.append(command)
+            return subprocess.CompletedProcess(command, 0, stdout="", stderr="")
+        with unittest.mock.patch("at_login.subprocess.run", record):
+            self.at_login.restart_early_portals()
+        stop = ["systemctl", "--user", "stop", "plasma-xdg-desktop-portal-kde.service"]
+        self.assertIn(stop, calls)
+        restart = next(index for index, command in enumerate(calls) if "try-restart" in command)
+        self.assertLess(calls.index(stop), restart)
+
+    def test_file_dialog_portal_never_takes_the_session_qt_theme(self):
+        drop_in = SESSION_SOURCE_DIR / "portals" / "plasma-xdg-desktop-portal-kde.conf"
+        lines = drop_in.read_text().splitlines()
+        self.assertIn("[Service]", lines)
+        self.assertIn("Environment=QT_QPA_PLATFORMTHEME=kde", lines)
+        self.assertIn("Environment=QT_STYLE_OVERRIDE=", lines)
+        build = (SESSION_SOURCE_DIR / "meson.build").read_text()
+        self.assertIn("plasma-xdg-desktop-portal-kde.service.d", build)
+        self.assertIn("'portals' / 'plasma-xdg-desktop-portal-kde.conf'", build)
 
 
 class TestGtkWindowButtons(SessionTestCase):
