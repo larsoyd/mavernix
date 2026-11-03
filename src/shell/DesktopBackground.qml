@@ -15,6 +15,8 @@ PanelWindow {
     property bool showsFiles: false
     // The shell's UserChoices, which keep the order of the desktop's files.
     property var choices: null
+    // shown with its picture decoded
+    readonly property bool drawn: backingWindowVisible && picture.ready
 
     WlrLayershell.layer: WlrLayer.Background
     exclusionMode: ExclusionMode.Ignore
@@ -34,6 +36,7 @@ PanelWindow {
     color: "black"
 
     Fill {
+        id: picture
         anchors.fill: parent
         fill: background.fill
         themeDirectory: background.settings.theme_directory

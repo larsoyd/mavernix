@@ -167,7 +167,9 @@ def animation_sections(theme):
     animations = theme.get("animation", {})
     # Windows only. Wayfire's default also takes X11 menus ("x-or"), which
     # then pop in and out like windows while Wayland menus simply appear.
-    animate = ["[animate]", 'enabled_for = type equals "toplevel"']
+    # the login cover must hide the desktop from its first frame, not fade in over it
+    animate = ["[animate]", 'enabled_for = type equals "toplevel"',
+               'fade_enabled_for = type equals "overlay" & !(app_id equals "mavernix-entry")']
     sections = [animate]
     plugins = []
 

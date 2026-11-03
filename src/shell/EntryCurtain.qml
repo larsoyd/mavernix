@@ -1,4 +1,4 @@
-// the first start after a login fades in from the compositor's own empty colour, a restart does not
+// a login fades in from the compositor's empty colour once the desktop is drawn, not a restart
 
 import QtQuick
 import Quickshell
@@ -10,6 +10,8 @@ Scope {
     id: entry
 
     required property var settings
+    // every desktop picture is decoded and on screen
+    property bool desktopReady: false
 
     // the same colour make_wayfire_config.py gives the compositor where nothing is drawn
     readonly property color cover: {
@@ -20,7 +22,11 @@ Scope {
         return pushed && stops.length ? ThemeValues.color(stops[Math.floor(stops.length / 2)]) : "#1a1a1a"
     }
     property bool covering: false
+    property bool lifting: false
     property real shade: 1
+    property real coveredAt: 0
+    // a picture that never loads must not keep the desktop hidden
+    readonly property int deadline: 4000
 
     FileView {
         id: note
@@ -33,12 +39,27 @@ Scope {
         if (note.text() !== "")
             return
         note.setText("entered\n")
+        coveredAt = Date.now()
         covering = true
     }
 
-    SequentialAnimation {
+    Timer {
+        interval: entry.deadline
         running: entry.covering
-        PauseAnimation { duration: 250 }
+        onTriggered: entry.lift("deadline")
+    }
+
+    function lift(reason) {
+        if (!covering || lifting)
+            return
+        console.log("[entry] lift reason=" + reason + " waited_ms=" + (Date.now() - coveredAt))
+        lifting = true
+    }
+
+    onDesktopReadyChanged: if (desktopReady) lift("ready")
+
+    SequentialAnimation {
+        running: entry.lifting
         NumberAnimation { target: entry; property: "shade"; to: 0; duration: 450; easing.type: Easing.InOutQuad }
         ScriptAction { script: entry.covering = false }
     }

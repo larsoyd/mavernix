@@ -20,6 +20,11 @@ ShellRoot {
 
     readonly property var settings: JSON.parse(settingsFile.text())
 
+    // declared first so its windows map ahead of the menu bar and the dock
+    EntryCurtain {
+        settings: shell.settings
+        desktopReady: backgrounds.instances.length > 0 && backgrounds.instances.every(background => background.drawn)
+    }
 
     // panel, dock and overlays go on [display] main_screen, else the leftmost screen
     // the screen list reorders when a monitor returns, the layout stays
@@ -37,6 +42,7 @@ ShellRoot {
     }
 
     Variants {
+        id: backgrounds
         model: Quickshell.screens
         DesktopBackground {
             required property var modelData
@@ -305,10 +311,6 @@ ShellRoot {
                 screenFlash.flash()
             }
         }
-    }
-
-    EntryCurtain {
-        settings: shell.settings
     }
 
     ScreenFlash {

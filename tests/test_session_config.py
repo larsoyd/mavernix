@@ -407,6 +407,9 @@ class TestWindowAnimations(SessionTestCase):
         self.assertIn('enabled_for = type equals "toplevel"', sections[0])
         self.assertIn(["[themed-open-close]", "pop_duration = 200ms circle"], sections)
 
+        # the login cover is drawn whole at once, other overlays keep their fade
+        self.assertIn('fade_enabled_for = type equals "overlay" & !(app_id equals "mavernix-entry")', sections[0])
+
         # A desktop's [window] quick_open_close_ms keeps the curve.
         make_wayfire_config.shorten_open_and_close(sections, 120)
         self.assertIn(["[themed-open-close]", "pop_duration = 120ms circle"], sections)
