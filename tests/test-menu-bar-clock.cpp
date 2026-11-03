@@ -32,11 +32,11 @@ class TestMenuBarClock : public QObject
     }
 
     static QVariantMap with(const QString& format, bool time, bool date, const QString& style = QString(),
-        bool region_time = false)
+        bool region_time = false, bool region_date = false)
     {
         return {{QStringLiteral("format"), format}, {QStringLiteral("showTime"), time},
             {QStringLiteral("showDate"), date}, {QStringLiteral("dateStyle"), style},
-            {QStringLiteral("regionTime"), region_time}};
+            {QStringLiteral("regionTime"), region_time}, {QStringLiteral("regionDate"), region_date}};
     }
 
   private slots:
@@ -63,56 +63,82 @@ class TestMenuBarClock : public QObject
         QCOMPARE(text(with("ddd h:mm AP", true, false), "nb_NO", "nb_NO"), QStringLiteral("Tue 1:05 PM"));
     }
 
-    void fullDateIsWrittenOutWithAnEnglishOrdinal()
+    void longDateIsWrittenOutWithAnEnglishOrdinal()
     {
-        QCOMPARE(text(with("HH:mm", true, true, "full"), "nb_NO", "en_US"), QStringLiteral("January 13th 13:05"));
+        QCOMPARE(text(with("HH:mm", true, true, "long"), "nb_NO", "en_US"), QStringLiteral("January 13th 13:05"));
         const QList<QPair<int, QString>> days = {{1, "1st"}, {2, "2nd"}, {3, "3rd"}, {4, "4th"}, {11, "11th"},
             {12, "12th"}, {21, "21st"}, {22, "22nd"}, {23, "23rd"}, {31, "31st"}};
         for (const auto& [day, ordinal] : days)
         {
-            QCOMPARE(text(with("HH:mm", false, true, "full"), "nb_NO", "en_US", day), "January " + ordinal);
+            QCOMPARE(text(with("HH:mm", false, true, "long"), "nb_NO", "en_US", day), "January " + ordinal);
         }
     }
 
-    void shortDateCutsTheMonthWithAPointUnlessItIsWhole()
+    void anUnknownStyleIsTheLongOne()
     {
-        QCOMPARE(text(with("HH:mm", true, true, "short"), "nb_NO", "en_US"), QStringLiteral("Jan. 13th 13:05"));
-        QCOMPARE(text(with("HH:mm", false, true, "short"), "nb_NO", "en_US", 13, 5), QStringLiteral("May 13th"));
+        QCOMPARE(text(with("ddd HH:mm", false, true, "region"), "nb_NO", "en_US"),
+            QStringLiteral("Tuesday January 13th"));
+        QCOMPARE(text(with("HH:mm", false, true, QString()), "nb_NO", "en_US"), QStringLiteral("January 13th"));
+    }
+
+    void mediumDateCutsTheMonthWithAPointUnlessItIsWhole()
+    {
+        QCOMPARE(text(with("HH:mm", true, true, "medium"), "nb_NO", "en_US"), QStringLiteral("Jan. 13th 13:05"));
+        QCOMPARE(text(with("HH:mm", false, true, "medium"), "nb_NO", "en_US", 13, 5), QStringLiteral("May 13th"));
     }
 
     void otherLanguagesTakeTheirOwnDayAndMonthWithoutOrdinals()
     {
-        QCOMPARE(text(with("HH:mm", false, true, "full"), "nb_NO", "nb_NO"), QStringLiteral("13. januar"));
-        QCOMPARE(text(with("HH:mm", false, true, "full"), "de_DE", "de_DE"), QStringLiteral("13. Januar"));
-        QCOMPARE(text(with("HH:mm", false, true, "full"), "es_ES", "es_ES"), QStringLiteral("13 de enero"));
-        QCOMPARE(text(with("HH:mm", false, true, "short"), "nb_NO", "nb_NO"), QStringLiteral("13. jan."));
+        QCOMPARE(text(with("HH:mm", false, true, "long"), "nb_NO", "nb_NO"), QStringLiteral("13. januar"));
+        QCOMPARE(text(with("HH:mm", false, true, "long"), "de_DE", "de_DE"), QStringLiteral("13. Januar"));
+        QCOMPARE(text(with("HH:mm", false, true, "long"), "es_ES", "es_ES"), QStringLiteral("13 de enero"));
+        QCOMPARE(text(with("HH:mm", false, true, "medium"), "nb_NO", "nb_NO"), QStringLiteral("13. jan."));
     }
 
-    void numbersKeepTheRegionsOrderWithAFullYear()
+    void shortDateIsNumbersInTheRegionsOrderWithAFullYear()
     {
-        QCOMPARE(text(with("HH:mm", true, true, "numeric"), "nb_NO", "en_US"), QStringLiteral("13/01/2026 13:05"));
-        QCOMPARE(text(with("HH:mm", false, true, "numeric"), "en_US", "en_US"), QStringLiteral("01/13/2026"));
-        QCOMPARE(text(with("HH:mm", false, true, "numeric"), "ja_JP", "en_US"), QStringLiteral("2026/01/13"));
-        QCOMPARE(text(with("HH:mm", false, true, "numeric"), "en_US", "en_US", 3), QStringLiteral("01/03/2026"));
+        QCOMPARE(text(with("HH:mm", true, true, "short"), "nb_NO", "en_US"), QStringLiteral("13/01/2026 13:05"));
+        QCOMPARE(text(with("HH:mm", false, true, "short"), "en_US", "en_US"), QStringLiteral("01/13/2026"));
+        QCOMPARE(text(with("HH:mm", false, true, "short"), "ja_JP", "en_US"), QStringLiteral("2026/01/13"));
+        QCOMPARE(text(with("HH:mm", false, true, "short"), "en_US", "en_US", 3), QStringLiteral("01/03/2026"));
     }
 
-    void theRegionWritesItsOwnDateAndTime()
+    void theRegionWritesItsOwnTime()
     {
-        QCOMPARE(text(with("HH:mm", true, true, "region"), "nb_NO", "en_US"), QStringLiteral("13.01.2026 13:05"));
         QCOMPARE(text(with("HH:mm", true, false, QString(), true), "en_US", "en_US"), QStringLiteral(u"1:05\u202FPM"));
         QCOMPARE(text(with("HH:mm:ss", true, false, QString(), true), "nb_NO", "en_US"), QStringLiteral("13:05:07"));
-        QCOMPARE(text(with("h:mm AP", true, true, "region", true), "nb_NO", "en_US"),
+        QCOMPARE(text(with("h:mm AP", true, true, "short", true, true), "nb_NO", "en_US"),
             QStringLiteral("13.01.2026 13:05"));
+    }
+
+    void theRegionWritesTheDateInItsLanguage()
+    {
+        QCOMPARE(text(with("HH:mm", false, true, "long", false, true), "nb_NO", "en_US"), QStringLiteral("13. januar"));
+        QCOMPARE(text(with("HH:mm", false, true, "medium", false, true), "nb_NO", "en_US"), QStringLiteral("13. jan."));
+        QCOMPARE(text(with("HH:mm", true, true, "short", false, true), "nb_NO", "en_US"),
+            QStringLiteral("13.01.2026 13:05"));
+        QCOMPARE(text(with("HH:mm", false, true, "short", false, true), "en_US", "en_US"), QStringLiteral("1/13/26"));
+        QCOMPARE(text(with("HH:mm", false, true, "long", false, true), "en_US", "nb_NO"), QStringLiteral("January 13th"));
     }
 
     void theDayOfTheWeekLeadsInTheDatesLanguage()
     {
-        QCOMPARE(text(with("ddd HH:mm", false, true, "full"), "nb_NO", "en_US"), QStringLiteral("Tue January 13th"));
-        QCOMPARE(text(with("ddd HH:mm", true, true, "short"), "nb_NO", "en_US"), QStringLiteral("Tue Jan. 13th 13:05"));
-        QCOMPARE(text(with("ddd HH:mm", true, true, "region"), "en_US", "en_US"), QStringLiteral("Tue 1/13/26 13:05"));
-        QCOMPARE(text(with("ddd HH:mm", true, true, "region"), "nb_NO", "en_US"), QStringLiteral("tir. 13.01.2026 13:05"));
-        QCOMPARE(text(with("ddd h:mm AP", true, true, "numeric"), "nb_NO", "nb_NO"),
+        QCOMPARE(text(with("ddd HH:mm", true, true, "medium"), "nb_NO", "en_US"), QStringLiteral("Tue Jan. 13th 13:05"));
+        QCOMPARE(text(with("ddd h:mm AP", true, true, "short"), "nb_NO", "nb_NO"),
             QStringLiteral("Tue 13/01/2026 1:05 PM"));
+        QCOMPARE(text(with("ddd HH:mm", true, true, "short", false, true), "nb_NO", "en_US"),
+            QStringLiteral("Tir. 13.01.2026 13:05"));
+        QCOMPARE(text(with("ddd HH:mm", true, true, "medium", false, true), "nb_NO", "en_US"),
+            QStringLiteral("Tir. 13. jan. 13:05"));
+    }
+
+    void aLongDateWritesTheDayOfTheWeekOut()
+    {
+        QCOMPARE(text(with("ddd HH:mm", false, true, "long"), "nb_NO", "en_US"), QStringLiteral("Tuesday January 13th"));
+        QCOMPARE(text(with("ddd HH:mm:ss", true, true, "long", true, true), "nb_NO", "en_US"),
+            QStringLiteral("Tirsdag 13. januar 13:05:07"));
+        QCOMPARE(text(with("ddd HH:mm", true, false, "long", false, true), "nb_NO", "en_US"),
+            QStringLiteral("Tir. 13:05"));
     }
 
     void theClockMovesToTheChosenPlace()

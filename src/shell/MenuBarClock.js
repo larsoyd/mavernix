@@ -9,19 +9,21 @@ const leadingWeekday = /^(dddd?)[ ,]*/
 // the clock format reads in english as it always has, only the region's own formats follow LC_TIME
 function text(date, choices, timeLocale, wordsLocale) {
     const format = choices.format ?? "HH:mm"
-    if (!choices.showDate && !choices.regionTime) {
+    const regionDate = choices.regionDate ?? false
+    if (!choices.showDate && !choices.regionTime && !regionDate) {
         return Qt.formatDateTime(date, format)
     }
     const weekday = format.match(leadingWeekday)?.[1] ?? ""
-    const style = choices.showDate ? choices.dateStyle : ""
+    const style = dateStyles.includes(choices.dateStyle) ? choices.dateStyle : "long"
     const parts = []
     if (weekday !== "") {
-        parts.push(style === "full" || style === "short" ? date.toLocaleString(wordsLocale, weekday)
-                   : style === "region" || choices.regionTime ? date.toLocaleString(timeLocale, weekday)
-                   : Qt.formatDateTime(date, weekday))
+        const written = choices.showDate && style === "long" ? "dddd" : weekday
+        parts.push(regionDate ? capitalized(date.toLocaleString(timeLocale, written))
+                   : choices.showDate && style !== "short" ? date.toLocaleString(wordsLocale, written)
+                   : Qt.formatDateTime(date, written))
     }
     if (choices.showDate) {
-        parts.push(dateText(date, style, timeLocale, wordsLocale))
+        parts.push(dateText(date, style, regionDate ? timeLocale : wordsLocale, timeLocale, regionDate))
     }
     if (choices.showTime ?? true) {
         parts.push(choices.regionTime ? date.toLocaleString(timeLocale, regionTimeFormat(timeLocale, format))
@@ -30,15 +32,19 @@ function text(date, choices, timeLocale, wordsLocale) {
     return parts.join(" ")
 }
 
-function dateText(date, style, timeLocale, wordsLocale) {
-    switch (style) {
-    case "region":
-        return date.toLocaleDateString(timeLocale, shortForm)
-    case "numeric":
-        return date.toLocaleString(timeLocale, numericFormat(timeLocale))
-    default:
-        return wordsDate(date, style === "short", wordsLocale)
+const dateStyles = ["long", "medium", "short"]
+
+function dateText(date, style, wordsLocale, timeLocale, regionDate) {
+    if (style !== "short") {
+        return wordsDate(date, style === "medium", wordsLocale)
     }
+    return regionDate ? date.toLocaleDateString(timeLocale, shortForm)
+                      : date.toLocaleString(timeLocale, numericFormat(timeLocale))
+}
+
+// a weekday leads the line, so it starts with a capital even where the language writes it small
+function capitalized(words) {
+    return words.charAt(0).toLocaleUpperCase() + words.slice(1)
 }
 
 // the region's short time, with seconds when the clock's own format has them

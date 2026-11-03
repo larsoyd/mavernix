@@ -85,10 +85,12 @@ clock_menu_date_format = "d MMMM yyyy"
 clock_position = "right"
 clock_shows_time = true
 clock_shows_date = false
-# "full" (January 13th), "short" (Jan. 13th), "numeric" or "region", the LC_TIME short date
-clock_date_style = "full"
+# "long" (Tuesday January 13th), "medium" (Tue Jan. 13th) or "short" (13/01/2026)
+clock_date_style = "long"
 # the time in LC_TIME's own format instead of clock_format's
 clock_region_time = false
+# the day and date in LC_TIME's language and its own short date
+clock_region_date = false
 
 # The desktop's own menus, shown in the panel while no window is active.
 # The first menu opens from the name (Settings, Desktop changes it) and has
@@ -628,8 +630,8 @@ menu_minimize = "Minimize"
 menu_close = "Close"
 dock_title = "Dock"
 menu_bar_show = "Show in the menu bar:"
-menu_bar_24_hours = "Show the time with 24 hours"
-menu_bar_seconds = "Show seconds"
+menu_bar_24_hours = "Use a 24-hour clock"
+menu_bar_seconds = "Display the time with seconds"
 menu_bar_blur = "Blur menu bar"
 blur_amount = "Blur:"
 blur_light = "Light"
@@ -647,19 +649,19 @@ reset_all_note = "Every choice you made is replaced by the desktop's own, includ
 reset_all_button = "Reset All"
 cancel = "Cancel"
 datetime_position = "Position in menu bar:"
-datetime_position_left = "At the left"
-datetime_position_middle = "In the middle"
-datetime_position_right = "At the right"
+datetime_position_left = "Left"
+datetime_position_middle = "Center"
+datetime_position_right = "Right"
 datetime_show_time = "Show the time"
 datetime_region_time = "Use the region's time format"
 datetime_date_options = "Date options:"
 datetime_weekday = "Show the day of the week"
 datetime_show_date = "Show date"
+datetime_region_date = "Use the region's date format"
 datetime_date_style = "Date style:"
-datetime_style_full = "Written out, as January 13th"
-datetime_style_short = "Short, as Jan. 13th"
-datetime_style_numeric = "In numbers"
-datetime_style_region = "As the region writes it"
+datetime_style_long = "Long"
+datetime_style_medium = "Medium"
+datetime_style_short = "Short"
 menu_bar_every_screen = "Show the menu bar on every display"
 menu_bar_own_menus = "Give each display the menus of its own window"
 menu_bar_items = { tray = "Icons of running programs", load = "Computer load", bluetooth = "Bluetooth", network = "Wi-Fi", volume = "Volume", battery = "Battery", clock = "Clock", search = "Search", notifications = "Notifications", session = "Session menu" }
