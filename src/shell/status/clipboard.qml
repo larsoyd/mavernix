@@ -2,6 +2,7 @@
 
 import QtQuick
 import QtQuick.Effects
+import Shell.Native
 import ".."
 import "../ThemeValues.js" as ThemeValues
 
@@ -34,19 +35,66 @@ StatusItem {
             readonly property real rowHeight: looks.item_height
             readonly property real pictureRowHeight: Math.round(rowHeight * 2)
             readonly property int mostRows: clipboardItem.words.shown_rows ?? 12
+            // the list never runs past the screen, whatever shown_rows says
+            readonly property real listRoom: Math.max(4 * rowHeight,
+                (clipboardItem.panel.screen?.height ?? 800) * 0.8 - 7 * rowHeight)
             property int marked: -1
             property string contextFor: ""
 
             implicitWidth: clipboardItem.words.width ?? 360
             implicitHeight: column.height + 2 * looks.padding
 
+            ClipboardSearch {
+                id: found
+                history: clipboardItem.history
+                filter: field.text
+            }
+
             function choose(row, plain) {
-                const id = clipboardItem.history.idAt(row)
+                const id = found.idAt(row)
                 if (id === "") {
                     return
                 }
                 clipboardItem.history.choose(id, plain ?? false)
                 clipboardItem.panel.closeMenu()
+            }
+
+            function mark(row) {
+                if (list.count === 0) {
+                    return
+                }
+                marked = Math.max(0, Math.min(list.count - 1, row))
+                list.positionViewAtIndex(marked, ListView.Contain)
+            }
+
+            function rowsInView() {
+                return Math.max(1, Math.floor(list.height / rowHeight) - 1)
+            }
+
+            // the row whose whole content shows beside the menu, after a rest on it
+            property int previewed: -1
+            onMarkedChanged: {
+                previewed = -1
+                resting.restart()
+            }
+            Timer {
+                id: resting
+                interval: clipboardItem.words.preview_delay_ms ?? 700
+                onTriggered: box.previewed = box.contextFor === "" ? box.marked : -1
+            }
+
+            function ago(when) {
+                const seconds = (Date.now() - when.getTime()) / 1000
+                if (seconds < 60) {
+                    return clipboardItem.words.copied_now ?? "Copied just now"
+                }
+                if (seconds < 3600) {
+                    return (clipboardItem.words.copied_minutes ?? "Copied %1 min ago").arg(Math.floor(seconds / 60))
+                }
+                if (seconds < 86400) {
+                    return (clipboardItem.words.copied_hours ?? "Copied %1 h ago").arg(Math.floor(seconds / 3600))
+                }
+                return (clipboardItem.words.copied_on ?? "Copied %1").arg(Qt.formatDateTime(when, "d MMM, HH:mm"))
             }
 
             Connections {
@@ -56,6 +104,7 @@ StatusItem {
                     box.marked = -1
                     box.contextFor = ""
                     list.positionViewAtBeginning()
+                    scroller.flash()
                 }
             }
 
@@ -142,8 +191,8 @@ StatusItem {
                         width: parent.width - x - box.looks.shortcut_end_inset
                         anchors.verticalCenter: parent.verticalCenter
                         onTextChanged: {
-                            clipboardItem.history.filter = text
                             box.marked = text === "" || list.count === 0 ? -1 : 0
+                            list.positionViewAtBeginning()
                         }
                         onAccepted: box.choose(Math.max(0, box.marked))
                         onKeyPressed: event => {
@@ -158,18 +207,20 @@ StatusItem {
                                     clipboardItem.panel.closeMenu()
                                 }
                             } else if (event.key === Qt.Key_Down) {
-                                box.marked = Math.min(list.count - 1, box.marked + 1)
-                                list.positionViewAtIndex(box.marked, ListView.Contain)
+                                box.mark(box.marked + 1)
                             } else if (event.key === Qt.Key_Up) {
-                                box.marked = Math.max(0, box.marked - 1)
-                                list.positionViewAtIndex(box.marked, ListView.Contain)
+                                box.mark(Math.max(0, box.marked - 1))
+                            } else if (event.key === Qt.Key_PageDown) {
+                                box.mark(box.marked + box.rowsInView())
+                            } else if (event.key === Qt.Key_PageUp) {
+                                box.mark(box.marked - box.rowsInView())
                             } else if (control && event.key >= Qt.Key_1 && event.key <= Qt.Key_9) {
                                 box.choose(event.key - Qt.Key_1)
                             } else if (control && event.key === Qt.Key_P && box.marked >= 0) {
-                                clipboardItem.history.togglePin(clipboardItem.history.idAt(box.marked))
+                                clipboardItem.history.togglePin(found.idAt(box.marked))
                             } else if (option && (event.key === Qt.Key_Backspace || event.key === Qt.Key_Delete)
                                        && box.marked >= 0) {
-                                clipboardItem.history.remove(clipboardItem.history.idAt(box.marked))
+                                clipboardItem.history.remove(found.idAt(box.marked))
                                 box.marked = Math.min(box.marked, list.count - 1)
                             } else {
                                 return
@@ -193,12 +244,13 @@ StatusItem {
                 ListView {
                     id: list
                     width: parent.width
-                    height: Math.min(contentHeight, box.mostRows * box.rowHeight)
+                    height: Math.min(contentHeight, box.mostRows * box.rowHeight, box.listRoom)
                     visible: count > 0
                     clip: true
                     interactive: contentHeight > height
                     boundsBehavior: Flickable.StopAtBounds
-                    model: clipboardItem.history
+                    model: found
+                    onMovementStarted: box.previewed = -1
 
                     section.property: "section"
                     section.delegate: Item {
@@ -223,6 +275,8 @@ StatusItem {
                         required property url thumbnail
                         required property size pictureSize
                         required property int fileCount
+                        required property string preview
+                        required property date added
 
                         readonly property bool marked: box.marked === index
                         readonly property color ink: ThemeValues.color(marked ? box.looks.highlight_text_color
@@ -260,12 +314,19 @@ StatusItem {
                             id: picture
                             visible: row.kind === "image"
                             x: box.looks.text_inset
-                            height: row.height - 6
-                            width: Math.min(height * 2, height * row.pictureSize.width / Math.max(1, row.pictureSize.height))
+                            height: row.height - 8
+                            width: Math.round(Math.min(height * 2, height * row.pictureSize.width / Math.max(1, row.pictureSize.height)))
                             anchors.verticalCenter: parent.verticalCenter
                             fillMode: Image.PreserveAspectFit
                             asynchronous: true
-                            source: row.thumbnail
+                            sourceSize: Qt.size(width * Screen.devicePixelRatio, height * Screen.devicePixelRatio)
+                            source: visible ? row.thumbnail : ""
+                            Rectangle {
+                                anchors.fill: parent
+                                anchors.margins: -1
+                                color: "transparent"
+                                border.color: Qt.rgba(0, 0, 0, 0.22)
+                            }
                         }
 
                         RowText {
@@ -338,6 +399,109 @@ StatusItem {
                     label: clipboardItem.words.pause ?? "Pause Clipboard History"
                     checked: clipboardItem.history.paused
                     onChosen: clipboardItem.history.paused = !clipboardItem.history.paused
+                }
+            }
+
+            // the overlay scroller of the time, shown while the list moves and once on opening
+            Rectangle {
+                id: scroller
+                readonly property real trackTop: column.y + list.y + 2
+                readonly property real trackLength: list.height - 4
+                visible: list.visible && list.interactive
+                x: box.width - width - 2
+                y: trackTop + list.visibleArea.yPosition * trackLength
+                width: 7
+                height: Math.max(18, list.visibleArea.heightRatio * trackLength)
+                radius: width / 2
+                color: Qt.rgba(0, 0, 0, 0.45)
+                border.color: Qt.rgba(1, 1, 1, 0.35)
+                opacity: flashing.running ? 1 : 0
+                Behavior on opacity {
+                    NumberAnimation { duration: scroller.opacity > 0 ? 300 : 120 }
+                }
+                function flash() {
+                    flashing.restart()
+                }
+                Connections {
+                    target: list
+                    function onContentYChanged() {
+                        scroller.flash()
+                    }
+                }
+                Component.onCompleted: flash()
+                Timer {
+                    id: flashing
+                    interval: 1000
+                }
+            }
+
+            // the whole of the rested-on row beside the menu, on the side with room
+            Item {
+                id: preview
+                readonly property var row: box.previewed >= 0 ? list.itemAtIndex(box.previewed) : null
+                readonly property bool picture: row?.kind === "image"
+                readonly property real inset: 10
+                visible: row !== null && box.contextFor === ""
+                width: Math.round(Math.max(footer.implicitWidth, picture ? shot.width : body.width) + 2 * inset)
+                height: Math.round((picture ? shot.height : body.height) + footer.implicitHeight + 3 * inset)
+                x: {
+                    const leftRoom = row !== null ? box.mapToItem(null, 0, 0).x : 0
+                    return leftRoom >= width + 8 ? -width - 8 : box.width + 8
+                }
+                y: row ? Math.max(0, Math.min(row.mapToItem(box, 0, 0).y - inset, box.height - height)) : 0
+                opacity: visible ? 1 : 0
+                Behavior on opacity {
+                    NumberAnimation { duration: 120 }
+                }
+
+                BoxFrame {
+                    looks: box.looks
+                }
+                Text {
+                    id: body
+                    visible: !preview.picture
+                    x: preview.inset
+                    y: preview.inset
+                    width: Math.min(implicitWidth, 380)
+                    text: preview.row?.preview ?? ""
+                    font.family: box.face.family
+                    font.pixelSize: Math.round(box.face.size * 0.85)
+                    color: ThemeValues.color(box.looks.text_color)
+                    elide: Text.ElideRight
+                    textFormat: Text.PlainText
+                    lineHeight: 1.1
+                }
+                Image {
+                    id: shot
+                    visible: preview.picture
+                    x: preview.inset
+                    y: preview.inset
+                    readonly property size whole: preview.row?.pictureSize ?? Qt.size(1, 1)
+                    readonly property real fit: Math.min(1, 256 / Math.max(1, whole.width), 256 / Math.max(1, whole.height))
+                    width: Math.max(1, Math.round(whole.width * fit))
+                    height: Math.max(1, Math.round(whole.height * fit))
+                    fillMode: Image.PreserveAspectFit
+                    asynchronous: true
+                    source: visible ? preview.row.thumbnail : ""
+                }
+                Text {
+                    id: footer
+                    x: preview.inset
+                    y: (preview.picture ? shot.y + shot.height : body.y + body.height) + preview.inset
+                    text: {
+                        const row = preview.row
+                        if (row === null) {
+                            return ""
+                        }
+                        const when = box.ago(row.added)
+                        if (row.kind === "image") {
+                            return when + " · " + row.pictureSize.width + " × " + row.pictureSize.height
+                        }
+                        return when
+                    }
+                    font.family: box.face.family
+                    font.pixelSize: Math.round(box.face.size * 0.8)
+                    color: ThemeValues.color(box.looks.disabled_text_color)
                 }
             }
 

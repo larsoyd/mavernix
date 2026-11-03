@@ -2078,9 +2078,11 @@ duration_ms = 150
 close_duration_ms = 220
 
 [animation.dock_folder]
-kind = "grow"
-duration_ms = 180
-close_duration_ms = 110
+kind = "from_tile"
+duration_ms = 250
+close_duration_ms = 250
+bezier = [0.25, 0.1, 0.25, 1.0]
+close_opacity = 0.2
 
 [animation.dock_folder_fan]
 kind = "rise"

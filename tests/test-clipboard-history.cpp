@@ -31,12 +31,23 @@ QByteArray pngOf(int width, int height, QRgb colour = qRgb(200, 30, 30))
     return bytes;
 }
 
-QStringList labels(const ClipboardHistory& history)
+QStringList labels(const QAbstractItemModel& model)
 {
     QStringList out;
-    for (int row = 0; row < history.rowCount(); ++row)
-        out << history.data(history.index(row), ClipboardHistory::LabelRole).toString();
+    for (int row = 0; row < model.rowCount(); ++row)
+        out << model.data(model.index(row, 0), ClipboardHistory::LabelRole).toString();
     return out;
+}
+
+QByteArray pictureOf(int width, int height, const char* format)
+{
+    QImage image(width, height, QImage::Format_RGB32);
+    image.fill(qRgb(40, 90, 160));
+    QByteArray bytes;
+    QBuffer buffer(&bytes);
+    buffer.open(QIODevice::WriteOnly);
+    image.save(&buffer, format);
+    return bytes;
 }
 
 QString idAt(const ClipboardHistory& history, int row)
@@ -384,7 +395,7 @@ class ClipboardHistoryTest : public QObject
         const QUrl thumbnail = history.data(row, ClipboardHistory::ThumbnailRole).toUrl();
         QImage small(thumbnail.toLocalFile());
         QVERIFY2(!small.isNull(), qPrintable(thumbnail.toString()));
-        QVERIFY(small.width() <= 128 && small.height() <= 128);
+        QCOMPARE(small.size(), QSize(256, 170));
         history.choose(idAt(history, 0));
         QCOMPARE(offered[0]->formats().contains("image/bmp"), false);
         QCOMPARE(offered[0]->formats().contains("text/html"), true);
@@ -438,12 +449,30 @@ class ClipboardHistoryTest : public QObject
         take(history, textData("Alpha beta"));
         take(history, textData("beta gamma"));
         take(history, textData("delta\nALPHA on the second line"));
-        history.setFilter("alpha");
-        QCOMPARE(labels(history), QStringList({"delta", "Alpha beta"}));
-        history.setFilter("BETA  alpha");
-        QCOMPARE(labels(history), QStringList({"Alpha beta"}));
-        history.setFilter("");
-        QCOMPARE(history.rowCount(), 3);
+        ClipboardSearch search;
+        search.setHistory(&history);
+        search.setFilter("alpha");
+        QCOMPARE(labels(search), QStringList({"delta", "Alpha beta"}));
+        search.setFilter("BETA  alpha");
+        QCOMPARE(labels(search), QStringList({"Alpha beta"}));
+        QCOMPARE(search.idAt(0), idAt(history, 2));
+        search.setFilter("");
+        QCOMPARE(search.rowCount(), 3);
+    }
+
+    void a_search_leaves_the_history_whole()
+    {
+        ClipboardHistory history;
+        begin(history);
+        take(history, textData("apple"));
+        take(history, textData("banana"));
+        ClipboardSearch search;
+        search.setHistory(&history);
+        search.setFilter("apple");
+        QCOMPARE(search.rowCount(), 1);
+        QCOMPARE(history.rowCount(), 2);
+        take(history, textData("pineapple"));
+        QCOMPARE(labels(search), QStringList({"pineapple", "apple"}));
     }
 
     void a_filter_change_keeps_rows_that_stay()
@@ -453,12 +482,162 @@ class ClipboardHistoryTest : public QObject
         take(history, textData("apple"));
         take(history, textData("apricot"));
         take(history, textData("banana"));
-        QSignalSpy resets(&history, &QAbstractItemModel::modelReset);
-        QSignalSpy removed(&history, &QAbstractItemModel::rowsRemoved);
-        history.setFilter("ap");
+        ClipboardSearch search;
+        search.setHistory(&history);
+        QSignalSpy resets(&search, &QAbstractItemModel::modelReset);
+        QSignalSpy removed(&search, &QAbstractItemModel::rowsRemoved);
+        search.setFilter("ap");
         QCOMPARE(resets.count(), 0);
         QCOMPARE(removed.count(), 1);
-        QCOMPARE(labels(history), QStringList({"apricot", "apple"}));
+        QCOMPARE(labels(search), QStringList({"apricot", "apple"}));
+    }
+
+    void other_picture_formats_become_png()
+    {
+        ClipboardHistory history;
+        begin(history);
+        auto* data = new QMimeData;
+        data->setData("image/jpeg", pictureOf(64, 48, "JPEG"));
+        data->setData("image/bmp", pictureOf(64, 48, "BMP"));
+        take(history, data);
+        QCOMPARE(history.rowCount(), 1);
+        QCOMPARE(history.data(history.index(0), ClipboardHistory::KindRole).toString(), QString("image"));
+        QCOMPARE(history.data(history.index(0), ClipboardHistory::PictureSizeRole).toSize(), QSize(64, 48));
+        history.choose(idAt(history, 0));
+        QCOMPARE(offered[0]->formats(), QStringList({"image/png"}));
+        QCOMPARE(QImage::fromData(offered[0]->data("image/png"), "PNG").size(), QSize(64, 48));
+    }
+
+    void a_picture_with_only_its_address_is_a_picture()
+    {
+        ClipboardHistory history;
+        begin(history);
+        auto* data = new QMimeData;
+        data->setData("image/png", pngOf(30, 20));
+        data->setData("text/plain", "https://example.org/cat.png");
+        take(history, data);
+        QCOMPARE(history.data(history.index(0), ClipboardHistory::KindRole).toString(), QString("image"));
+        QCOMPARE(history.data(history.index(0), ClipboardHistory::LabelRole).toString(), QString("https://example.org/cat.png"));
+        auto* cells = new QMimeData;
+        cells->setData("image/png", pngOf(30, 20, qRgb(1, 2, 3)));
+        cells->setData("text/plain", "a\tb\n1\t2");
+        take(history, cells);
+        QCOMPARE(history.data(history.index(0), ClipboardHistory::KindRole).toString(), QString("text"));
+    }
+
+    void text_offered_only_under_its_own_kind_is_text()
+    {
+        ClipboardHistory history;
+        begin(history);
+        const QByteArray ruby = "def stack\n" + QByteArray("  cells\n").repeated(10000) + "end\n";
+        auto* code = new QMimeData;
+        code->setData("application/x-ruby", ruby);
+        take(history, code);
+        auto* json = new QMimeData;
+        json->setData("application/json", "{\"a\": 1}");
+        take(history, json);
+        auto* blob = new QMimeData;
+        blob->setData("application/octet-stream", QByteArray("\x00\x01\x02", 3));
+        take(history, blob);
+        QCOMPARE(labels(history), QStringList({"{\"a\": 1}", "def stack"}));
+        QCOMPARE(history.data(history.index(1), ClipboardHistory::KindRole).toString(), QString("text"));
+        history.choose(idAt(history, 1));
+        QCOMPARE(offered[0]->formats(), QStringList({"application/x-ruby"}));
+        history.choose(idAt(history, 0), true);
+        QCOMPARE(offered[1]->data("text/plain"), ruby);
+    }
+
+    void a_broken_picture_is_not_kept()
+    {
+        ClipboardHistory history;
+        begin(history);
+        auto* data = new QMimeData;
+        data->setData("image/png", QByteArray(500, 'x'));
+        take(history, data);
+        QCOMPARE(history.rowCount(), 0);
+    }
+
+    void thumbnails_shrink_to_256_and_never_grow()
+    {
+        ClipboardHistory history;
+        begin(history);
+        auto* big = new QMimeData;
+        big->setData("image/png", pngOf(1000, 500));
+        take(history, big);
+        QCOMPARE(QImage(history.data(history.index(0), ClipboardHistory::ThumbnailRole).toUrl().toLocalFile()).size(),
+                 QSize(256, 128));
+        auto* small = new QMimeData;
+        small->setData("image/png", pngOf(40, 20, qRgb(9, 9, 9)));
+        take(history, small);
+        QCOMPARE(QImage(history.data(history.index(0), ClipboardHistory::ThumbnailRole).toUrl().toLocalFile()).size(),
+                 QSize(40, 20));
+    }
+
+    void plain_text_of_a_long_copy_is_whole()
+    {
+        ClipboardHistory history;
+        begin(history);
+        const QString text = QString("word ").repeated(30000);
+        take(history, textData(text));
+        history.choose(idAt(history, 0), true);
+        QCOMPARE(offered[0]->data("text/plain").size(), text.size());
+    }
+
+    void the_same_copy_announced_twice_changes_nothing()
+    {
+        ClipboardHistory history;
+        begin(history);
+        take(history, textData("once"));
+        QSignalSpy counts(&history, &ClipboardHistory::countsChanged);
+        QSignalSpy changed(&history, &QAbstractItemModel::dataChanged);
+        take(history, textData("once"));
+        QCOMPARE(counts.count(), 0);
+        QCOMPARE(changed.count(), 0);
+        QCOMPARE(history.rowCount(), 1);
+    }
+
+    void a_preview_holds_the_first_lines()
+    {
+        ClipboardHistory history;
+        begin(history);
+        QStringList lines;
+        for (int at = 0; at < 30; ++at)
+            lines << QString("line %1\t%2").arg(at).arg(QString(300, 'z'));
+        take(history, textData("\n\n" + lines.join("\n")));
+        const QString preview = history.data(history.index(0), ClipboardHistory::PreviewRole).toString();
+        const QStringList shown = preview.split('\n');
+        QCOMPARE(shown.size(), 12);
+        QVERIFY(shown[0].startsWith("line 0 "));
+        QVERIFY(shown[0].size() <= 120);
+        QVERIFY(!preview.contains('\t'));
+    }
+
+    void the_stack_lists_rows_with_what_a_cell_draws()
+    {
+        ClipboardHistory history;
+        begin(history);
+        take(history, textData("pinned words"));
+        history.pin(idAt(history, 0), true);
+        auto* files = new QMimeData;
+        files->setUrls({QUrl::fromLocalFile("/srv/a/report.pdf")});
+        take(history, files);
+        auto* image = new QMimeData;
+        image->setData("image/png", pngOf(30, 20));
+        take(history, image);
+        const QVariantList stack = history.stack();
+        QCOMPARE(stack.size(), 3);
+        const QVariantMap first = stack[0].toMap();
+        QCOMPARE(first["path"].toString(), idAt(history, 0));
+        QCOMPARE(first["pinned"].toBool(), true);
+        QCOMPARE(first["preview"].toString(), QString("pinned words"));
+        QCOMPARE(stack[1].toMap()["kind"].toString(), QString("image"));
+        QVERIFY(stack[1].toMap()["picture"].toString().startsWith("file://"));
+        QCOMPARE(stack[1].toMap()["width"].toInt(), 30);
+        QCOMPARE(stack[2].toMap()["icon"].toString(), QString("application-pdf"));
+        QCOMPARE(stack[2].toMap()["name"].toString(), QString("report.pdf"));
+        QCOMPARE(stack[2].toMap()["preview"].toString(), QString("/srv/a/report.pdf"));
+        const QDateTime added = history.data(history.index(0), ClipboardHistory::AddedRole).toDateTime();
+        QVERIFY(added.isValid() && qAbs(added.secsTo(QDateTime::currentDateTimeUtc())) < 60);
     }
 
     void history_survives_a_restart()

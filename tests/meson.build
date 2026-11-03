@@ -86,6 +86,17 @@ tests = {
         'include': test_sources / 'apps/settings',
         'dependencies': [qt_widgets],
     },
+    'clipboard-pane': {
+        'sources': [
+            test_sources / 'apps/settings/clipboard-pane.cpp',
+            test_sources / 'apps/settings/menu-bar-box.cpp',
+            test_sources / 'apps/settings/pane-parts.cpp',
+            test_sources / 'apps/settings/choices.cpp',
+            qt.compile_moc(headers: test_sources / 'apps/settings/clipboard-pane.hpp', dependencies: qt_widgets),
+        ],
+        'include': test_sources / 'apps/settings',
+        'dependencies': [qt_widgets],
+    },
     'overview': {
         'sources': [
             test_sources / 'apps/settings/overview.cpp',

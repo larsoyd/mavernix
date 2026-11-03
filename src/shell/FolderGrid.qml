@@ -101,8 +101,11 @@ Item {
 
     // --- Size ---------------------------------------------------------------------
 
-    readonly property int entryCount: shownEntries.length + 1
-    readonly property var layout: FolderGridLayout.layout(looks, entryCount, freeWidth, freeHeight)
+    // a last entry that opens the folder, unless there is no label for it
+    readonly property bool hasOpenEntry: openLabel !== ""
+    readonly property int entryCount: shownEntries.length + (hasOpenEntry ? 1 : 0)
+    property string emptyLabel: ""
+    readonly property var layout: FolderGridLayout.layout(looks, Math.max(1, entryCount), freeWidth, freeHeight)
     readonly property int columns: layout.columns
     readonly property int shownRows: layout.shownRows
     readonly property int rows: layout.rows
@@ -289,6 +292,15 @@ Item {
                 height: grid.shownCellHeight
             }
         }
+    }
+
+    FolderGridText {
+        visible: grid.entryCount === 0
+        folderGrid: grid
+        anchors.horizontalCenter: parent.horizontalCenter
+        y: Math.round(grid.firstRowTop + grid.shownCellHeight / 2 - height / 2)
+        text: grid.emptyLabel
+        color: ThemeValues.color(grid.looks.title_color ?? grid.looks.label_color ?? "#ffffff")
     }
 
     EdgeFadeMask {

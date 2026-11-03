@@ -2,7 +2,7 @@
 # the session makes Qt programs follow the desktop's theme.
 
 moc_sources = qt.compile_moc(
-    headers: ['settings-window.hpp', 'overview.hpp', 'dock-pane.hpp', 'desktop-pane.hpp', 'general-pane.hpp', 'datetime-pane.hpp', 'sound-pane.hpp',
+    headers: ['settings-window.hpp', 'overview.hpp', 'dock-pane.hpp', 'clipboard-pane.hpp', 'desktop-pane.hpp', 'general-pane.hpp', 'datetime-pane.hpp', 'sound-pane.hpp',
         'trackpad-pane.hpp', 'mouse-pane.hpp', 'network-pane.hpp', 'picture-chooser.hpp', 'energy-pane.hpp', 'display-pane.hpp',
         'desktops-pane.hpp', 'windows-pane.hpp', 'extensions-pane.hpp', 'source-list-delegate.hpp', 'bluetooth-pane.hpp',
         'icons-pane.hpp', 'keyboard-pane.hpp', 'defaults-pane.hpp', 'shortcut-editor.hpp', 'program-shortcut-dialog.hpp',
@@ -18,6 +18,7 @@ executable(
         'settings-window.cpp',
         'overview.cpp',
         'dock-pane.cpp',
+        'clipboard-pane.cpp',
         'desktop-pane.cpp',
         'general-pane.cpp',
         'datetime-pane.cpp',

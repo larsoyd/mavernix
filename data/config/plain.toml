@@ -147,7 +147,9 @@ settings_command = ["mavernix-settings", "sound"]
 
 [status.clipboard]
 # Every copy is kept, newest first. Pinned items stay until removed and do
-# not count toward keep_items. remember keeps the rest across logins.
+# not count toward keep_items. remember keeps the rest across logins. A copy
+# bigger than image_limit_mb is not kept. System Preferences, Clipboard,
+# changes these for the user.
 keep_items = 100
 remember = true
 keep_images = true
@@ -439,6 +441,14 @@ more_in_file_manager = "%1 more"
 # The folder of all programs: its name when dragged in, and its last entry.
 programs_folder = "Programs"
 open_app_grid = "Open app grid"
+# The clipboard history as a stack in the dock ({ clipboard = true }).
+clipboard = "Clipboard"
+clipboard_empty = "No Copied Items"
+clipboard_picture = "Picture %1 × %2"
+clipboard_items = "%1 Items"
+clipboard_pause = "Pause Clipboard History"
+clipboard_clear = "Clear History"
+clipboard_settings = "Clipboard Settings…"
 # The dock's own menu (on the divider): folders it offers to add.
 add_to_dock = "Add to Dock"
 home_folder = "Home"
@@ -532,7 +542,7 @@ enabled = []
 name = "Settings"
 # The panes, grouped as on the first page.
 groups = [
-    ["general", "desktop", "dock", "desktops", "windows"],
+    ["general", "desktop", "dock", "clipboard", "desktops", "windows"],
     ["display", "energy", "keyboard", "mouse", "trackpad", "sound"],
     ["network", "bluetooth"],
     ["datetime", "startup", "defaults", "icons"],

@@ -18,11 +18,14 @@ PanelWindow {
     property string title: ""
     property var entries: []
     property string openLabel: ""
+    property string emptyLabel: ""
     property string moreLabel: "%1"
 
     // The middle of the folder tile's top edge, on the screen.
     property real anchorX: 0
     property real anchorY: 0
+    // where a grid that comes from its tile starts and ends, the tile's middle
+    property real tileMiddleY: anchorY
     // How much of the screen's height the dock takes while resting.
     property real dockThickness: 0
 
@@ -30,9 +33,7 @@ PanelWindow {
     signal folderChosen()
     signal dismissed()
 
-    // [animation.dock_folder] for a grid, { kind: "none" | "fade" | "grow",
-    // duration_ms, close_duration_ms }; [animation.dock_folder_fan] for a
-    // fan, { kind: "none" | "rise", ... }.
+    // how a grid and a fan come and go, the theme's dock_folder motions
     readonly property var motions: settings.theme.animation ?? ({})
     readonly property var motion:
         (view === "fan" ? motions.dock_folder_fan : motions.dock_folder) ?? ({ kind: "none" })
@@ -48,7 +49,11 @@ PanelWindow {
         }
     }
     Behavior on shown {
-        NumberAnimation { duration: overlay.open ? overlay.openDuration : overlay.closeDuration }
+        NumberAnimation {
+            duration: overlay.open ? overlay.openDuration : overlay.closeDuration
+            easing.type: overlay.motion.bezier !== undefined ? Easing.Bezier : Easing.Linear
+            easing.bezierCurve: (overlay.motion.bezier ?? [0, 0, 1, 1]).concat([1, 1])
+        }
     }
 
     // The window stays until the going-away motion is over, and then for a
@@ -138,6 +143,7 @@ PanelWindow {
         title: overlay.title
         entries: overlay.entries
         openLabel: overlay.openLabel
+        emptyLabel: overlay.emptyLabel
 
         readonly property var boxLooks: looks.box ?? overlay.plainBoxLooks
         readonly property real pointerLength: boxLooks.pointer_height ?? boxLooks.pointer?.height ?? 0
@@ -151,13 +157,24 @@ PanelWindow {
         freeHeight: overlay.height - overlay.dockThickness - (overlay.settings.theme.panel?.height ?? 0)
         pointerX: overlay.anchorX - x
 
-        opacity: overlay.shown
-        transform: Scale {
-            origin.x: grid.pointerX
-            origin.y: grid.height + grid.pointerLength
-            xScale: overlay.motion.kind === "grow" ? overlay.shown : 1
-            yScale: xScale
-        }
+        // from_tile grows the box about its middle while that middle travels
+        // out of the tile, and it shrinks back fading only part way
+        readonly property bool fromTile: overlay.motion.kind === "from_tile"
+        opacity: fromTile ? (overlay.open ? 1 : (overlay.motion.close_opacity ?? 0)
+                                                + (1 - (overlay.motion.close_opacity ?? 0)) * overlay.shown)
+                          : overlay.shown
+        transform: [
+            Scale {
+                origin.x: grid.fromTile ? grid.width / 2 : grid.pointerX
+                origin.y: grid.fromTile ? grid.height / 2 : grid.height + grid.pointerLength
+                xScale: overlay.motion.kind === "grow" || grid.fromTile ? Math.max(0.00001, overlay.shown) : 1
+                yScale: xScale
+            },
+            Translate {
+                x: grid.fromTile ? (overlay.anchorX - grid.x - grid.width / 2) * (1 - overlay.shown) : 0
+                y: grid.fromTile ? (overlay.tileMiddleY - grid.y - grid.height / 2) * (1 - overlay.shown) : 0
+            }
+        ]
 
         onFileChosen: path => overlay.fileChosen(path)
         onFolderChosen: overlay.folderChosen()

@@ -40,16 +40,53 @@ QtObject {
         return folder?.programs === true
     }
 
+    // the clipboard history as a stack, always a grid
+    function isClipboard(folder) {
+        return folder?.clipboard === true
+    }
+
     // How the folder shows its entries: its `view`, if it is one of `views`.
     function viewOf(folder) {
+        if (isClipboard(folder)) {
+            return "grid"
+        }
         const fallback = isProgramFolder(folder) ? "grid" : "list"
         const view = folder?.view ?? fallback
         return views.includes(view) ? view : fallback
     }
 
     // What the listed folder holds.
-    readonly property var listedEntries: isProgramFolder(listedFolder)
-        ? programEntries(listedFolder) : fileContents.entries
+    readonly property var listedEntries: isClipboard(listedFolder) ? clipboardEntries
+        : isProgramFolder(listedFolder) ? programEntries(listedFolder) : fileContents.entries
+
+    // --- The clipboard history ------------------------------------------------
+
+    readonly property var clipboard: shell?.clipboardHistory ?? null
+    property var clipboardEntries: []
+    function readClipboard() {
+        clipboardEntries = (clipboard?.stack() ?? []).map(cell => {
+            if (cell.kind === "image") {
+                cell.name = cell.name !== "" ? cell.name
+                    : (words.clipboard_picture ?? "Picture %1 × %2").arg(cell.width).arg(cell.height)
+            } else if (cell.kind === "files" && cell.files > 1) {
+                cell.name = (words.clipboard_items ?? "%1 Items").arg(cell.files)
+            }
+            return cell
+        })
+    }
+    property Connections clipboardChanges: Connections {
+        target: folders.clipboard
+        function onCountsChanged() {
+            if (folders.isClipboard(folders.listedFolder)) {
+                folders.readClipboard()
+            }
+        }
+    }
+    onListedFolderChanged: {
+        if (isClipboard(listedFolder)) {
+            readClipboard()
+        }
+    }
 
     // --- A folder of files ------------------------------------------------------
 

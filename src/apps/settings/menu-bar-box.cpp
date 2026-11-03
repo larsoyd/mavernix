@@ -29,7 +29,7 @@ QCheckBox* menu_bar_box(Choices& choices, const QString& item, const QString& wo
 QStringList items_without_a_pane(Choices& choices)
 {
     const QStringList with_a_pane = {QStringLiteral("bluetooth"), QStringLiteral("network"), QStringLiteral("volume"),
-        QStringLiteral("battery"), QStringLiteral("clock")};
+        QStringLiteral("battery"), QStringLiteral("clock"), QStringLiteral("clipboard")};
     QStringList items = choices.value(panel_table, QStringLiteral("right")).toStringList();
     for (const QString& item : with_a_pane)
     {

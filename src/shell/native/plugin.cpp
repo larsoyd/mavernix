@@ -62,6 +62,7 @@ void ShellNativePlugin::registerTypes(const char* uri)
     qmlRegisterType<ApplicationMenu>(uri, major_version, minor_version, "ApplicationMenu");
     qmlRegisterType<BluetoothAgent>(uri, major_version, minor_version, "BluetoothAgent");
     qmlRegisterType<ClipboardHistory>(uri, major_version, minor_version, "ClipboardHistory");
+    qmlRegisterType<ClipboardSearch>(uri, major_version, minor_version, "ClipboardSearch");
     qmlRegisterType<DesktopAside>(uri, major_version, minor_version, "DesktopAside");
     qmlRegisterType<Desktops>(uri, major_version, minor_version, "Desktops");
     qmlRegisterType<FileKind>(uri, major_version, minor_version, "FileKind");
