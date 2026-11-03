@@ -307,6 +307,10 @@ ShellRoot {
         }
     }
 
+    EntryCurtain {
+        settings: shell.settings
+    }
+
     ScreenFlash {
         id: screenFlash
         screen: shell.mainScreen
