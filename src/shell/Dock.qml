@@ -1497,8 +1497,12 @@ PanelWindow {
     }
 
     function openMenu(index) {
+        menuStartsAtTop = false
         showMenu(index, menus.forPlace(places[index], tiles.itemAt(index)))
     }
+
+    // a list newest first opens at its top, a folder's next to the dock
+    property bool menuStartsAtTop: false
 
     function showMenu(index, items) {
         menuItems = items
@@ -1549,7 +1553,9 @@ PanelWindow {
         const tile = tiles.itemAt(menuIndex)
         closeMenu()
 
-        if (id >= menus.fileBaseId) {
+        if (id >= menus.fileBaseId && folders.isClipboard(place.custom)) {
+            shell.clipboardHistory.choose(listedFiles[id - menus.fileBaseId].path)
+        } else if (id >= menus.fileBaseId) {
             folders.openEntry(place.custom, listedFiles[id - menus.fileBaseId].path)
         } else if (id === menus.openFolderId) {
             folders.openWhole(place.custom)
@@ -1638,7 +1644,7 @@ PanelWindow {
         // A long menu, such as a folder's list, scrolls below the panel and
         // opens at its end, next to the dock.
         mostMenuHeight: bottomEdge - (dock.settings.theme.panel?.height ?? 0) - (dock.menuLooks.top_margin ?? 0)
-        startsAtEnd: true
+        startsAtEnd: !dock.menuStartsAtTop
 
         onChosen: id => dock.menuChosen(id)
         onDismissed: dock.closeMenu()
@@ -1673,8 +1679,14 @@ PanelWindow {
             return
         }
 
-        const list = menus.folderList(folder, folders.listedEntries, themeIcons)
+        const clipboard = folders.isClipboard(folder)
+        if (clipboard) {
+            folders.readClipboard()
+        }
+        const list = clipboard ? menus.clipboardList(folders.listedEntries, themeIcons)
+                               : menus.folderList(folder, folders.listedEntries, themeIcons)
         listedFiles = list.files
+        menuStartsAtTop = clipboard
         showMenu(index, list.items)
     }
 
@@ -1690,6 +1702,8 @@ PanelWindow {
         }
         if (folderIndex === index) {
             closeFolder()
+        } else if (menuIndex === index) {
+            closeMenu()
         } else {
             closeMenu()
             showFolder(index)

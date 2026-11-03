@@ -86,7 +86,7 @@ QtObject {
             return [entry(openId, (words.open_named ?? "Open “%1”").arg(place.window.title))]
         }
         if (dockFolders.isClipboard(place.custom)) {
-            return forClipboard()
+            return forClipboard(place.custom)
         }
         if (place.custom?.folder !== undefined || dockFolders.isProgramFolder(place.custom)) {
             return forFolder(place.custom)
@@ -152,10 +152,14 @@ QtObject {
         return items
     }
 
-    // the clipboard's menu: pausing and clearing its history, removing it
-    function forClipboard() {
+    // the clipboard's menu: its view, pausing and clearing its history, removing it
+    function forClipboard(place) {
         const history = dockFolders.clipboard
-        return [
+        const viewWords = { grid: words.view_grid ?? "Grid", list: words.view_list ?? "List" }
+        const views = ["grid", "list"].map(view => ticked(viewBaseId + dockFolders.views.indexOf(view), viewWords[view],
+                                                          dockFolders.viewOf(place) === view))
+        return [entry(-1, words.view_as ?? "Show contents as", false)].concat(views, [
+            separator(),
             ticked(clipboardPauseId, words.clipboard_pause ?? "Pause Clipboard History", history?.paused ?? false),
             entry(clipboardClearId, words.clipboard_clear ?? "Clear History",
                   (history?.total ?? 0) > (history?.pinnedCount ?? 0)),
@@ -163,7 +167,29 @@ QtObject {
             entry(removeId, words.remove ?? "Remove from dock"),
             separator(),
             entry(clipboardSettingsId, words.clipboard_settings ?? "Clipboard Settings…")
-        ]
+        ])
+    }
+
+    // the clipboard history as a list menu, newest first: { items, files } as folderList
+    function clipboardList(entries, icons) {
+        const longest = 60
+        const files = entries.slice()
+        const items = files.map((file, number) => {
+            const name = file.name.length > longest ? file.name.substring(0, longest - 1) + "…" : file.name
+            const item = entry(fileBaseId + number, name)
+            item.icon = file.picture !== "" ? file.picture
+                : icons.forFolderEntry({ icon: file.icon ?? (file.kind === "link" ? "text-html" : "text-plain"),
+                                         genericIcon: file.genericIcon ?? "text-x-generic" })
+            return item
+        })
+        if (items.length === 0) {
+            items.push(entry(-1, words.clipboard_empty ?? "No Copied Items", false))
+        }
+        const history = dockFolders.clipboard
+        items.push(separator())
+        items.push(entry(clipboardClearId, words.clipboard_clear ?? "Clear History",
+                         (history?.total ?? 0) > (history?.pinnedCount ?? 0)))
+        return { items: items, files: files }
     }
 
     // A folder's menu: its order and view, removing it, opening it.
