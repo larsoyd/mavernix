@@ -15,6 +15,8 @@ Row {
 
     required property var names
     required property var panel
+    // how far from its start the row may draw before it meets the other end's items
+    property real room: Infinity
 
     spacing: panel.looks.item_spacing
 
@@ -268,6 +270,7 @@ Row {
     Component {
         id: menusItem
         Item {
+            id: menus
             width: titles.width
             height: row.height
 
@@ -281,17 +284,27 @@ Row {
                 Repeater {
                     model: Math.max(0, row.applicationMenus.length - row.firstOrdinaryMenu)
 
-                    PanelTitle {
+                    Item {
+                        id: slot
                         required property int index
                         // Briefly undefined while a shorter menu bar replaces a longer one.
                         readonly property var topMenu: row.applicationMenus[index + row.firstOrdinaryMenu]
+                        width: title.width
+                        height: titles.height
 
-                        panel: row.panel
-                        itemRow: row
-                        text: topMenu?.label ?? ""
-                        menuItems: topMenu?.children ?? []
-                        onOpening: row.menuAboutToShow(topMenu.id)
-                        onChosen: id => row.chooseMenuEntry(id)
+                        PanelTitle {
+                            id: title
+                            // titles that would run under the other end's items are left out from the last
+                            visible: menus.parent.x + slot.x + width <= row.room
+                            panel: row.panel
+                            itemRow: row
+                            text: slot.topMenu?.label ?? ""
+                            menuItems: slot.topMenu?.children ?? []
+                            onOpening: row.menuAboutToShow(slot.topMenu.id)
+                            onChosen: id => row.chooseMenuEntry(id)
+                            // a title with no menu is a command of its own, as reaper's audio status
+                            onActivated: row.chooseMenuEntry(slot.topMenu.id)
+                        }
                     }
                 }
             }
