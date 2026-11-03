@@ -14,7 +14,7 @@ quick_open_close_ms = 120
 
 [panel]
 left = ["logo", "app_name", "menus"]
-right = ["tray", "bluetooth", "volume", "network", "battery", "clock", "search", "notifications"]
+right = ["tray", "clipboard", "bluetooth", "volume", "network", "battery", "clock", "search", "notifications"]
 quit_label = "Quit %1"
 logo_menu = [
     { label = "About This PC", command = ["mavernix-about"] },

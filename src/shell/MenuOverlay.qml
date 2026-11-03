@@ -85,7 +85,8 @@ PanelWindow {
             shownItems = items
             box.forgetMarks()
             shown.opacity = 1
-            keys.forceActiveFocus()
+            const focused = popoverContents.item ?? keys
+            focused.forceActiveFocus()
         } else if (fades) {
             if (justChosen && (closeMotion.blink_ms ?? 0) > 0) {
                 blinkingMenu = box.innermost()
@@ -282,6 +283,12 @@ PanelWindow {
             Loader {
                 id: popoverContents
                 sourceComponent: overlay.popover
+                // a popover with a field of its own takes the keys from the menu
+                onLoaded: {
+                    if (overlay.open) {
+                        item.forceActiveFocus()
+                    }
+                }
             }
         }
     }

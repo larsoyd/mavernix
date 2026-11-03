@@ -345,6 +345,18 @@ void ClipboardHistory::choose(const QString& id, bool plain)
     }
 }
 
+QString ClipboardHistory::idAt(int row) const
+{
+    return row >= 0 && row < shown.size() ? shown[row] : QString();
+}
+
+void ClipboardHistory::togglePin(const QString& id)
+{
+    const int at = indexOf(id);
+    if (at >= 0)
+        pin(id, !entries[at].pinned);
+}
+
 void ClipboardHistory::pin(const QString& id, bool on)
 {
     const int at = indexOf(id);

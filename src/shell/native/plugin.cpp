@@ -12,6 +12,7 @@
 #include "active-window.hpp"
 #include "application-menu.hpp"
 #include "bluetooth-agent.hpp"
+#include "clipboard-history.hpp"
 #include "desktop-aside.hpp"
 #include "desktops.hpp"
 #include "file-kind.hpp"
@@ -60,6 +61,7 @@ void ShellNativePlugin::registerTypes(const char* uri)
     qmlRegisterType<ActiveWindow>(uri, major_version, minor_version, "ActiveWindow");
     qmlRegisterType<ApplicationMenu>(uri, major_version, minor_version, "ApplicationMenu");
     qmlRegisterType<BluetoothAgent>(uri, major_version, minor_version, "BluetoothAgent");
+    qmlRegisterType<ClipboardHistory>(uri, major_version, minor_version, "ClipboardHistory");
     qmlRegisterType<DesktopAside>(uri, major_version, minor_version, "DesktopAside");
     qmlRegisterType<Desktops>(uri, major_version, minor_version, "Desktops");
     qmlRegisterType<FileKind>(uri, major_version, minor_version, "FileKind");

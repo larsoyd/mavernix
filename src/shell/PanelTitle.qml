@@ -40,6 +40,9 @@ Item {
     signal slid(int id, real value)
     // Pressed without a menu to open.
     signal activated()
+    // option pressed, for a title that takes it instead of its menu
+    property bool takesOptionPress: false
+    signal optionPressed()
     // Up is positive.
     signal scrolled(real notches)
 
@@ -123,8 +126,10 @@ Item {
         height: title.panel.height
         hoverEnabled: true
 
-        onPressed: {
-            if (title.opensMenu) {
+        onPressed: mouse => {
+            if (title.takesOptionPress && (mouse.modifiers & Qt.AltModifier)) {
+                title.optionPressed()
+            } else if (title.opensMenu) {
                 title.panel.toggleMenu(title)
             } else {
                 title.activated()

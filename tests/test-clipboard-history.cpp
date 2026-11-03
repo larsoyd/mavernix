@@ -182,6 +182,21 @@ class ClipboardHistoryTest : public QObject
         QCOMPARE(labels(history), QStringList({"one"}));
     }
 
+    void rows_are_reached_by_position()
+    {
+        ClipboardHistory history;
+        begin(history);
+        take(history, textData("one"));
+        take(history, textData("two"));
+        QCOMPARE(history.idAt(1), idAt(history, 1));
+        QCOMPARE(history.idAt(2), QString());
+        QCOMPARE(history.idAt(-1), QString());
+        history.togglePin(history.idAt(1));
+        QCOMPARE(labels(history), QStringList({"one", "two"}));
+        history.togglePin(history.idAt(0));
+        QCOMPARE(labels(history), QStringList({"two", "one"}));
+    }
+
     void clear_keeps_pins()
     {
         ClipboardHistory history;

@@ -77,7 +77,7 @@ menus_per_screen = false
 position = "top"
 left = ["app_name", "menus"]
 # Status items (docs/panel-items.md); one with nothing to show takes no room.
-right = ["tray", "load", "bluetooth", "network", "volume", "battery", "clock", "search", "notifications", "session"]
+right = ["tray", "clipboard", "load", "bluetooth", "network", "volume", "battery", "clock", "search", "notifications", "session"]
 quit_label = "Close %1"
 clock_format = "HH:mm"
 clock_menu_date_format = "d MMMM yyyy"
@@ -144,6 +144,14 @@ input_label = "Input Device:"
 mute_label = "Mute"
 settings_label = "Sound Settings…"
 settings_command = ["mavernix-settings", "sound"]
+
+[status.clipboard]
+# Every copy is kept, newest first. Pinned items stay until removed and do
+# not count toward keep_items. remember keeps the rest across logins.
+keep_items = 100
+remember = true
+keep_images = true
+image_limit_mb = 20
 
 [status.tray]
 # Programs whose icon is a plain light shape, lost on a light panel. Drawn in
@@ -281,6 +289,7 @@ switch_program_back = "<super> <shift> KEY_TAB"
 minimize_window = "<super> KEY_H"
 fullscreen_window = "KEY_F11"
 search = "<super> KEY_SPACE"
+clipboard_history = "<super> KEY_V"
 lock = "<super> KEY_L"
 volume_up = "KEY_VOLUMEUP"
 volume_down = "KEY_VOLUMEDOWN"
