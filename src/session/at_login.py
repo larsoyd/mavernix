@@ -53,6 +53,8 @@ TRAY_HOST_SECONDS = 10
 
 PORTAL_SERVICE = "xdg-desktop-portal.service"
 PORTAL_HELPERS = ["xdg-desktop-portal-gtk.service", "xdg-desktop-portal-wlr.service"]
+# kept out of the restart, it comes back on demand with this login's folders
+FILE_DIALOG_PORTAL = "plasma-xdg-desktop-portal-kde.service"
 
 def say(message):
     print(f"at_login: {message}", file=sys.stderr)
@@ -146,6 +148,7 @@ def restart_early_portals():
     XDG_CURRENT_DESKTOP, so it offers no ScreenCast, and the GTK helper hits
     systemd's start limit.
     """
+    subprocess.run(["systemctl", "--user", "stop", FILE_DIALOG_PORTAL], capture_output=True)
     # try-restart touches only running services, starting nothing unasked.
     subprocess.run(["systemctl", "--user", "reset-failed"] + PORTAL_HELPERS,
                    capture_output=True)
