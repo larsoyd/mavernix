@@ -172,6 +172,19 @@ ShellRoot {
     // a panel about to open a menu, so the others close theirs
     signal menuOpening(var opener)
 
+    // one history for the clipboard item on every screen
+    readonly property var clipboardChoices: (settings.config.status ?? ({})).clipboard ?? ({})
+    readonly property alias clipboardHistory: clipboardHistory
+    ClipboardHistory {
+        id: clipboardHistory
+        keepItems: shell.clipboardChoices.keep_items ?? 100
+        remember: shell.clipboardChoices.remember ?? true
+        keepImages: shell.clipboardChoices.keep_images ?? true
+        imageLimitMb: shell.clipboardChoices.image_limit_mb ?? 20
+    }
+    // the main screen's clipboard item opens its menu
+    signal clipboardWanted()
+
     // [panel] every_screen: every panel shows the same menus
     readonly property var panelScreens: (userChoices.value("panel", "every_screen") ?? false)
         ? Quickshell.screens : [mainScreen].filter(screen => screen !== null)
@@ -271,10 +284,13 @@ ShellRoot {
             dock.emptyTrash()
         } else if (action === "quit_app") {
             quitActiveApp()
+        } else if (action === "clipboard_history") {
+            shell.clipboardWanted()
         } else {
             console.warn("shell: the config asks for an action the shell does not have:", action,
                          "- known: app_grid, volume_up, volume_down, volume_mute, lock, notification_list,",
-                         "search, window_overview, switch_program, switch_program_back, empty_trash, quit_app")
+                         "search, window_overview, switch_program, switch_program_back, empty_trash, quit_app,",
+                         "clipboard_history")
         }
     }
 

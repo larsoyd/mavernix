@@ -42,7 +42,7 @@ PanelWindow {
         field.text = ""
         marked = 0
         if (open) {
-            field.forceActiveFocus()
+            field.input.forceActiveFocus()
         }
     }
 
@@ -315,68 +315,28 @@ PanelWindow {
                 color: ThemeValues.color(search.looks.header_text_color ?? "#ffffff")
             }
 
-            Item {
-                id: fieldBox
+            SearchField {
+                id: field
+                looks: search.looks
+                face: search.theme.fonts.search ?? search.theme.fonts.menu
+                themeDirectory: search.themeDirectory
                 x: search.headingWidth + (search.looks.field_inset ?? 10)
                 width: parent.width - x - (search.looks.field_right ?? 8)
-                height: search.looks.field_height ?? 22
                 y: search.looks.field_top ?? Math.round((header.height - height) / 2)
 
-                Fill {
-                    anchors.fill: parent
-                    fill: search.looks.field ?? ({ color: "#ffffff", radius: 4 })
-                    themeDirectory: search.themeDirectory
-                }
-                TextInput {
-                    id: field
-                    x: search.looks.field_text_inset ?? 10
-                    width: clearButton.x - x
-                    // Centred unless the theme gives the baseline row.
-                    y: search.looks.field_text_baseline_row !== undefined
-                        ? Math.round(search.looks.field_text_baseline_row - baselineOffset)
-                        : Math.round((fieldBox.height - height) / 2)
-                    clip: true
-                    color: ThemeValues.color(search.looks.field_text_color ?? "#000000")
-                    readonly property var face: search.theme.fonts.search ?? search.theme.fonts.menu
-                    font.family: face.family
-                    font.pixelSize: face.size
-
-                    Keys.onEscapePressed: search.open = false
-                    Keys.onDownPressed: search.marked = Math.min(search.rows.length - 1, search.marked + 1)
-                    Keys.onUpPressed: search.marked = Math.max(0, search.marked - 1)
-                    onAccepted: search.openMarked()
-                }
-
-                // Empties the field; shown while there is text.
-                Rectangle {
-                    id: clearButton
-                    readonly property var buttonLooks: search.looks.clear_button ?? ({})
-                    readonly property real crossLength: buttonLooks.cross_length ?? 7
-                    visible: field.text !== ""
-                    width: buttonLooks.size ?? 14
-                    height: width
-                    radius: width / 2
-                    x: parent.width - width - (buttonLooks.right_inset ?? 4)
-                    anchors.verticalCenter: parent.verticalCenter
-                    color: ThemeValues.color(buttonLooks.color ?? "#b0b0b0")
-
-                    Repeater {
-                        model: [45, -45]
-                        Rectangle {
-                            required property int modelData
-                            anchors.centerIn: parent
-                            width: clearButton.crossLength
-                            height: clearButton.buttonLooks.cross_thickness ?? 1.5
-                            rotation: modelData
-                            antialiasing: true
-                            color: ThemeValues.color(clearButton.buttonLooks.cross_color ?? "#ffffff")
-                        }
+                onKeyPressed: event => {
+                    if (event.key === Qt.Key_Escape) {
+                        search.open = false
+                    } else if (event.key === Qt.Key_Down) {
+                        search.marked = Math.min(search.rows.length - 1, search.marked + 1)
+                    } else if (event.key === Qt.Key_Up) {
+                        search.marked = Math.max(0, search.marked - 1)
+                    } else {
+                        return
                     }
-                    MouseArea {
-                        anchors.fill: parent
-                        onClicked: field.text = ""
-                    }
+                    event.accepted = true
                 }
+                onAccepted: search.openMarked()
             }
         }
 

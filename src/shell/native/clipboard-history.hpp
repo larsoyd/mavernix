@@ -68,7 +68,9 @@ class ClipboardHistory : public QAbstractListModel, public QQmlParserStatus
     int pinnedCount() const;
     int total() const { return int(entries.size()); }
 
+    Q_INVOKABLE QString idAt(int row) const;
     Q_INVOKABLE void choose(const QString& id, bool plain = false);
+    Q_INVOKABLE void togglePin(const QString& id);
     Q_INVOKABLE void pin(const QString& id, bool on);
     Q_INVOKABLE void remove(const QString& id);
     Q_INVOKABLE void clearHistory();
