@@ -47,7 +47,7 @@ QtObject {
     // How the folder shows its entries: its `view`, if it is one of `views`.
     function viewOf(folder) {
         if (isClipboard(folder)) {
-            return "grid"
+            return folder.view === "list" ? "list" : "grid"
         }
         const fallback = isProgramFolder(folder) ? "grid" : "list"
         const view = folder?.view ?? fallback
