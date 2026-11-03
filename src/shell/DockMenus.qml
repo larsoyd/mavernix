@@ -6,6 +6,7 @@
 // Items are plain objects in MenuBox's form.
 
 import QtQuick
+import "StackSize.js" as StackSize
 
 QtObject {
     id: menus
@@ -47,6 +48,7 @@ QtObject {
     readonly property int viewBaseId: 300
     readonly property int actionBaseId: 400
     readonly property int addFolderBaseId: 500
+    readonly property int sizeBaseId: 600
     readonly property int fileBaseId: 10000
 
     function entry(id, label, enabled, children) {
@@ -152,13 +154,19 @@ QtObject {
         return items
     }
 
-    // the clipboard's menu: its view, pausing and clearing its history, removing it
+    // the clipboard's menu: its view and size, pausing and clearing its history, removing it
     function forClipboard(place) {
         const history = dockFolders.clipboard
         const viewWords = { grid: words.view_grid ?? "Grid", list: words.view_list ?? "List" }
         const views = ["grid", "list"].map(view => ticked(viewBaseId + dockFolders.views.indexOf(view), viewWords[view],
                                                           dockFolders.viewOf(place) === view))
+        const sizeWords = { small: words.size_small ?? "Small", medium: words.size_medium ?? "Medium",
+                            large: words.size_large ?? "Large" }
+        const sizes = StackSize.names.map((size, number) => ticked(sizeBaseId + number, sizeWords[size],
+                                                                   StackSize.named(place.size) === size))
         return [entry(-1, words.view_as ?? "Show contents as", false)].concat(views, [
+            separator(),
+            entry(-1, words.size ?? "Size", false)], sizes, [
             separator(),
             ticked(clipboardPauseId, words.clipboard_pause ?? "Pause Clipboard History", history?.paused ?? false),
             entry(clipboardClearId, words.clipboard_clear ?? "Clear History",
@@ -171,8 +179,8 @@ QtObject {
     }
 
     // the clipboard history as a list menu, newest first: { items, files } as folderList
-    function clipboardList(entries, icons) {
-        const longest = 60
+    function clipboardList(entries, icons, size) {
+        const longest = StackSize.bounds(size).longest
         const files = entries.slice()
         const items = files.map((file, number) => {
             const name = file.name.length > longest ? file.name.substring(0, longest - 1) + "…" : file.name

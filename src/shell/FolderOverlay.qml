@@ -20,6 +20,7 @@ PanelWindow {
     property string openLabel: ""
     property string emptyLabel: ""
     property string moreLabel: "%1"
+    property var bound: null
 
     // The middle of the folder tile's top edge, on the screen.
     property real anchorX: 0
@@ -144,6 +145,7 @@ PanelWindow {
         entries: overlay.entries
         openLabel: overlay.openLabel
         emptyLabel: overlay.emptyLabel
+        bound: overlay.bound
 
         readonly property var boxLooks: looks.box ?? overlay.plainBoxLooks
         readonly property real pointerLength: boxLooks.pointer_height ?? boxLooks.pointer?.height ?? 0
