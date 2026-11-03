@@ -5,6 +5,7 @@
 #
 #   configure-desktop all STATE_DIR          at login (start-desktop)
 #   configure-desktop switch STATE_DIR NAME  switch desktop and restart the shell
+#   configure-desktop reload STATE_DIR       the same desktop anew, after an update
 #   configure-desktop choices STATE_DIR      after a settings change: compositor
 #                                            settings and GTK window buttons only
 #
@@ -16,7 +17,7 @@ set -euo pipefail
 source "$(dirname "$(readlink -f "$0")")/paths.sh"
 
 usage() {
-    echo "usage: configure-desktop all STATE_DIR | switch STATE_DIR NAME | choices STATE_DIR | greeter-look STATE_DIR" >&2
+    echo "usage: configure-desktop all STATE_DIR | switch STATE_DIR NAME | reload STATE_DIR | choices STATE_DIR | greeter-look STATE_DIR" >&2
     exit 2
 }
 
@@ -434,6 +435,18 @@ restart_shell() {
     kill -HUP "$(cat "$pid_file")"
 }
 
+# an installed update or a new desktop shows at once, with no new login
+refresh_themes() {
+    python3 "$session_dir/refresh_themes.py" || echo "configure-desktop: themes were not brought up to date" >&2
+}
+
+apply_and_restart() {
+    refresh_themes
+    configure_everything
+    tell_services
+    restart_shell
+}
+
 # Read by pick_desktop.py; the settings window writes the same file.
 remember_choice() {
     local name=$1
@@ -459,11 +472,15 @@ switch)
     config=$found
     write_current
     remember_choice "$name"
-    configure_everything
-    tell_services
-    restart_shell
+    apply_and_restart
     # On a scaled screen the compositor sizes the pointer for the new theme
     # only once the theme is in place; a second reload a moment later does.
+    ( sleep 1; write_compositor_settings > /dev/null 2>&1 ) &
+    ;;
+reload)
+    [[ $# -eq 2 ]] || usage
+    read_current
+    apply_and_restart
     ( sleep 1; write_compositor_settings > /dev/null 2>&1 ) &
     ;;
 greeter-look)

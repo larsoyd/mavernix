@@ -10,7 +10,7 @@ Mavernix comes with one, `plain`: light and flat, with the keys you'd expect on 
 
 If you haven't picked one, the desktop the Theme Installer added last starts. Before it has added any, that's `plain`.
 
-To pick one, use the Theme pane in Settings. The change happens right away and is saved in `~/.config/mavernix/desktop`. In a terminal inside the session, `mavernix-switch NAME` does the same thing.
+To pick one, use the Theme pane in Settings. The change happens right away and is saved in `~/.config/mavernix/desktop`. In a terminal inside the session, `mavernix-switch NAME` does the same thing. After installing a new version, `mavernix-reload` brings the running session up to it without logging out: theme updates, the session's settings and a fresh panel and dock, while open programs stay open. Only a change to the compositor's own plugins still needs a new login.
 
 Switching rewrites everything that depends on the desktop and restarts the panel and dock, and the compositor redraws every window frame. Programs that are already open keep their old look until you start them again. That's because a toolkit only reads its theme when a program starts.
 

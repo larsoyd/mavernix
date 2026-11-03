@@ -36,7 +36,7 @@ One rule keeps these apart: you should be able to make a different desktop with 
    Then it becomes Wayfire, and Wayfire starts the shell.
 2. **The shell and the programs** read `shell.json`. Its path is in `DESKTOP_SHELL_SETTINGS`. When you change something while the desktop runs (the dock's contents, anything in the settings window), it goes into your own file, `~/.config/mavernix/NAME.json`. That file is laid over the config at the next start, and the shell watches it.
 3. **The shell and the compositor** talk over Wayfire's IPC socket. The shell asks for things like window pictures and desktop switches, and the compositor's plugins report back.
-4. **Switching desktop** while the session runs (`mavernix-switch NAME`, or the Theme pane in the settings window) runs `configure-desktop` again and restarts the shell. The compositor rereads its settings on its own.
+4. **Switching desktop** while the session runs (`mavernix-switch NAME`, or the Theme pane in the settings window) runs `configure-desktop` again and restarts the shell. The compositor rereads its settings on its own. `mavernix-reload` does the same for the desktop already running, after an update, and brings imported themes up to date first.
 
 ## Where things are installed
 
