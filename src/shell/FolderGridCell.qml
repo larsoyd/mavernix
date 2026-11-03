@@ -136,7 +136,9 @@ Item {
         id: wholeName
         visible: press.containsMouse && name.truncated && cell.expandedLooks !== null
         readonly property real padding: cell.expandedLooks?.padding ?? 8
-        width: wholeText.implicitWidth + 2 * padding
+        // as wide as the box allows and no wider, so a long copy is cut, never off screen
+        readonly property real widest: cell.folderGrid.width - cell.folderGrid.sidePadding
+        width: Math.round(Math.min(wholeText.implicitWidth + 2 * padding, widest))
         height: cell.expandedLooks?.height ?? (wholeText.implicitHeight + 4)
         // Centred on the entry, but moved in rather than cut off at the box's sides.
         x: Math.max(cell.folderGrid.sidePadding / 2 - cell.x,
@@ -153,6 +155,9 @@ Item {
             id: wholeText
             folderGrid: cell.folderGrid
             anchors.centerIn: parent
+            width: Math.min(implicitWidth, wholeName.widest - 2 * wholeName.padding)
+            horizontalAlignment: Text.AlignHCenter
+            elide: name.elide
             text: name.text
             color: ThemeValues.color(cell.expandedLooks?.text_color ?? "#000000")
         }
