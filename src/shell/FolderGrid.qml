@@ -105,7 +105,9 @@ Item {
     readonly property bool hasOpenEntry: openLabel !== ""
     readonly property int entryCount: shownEntries.length + (hasOpenEntry ? 1 : 0)
     property string emptyLabel: ""
-    readonly property var layout: FolderGridLayout.layout(looks, Math.max(1, entryCount), freeWidth, freeHeight)
+    // how far a clipboard stack may grow, null for a folder that fills its stage
+    property var bound: null
+    readonly property var layout: FolderGridLayout.layout(looks, Math.max(1, entryCount), freeWidth, freeHeight, bound)
     readonly property int columns: layout.columns
     readonly property int shownRows: layout.shownRows
     readonly property int rows: layout.rows

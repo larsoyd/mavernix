@@ -12,6 +12,7 @@ import Quickshell.Io
 import Shell.Native
 import "DockLayout.js" as DockLayout
 import "DroppedFiles.js" as DroppedFiles
+import "StackSize.js" as StackSize
 import "ThemeValues.js" as ThemeValues
 
 PanelWindow {
@@ -1498,11 +1499,14 @@ PanelWindow {
 
     function openMenu(index) {
         menuStartsAtTop = false
+        menuSize = ""
         showMenu(index, menus.forPlace(places[index], tiles.itemAt(index)))
     }
 
     // a list newest first opens at its top, a folder's next to the dock
     property bool menuStartsAtTop: false
+    // the clipboard list's size, empty for a menu as long as the screen allows
+    property string menuSize: ""
 
     function showMenu(index, items) {
         menuItems = items
@@ -1559,6 +1563,9 @@ PanelWindow {
             folders.openEntry(place.custom, listedFiles[id - menus.fileBaseId].path)
         } else if (id === menus.openFolderId) {
             folders.openWhole(place.custom)
+        } else if (id >= menus.sizeBaseId) {
+            const changed = Object.assign({}, place.custom, { size: StackSize.names[id - menus.sizeBaseId] })
+            choices.set("dock", "groups", groupsReplacing(place.listedAs, changed))
         } else if (id >= menus.addFolderBaseId) {
             addFolder(addableFolders[id - menus.addFolderBaseId].place)
         } else if (id >= menus.actionBaseId) {
@@ -1641,9 +1648,12 @@ PanelWindow {
         readonly property real bottomEdge: screen.height - iconTopAboveBottom - (dock.menuLooks.tile_gap ?? 4)
                                            - pointerLength
         menuY: bottomEdge - menuHeight
-        // A long menu, such as a folder's list, scrolls below the panel and
-        // opens at its end, next to the dock.
-        mostMenuHeight: bottomEdge - (dock.settings.theme.panel?.height ?? 0) - (dock.menuLooks.top_margin ?? 0)
+        // a long menu scrolls below the panel and opens at its end by the dock
+        // and the clipboard's list keeps to its size
+        readonly property real room: bottomEdge - (dock.settings.theme.panel?.height ?? 0) - (dock.menuLooks.top_margin ?? 0)
+        mostMenuHeight: dock.menuSize === "" ? room
+            : StackSize.listHeight(dock.menuSize, dock.menuLooks.icon_item_height ?? dock.menuLooks.item_height,
+                                   dock.menuLooks.padding ?? 0, room)
         startsAtEnd: !dock.menuStartsAtTop
 
         onChosen: id => dock.menuChosen(id)
@@ -1683,10 +1693,11 @@ PanelWindow {
         if (clipboard) {
             folders.readClipboard()
         }
-        const list = clipboard ? menus.clipboardList(folders.listedEntries, themeIcons)
+        const list = clipboard ? menus.clipboardList(folders.listedEntries, themeIcons, folder.size)
                                : menus.folderList(folder, folders.listedEntries, themeIcons)
         listedFiles = list.files
         menuStartsAtTop = clipboard
+        menuSize = clipboard ? StackSize.named(folder.size) : ""
         showMenu(index, list.items)
     }
 
@@ -1723,6 +1734,7 @@ PanelWindow {
         readonly property bool clipboard: folders.isClipboard(folders.listedFolder)
         openLabel: clipboard ? "" : folders.openWholeLabel(folders.listedFolder)
         emptyLabel: dock.words.clipboard_empty ?? "No Copied Items"
+        bound: clipboard ? StackSize.bounds(folders.listedFolder.size) : null
         moreLabel: dock.words.more_in_file_manager ?? "%1 more"
 
         readonly property var tile: dock.folderIndex >= 0 ? tiles.itemAt(dock.folderIndex) : null
