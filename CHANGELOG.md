@@ -9,6 +9,7 @@
 
 ### Changed
 
+- An application's menus that would run into the items at the right end of the menu bar are left out from the last one, and come back when there is room.
 - Searching in System Preferences dims the window and lights the panes it finds, as on OS X, and View can organize the panes alphabetically.
 - System Preferences is laid out as on OS X: every pane has one column of labels, rows sit close together and lines part the subjects. General takes in Theme and App Style, Date & Time is new, and each menu bar item is now chosen in the pane about that thing. Sound has tabs, and the buttons in Keyboard are no longer cut off.
 - Dock icons are drawn sharper: each is read at the largest size and shrunk with a Lanczos filter, at every size, as on OS X. Building now needs Qt Shader Tools.

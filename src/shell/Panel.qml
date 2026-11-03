@@ -169,9 +169,11 @@ PanelWindow {
         }
         names: panel.itemsAt("left")
         panel: panel
+        room: rightItems.x - x - panel.looks.item_spacing
     }
 
     PanelItems {
+        id: rightItems
         anchors {
             right: parent.right
             rightMargin: panel.looks.edge_padding
