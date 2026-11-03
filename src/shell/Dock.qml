@@ -527,18 +527,33 @@ PanelWindow {
             }
             choices.push({ label: place.name, place: place })
         }
+        if (shell?.clipboardHistory) {
+            choices.push({ label: words.clipboard ?? "Clipboard", place: clipboardPlace })
+        }
         for (const choice of choices) {
             choice.kept = kept.some(entry => typeof entry === "object"
-                && (choice.place.programs ? folders.isProgramFolder(entry)
-                                          : entry.folder !== undefined && entry.folder === choice.place.folder))
+                && (choice.place.clipboard ? folders.isClipboard(entry)
+                    : choice.place.programs ? folders.isProgramFolder(entry)
+                    : entry.folder !== undefined && entry.folder === choice.place.folder))
         }
         return choices
     }
+
+    readonly property var clipboardPlace: ({ name: words.clipboard ?? "Clipboard", icon: "mavernix-clipboard", clipboard: true })
 
     // Puts a folder among the folders, beside the trash: into the last group,
     // which a dock of one group gets as a new one.
     function addFolder(place) {
         const groups = keptGroups.map(group => group.slice())
+        // the clipboard goes right of the first tile, the file manager's place
+        if (folders.isClipboard(place)) {
+            if (groups.length === 0) {
+                groups.push([])
+            }
+            groups[0].splice(Math.min(1, groups[0].length), 0, place)
+            choices.set("dock", "groups", groups)
+            return
+        }
         if (groups.length < 2) {
             groups.push([])
         }
@@ -1345,8 +1360,8 @@ PanelWindow {
             choices: dock.choices
             minimizedWindow: place.window
             readonly property var custom: place.custom ?? null
-            readonly property bool showsOpenFolder:
-                index === dock.folderIndex && dock.looks.folder?.open_image !== undefined
+            readonly property bool showsOpenFolder: index === dock.folderIndex
+                && dock.looks.folder?.open_image !== undefined && !folders.isClipboard(custom)
             // A minimised window's tile is empty while its picture is being made.
             pictureComing: place.window !== null && dock.showsWindowPictures
                 && dock.windowPictureComing(place.window)
@@ -1364,9 +1379,10 @@ PanelWindow {
                     return ""
                 }
                 // Not every icon theme has "folder-applications".
-                return dock.iconPicture(custom.icon ?? "", folders.isProgramFolder(custom) ? "folder" : undefined)
+                return dock.iconPicture(custom.icon ?? "", folders.isProgramFolder(custom) ? "folder"
+                                                           : folders.isClipboard(custom) ? "edit-paste" : undefined)
             }
-            opensFolder: custom?.folder !== undefined || folders.isProgramFolder(custom)
+            opensFolder: custom?.folder !== undefined || folders.isProgramFolder(custom) || folders.isClipboard(custom)
             onFolderWanted: dock.showFolder(index)
             onMinimizedWindowWanted: window => dock.bringBack(window)
             // read anew at each size they kept the shell busy decoding through a resize
@@ -1537,6 +1553,12 @@ PanelWindow {
             if (sounds !== null) {
                 sounds.play("dock-item-remove")
             }
+        } else if (id === menus.clipboardPauseId) {
+            shell.clipboardHistory.paused = !shell.clipboardHistory.paused
+        } else if (id === menus.clipboardClearId) {
+            shell.clipboardHistory.clearHistory()
+        } else if (id === menus.clipboardSettingsId) {
+            Quickshell.execDetached(config.clipboard_settings_command ?? ["mavernix-settings", "clipboard"])
         } else if (id === menus.openId) {
             tile.activate()
         } else if (id === menus.quitId) {
@@ -1642,6 +1664,21 @@ PanelWindow {
         folderIndex = -1
     }
 
+    // the clipboard's stack for its shortcut, false when the dock has no clipboard
+    function showClipboardStack() {
+        const index = places.findIndex(place => folders.isClipboard(place.custom))
+        if (index < 0) {
+            return false
+        }
+        if (folderIndex === index) {
+            closeFolder()
+        } else {
+            closeMenu()
+            showFolder(index)
+        }
+        return true
+    }
+
     FolderOverlay {
         id: folderOverlay
         screen: dock.screen
@@ -1651,21 +1688,26 @@ PanelWindow {
         view: folders.viewOf(folders.listedFolder)
         title: folders.listedFolder?.name ?? ""
         entries: folders.listedEntries
-        openLabel: folders.openWholeLabel(folders.listedFolder)
+        readonly property bool clipboard: folders.isClipboard(folders.listedFolder)
+        openLabel: clipboard ? "" : folders.openWholeLabel(folders.listedFolder)
+        emptyLabel: dock.words.clipboard_empty ?? "No Copied Items"
         moreLabel: dock.words.more_in_file_manager ?? "%1 more"
 
         readonly property var tile: dock.folderIndex >= 0 ? tiles.itemAt(dock.folderIndex) : null
         // (The last place is kept while they go away.)
         property real lastAnchorX: 0
         property real lastAnchorY: 0
+        property real lastMiddleY: 0
         onTileChanged: {
             if (tile !== null) {
                 lastAnchorX = Math.round(tile.x + tile.width / 2)
                 lastAnchorY = screen.height - (dock.base + tile.width - dock.tileMargin)
+                lastMiddleY = Math.round(screen.height - dock.base - tile.width / 2)
             }
         }
         anchorX: lastAnchorX
         anchorY: lastAnchorY
+        tileMiddleY: lastMiddleY
         dockThickness: dock.restingHeight
 
         // Once its window is let go, the folder's entries are too, so that a
@@ -1679,7 +1721,11 @@ PanelWindow {
 
         onFileChosen: path => {
             dock.closeFolder()
-            folders.openEntry(folders.listedFolder, path)
+            if (clipboard) {
+                dock.shell.clipboardHistory.choose(path)
+            } else {
+                folders.openEntry(folders.listedFolder, path)
+            }
         }
         onFolderChosen: {
             dock.closeFolder()

@@ -4,6 +4,7 @@
 // entry, with no file, opens the folder itself.
 
 import QtQuick
+import QtQuick.Effects
 import "ThemeValues.js" as ThemeValues
 
 Item {
@@ -33,7 +34,56 @@ Item {
         ? (looks.open_image_size ?? folderGrid.iconSize) * folderGrid.cellScale
         : folderGrid.shownIconSize
 
+    // a copied picture in the frame desktop previews have
+    FramedPicture {
+        visible: (cell.file?.picture ?? "") !== ""
+        anchors.horizontalCenter: parent.horizontalCenter
+        y: (cell.folderGrid.shownIconSize - cell.pictureSize) / 2
+        width: cell.pictureSize
+        height: cell.pictureSize
+        source: visible ? cell.file.picture : ""
+        frame: cell.folderGrid.settings.theme.desktop?.icons?.preview_frame ?? null
+        opacity: press.pressed ? 0.6 : 1
+    }
+
+    // copied text as a page with its first lines, as icon previews of text files
+    Item {
+        id: page
+        visible: (cell.file?.preview ?? "") !== "" && (cell.file?.picture ?? "") === "" && cell.file?.icon === undefined
+        anchors.horizontalCenter: parent.horizontalCenter
+        y: (cell.folderGrid.shownIconSize - height) / 2
+        height: Math.round(cell.pictureSize * 0.9)
+        width: Math.round(height * 0.78)
+        opacity: press.pressed ? 0.6 : 1
+        RectangularShadow {
+            anchors.fill: parent
+            offset.y: 1
+            blur: 4
+            color: "#00000080"
+        }
+        Rectangle {
+            anchors.fill: parent
+            color: "#ffffff"
+            clip: true
+            Text {
+                x: Math.round(parent.width * 0.09)
+                y: x
+                width: parent.width - 2 * x
+                height: parent.height - 2 * y
+                clip: true
+                text: page.visible ? cell.file.preview : ""
+                textFormat: Text.PlainText
+                wrapMode: Text.WrapAtWordBoundaryOrAnywhere
+                font.family: cell.folderGrid.font.family
+                font.pixelSize: Math.max(5, Math.round(parent.width / 10))
+                lineHeight: 0.95
+                color: cell.file?.kind === "link" ? "#2a5db0" : "#333333"
+            }
+        }
+    }
+
     Image {
+        visible: !page.visible && (cell.file?.picture ?? "") === ""
         anchors.horizontalCenter: parent.horizontalCenter
         y: (cell.folderGrid.shownIconSize - cell.pictureSize) / 2
         width: cell.pictureSize
@@ -56,12 +106,24 @@ Item {
         opacity: press.pressed ? 0.6 : 1
     }
 
+    Image {
+        visible: cell.file?.pinned ?? false
+        readonly property string pin: cell.icons.find("pin")
+        source: visible ? pin : ""
+        width: Math.round(16 * cell.folderGrid.cellScale)
+        height: width
+        sourceSize: Qt.size(width * Screen.devicePixelRatio, height * Screen.devicePixelRatio)
+        x: Math.round(cell.width / 2 + cell.pictureSize / 2 - width * 0.75)
+        y: Math.round((cell.folderGrid.shownIconSize - cell.pictureSize) / 2)
+    }
+
     FolderGridText {
         id: name
         folderGrid: cell.folderGrid
         anchors.horizontalCenter: parent.horizontalCenter
         width: Math.min(implicitWidth, (cell.looks.label_width ?? (cell.folderGrid.cellWidth - 8)) * cell.folderGrid.cellScale)
-        elide: Text.ElideMiddle
+        // a file's name keeps its end, copied text its start
+        elide: cell.file?.kind !== undefined ? Text.ElideRight : Text.ElideMiddle
         y: (cell.looks.label_baseline ?? (cell.folderGrid.iconSize + 16)) * cell.folderGrid.cellScale - baselineOffset
         text: cell.file !== null ? cell.file.name : cell.folderGrid.openLabel
         style: cell.looks.label_shadow_color !== undefined ? Text.Raised : Text.Normal

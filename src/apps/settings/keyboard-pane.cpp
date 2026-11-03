@@ -71,6 +71,7 @@ static const QList<Category>& categories()
                 {"switch_program", "Next Program"},
                 {"switch_program_back", "Previous Program"},
                 {"notification_list", "Show Notifications"},
+                {"clipboard_history", "Show Clipboard History"},
                 {"lock", "Lock Screen"},
             }},
         {"sound", "Sound",

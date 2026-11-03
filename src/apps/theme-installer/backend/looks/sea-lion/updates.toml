@@ -349,3 +349,28 @@ revision = 13
 import_brings = [
     "Markdown, spreadsheet text and other text files get TextEdit's document icon instead of the plain one.",
 ]
+
+[[update]]
+revision = 14
+
+[update.settings."animation.dock_folder"]
+bezier = [0.25, 0.1, 0.25, 1.0]
+close_opacity = 0.2
+
+[[update.corrections]]
+table = "animation.dock_folder"
+key = "kind"
+was = "grow"
+now = "from_tile"
+
+[[update.corrections]]
+table = "animation.dock_folder"
+key = "duration_ms"
+was = 180
+now = 250
+
+[[update.corrections]]
+table = "animation.dock_folder"
+key = "close_duration_ms"
+was = 110
+now = 250

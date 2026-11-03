@@ -11,9 +11,12 @@
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QMimeData>
+#include <QMimeDatabase>
 #include <QRegularExpression>
 #include <QSaveFile>
 #include <QStandardPaths>
+
+#include <optional>
 
 namespace
 {
@@ -24,7 +27,9 @@ const auto privateFile = QFile::ReadOwner | QFile::WriteOwner | QFile::ReadUser 
 const auto privateDir = privateFile | QFile::ExeOwner | QFile::ExeUser;
 constexpr int searchedChars = 65536;
 constexpr int labelChars = 200;
-constexpr int thumbnailSide = 128;
+constexpr int thumbnailSide = 256;
+constexpr int previewLines = 12;
+constexpr int previewChars = 120;
 
 QString hashOf(const QByteArray& bytes)
 {
@@ -50,6 +55,44 @@ bool isLink(const QString& text)
 {
     static const QRegularExpression link(QStringLiteral("^https?://\\S+$"));
     return link.match(text.trimmed()).hasMatch();
+}
+
+QString previewOf(const QString& text)
+{
+    QStringList lines;
+    for (const QString& line : text.left(previewLines * 1024).split(QLatin1Char('\n'))) {
+        if (lines.isEmpty() && line.trimmed().isEmpty())
+            continue;
+        QString shown = line.left(previewChars);
+        shown.replace(QLatin1Char('\t'), QStringLiteral("    "));
+        shown.truncate(previewChars);
+        while (!shown.isEmpty() && shown.back().isSpace())
+            shown.chop(1);
+        lines << shown;
+        if (lines.size() == previewLines)
+            break;
+    }
+    while (!lines.isEmpty() && lines.last().isEmpty())
+        lines.removeLast();
+    return lines.join(QLatin1Char('\n'));
+}
+
+// plain text under a kind of its own, such as code or json, but not markup
+bool isTextual(const QString& mime)
+{
+    static const QMimeDatabase kinds;
+    static const QStringList markup = {QStringLiteral("text/html"), QStringLiteral("application/xhtml+xml"),
+                                       QStringLiteral("text/rtf"), QStringLiteral("text/richtext"),
+                                       QStringLiteral("text/uri-list")};
+    return !markup.contains(mime) && kinds.mimeTypeForName(mime).inherits(QStringLiteral("text/plain"));
+}
+
+QByteArray asPng(const QImage& image)
+{
+    QByteArray bytes;
+    QBuffer buffer(&bytes);
+    buffer.open(QIODevice::WriteOnly);
+    return image.save(&buffer, "PNG") ? bytes : QByteArray();
 }
 }
 
@@ -94,6 +137,10 @@ QVariant ClipboardHistory::data(const QModelIndex& index, int role) const
         return entry.pictureSize;
     case FileCountRole:
         return entry.fileCount;
+    case PreviewRole:
+        return entry.kind == QLatin1String("image") ? QString() : previewOf(entry.text);
+    case AddedRole:
+        return entry.added;
     }
     return {};
 }
@@ -102,7 +149,7 @@ QHash<int, QByteArray> ClipboardHistory::roleNames() const
 {
     return {{IdRole, "entryId"},       {KindRole, "kind"},           {LabelRole, "label"},
             {PinnedRole, "pinned"},    {SectionRole, "section"},     {ThumbnailRole, "thumbnail"},
-            {PictureSizeRole, "pictureSize"}, {FileCountRole, "fileCount"}};
+            {PictureSizeRole, "pictureSize"}, {FileCountRole, "fileCount"}, {PreviewRole, "preview"}, {AddedRole, "added"}};
 }
 
 void ClipboardHistory::componentComplete()
@@ -223,15 +270,32 @@ void ClipboardHistory::take(const QMimeData* data, bool ours)
         return;
     }
 
-    const bool png = offered.contains(QStringLiteral("image/png"));
+    QByteArray picture;
+    QImage decoded;
+    if (imagesKept) {
+        QStringList pictures = offered.filter(QRegularExpression(QStringLiteral("^image/")));
+        pictures.removeAll(QStringLiteral("image/png"));
+        if (offered.contains(QStringLiteral("image/png")))
+            pictures.prepend(QStringLiteral("image/png"));
+        for (const QString& mime : std::as_const(pictures)) {
+            const QByteArray bytes = data->data(mime);
+            if (decoded.loadFromData(bytes)) {
+                picture = mime == QLatin1String("image/png") ? bytes : asPng(decoded);
+                break;
+            }
+        }
+    }
     QList<QPair<QString, QByteArray>> kept;
     qint64 bytes = 0;
     for (const QString& mime : offered) {
-        const bool image = mime.startsWith(QLatin1String("image/"));
-        if (!mime.contains(QLatin1Char('/')) || (image && !imagesKept) || (image && png && mime != QLatin1String("image/png")))
+        if (!mime.contains(QLatin1Char('/')) || mime.startsWith(QLatin1String("image/")))
             continue;
         kept << qMakePair(mime, data->data(mime));
         bytes += kept.last().second.size();
+    }
+    if (!picture.isEmpty()) {
+        kept << qMakePair(QStringLiteral("image/png"), picture);
+        bytes += picture.size();
     }
     if (bytes > qint64(imageMb) * 1024 * 1024) {
         qInfo("[clipboard] skipped reason=too_big bytes=%lld", bytes);
@@ -250,8 +314,11 @@ void ClipboardHistory::take(const QMimeData* data, bool ours)
     QByteArray textBytes = bytesOf(QStringLiteral("text/plain;charset=utf-8"));
     if (textBytes.isEmpty())
         textBytes = bytesOf(QStringLiteral("text/plain"));
+    for (const auto& [mime, value] : std::as_const(kept))
+        if (textBytes.isEmpty() && isTextual(mime))
+            textBytes = value;
     const QString text = QString::fromUtf8(textBytes);
-    const QByteArray picture = bytesOf(QStringLiteral("image/png"));
+    const bool pictureFirst = !picture.isEmpty() && (firstLine(text).isEmpty() || isLink(text));
     if (!urls.isEmpty() && std::all_of(urls.cbegin(), urls.cend(), [](const QUrl& url) { return url.isLocalFile(); })) {
         entry.kind = QStringLiteral("files");
         entry.label = QFileInfo(urls.first().toLocalFile()).fileName();
@@ -259,22 +326,25 @@ void ClipboardHistory::take(const QMimeData* data, bool ours)
         for (const QUrl& url : urls)
             entry.text += url.toLocalFile() + QLatin1Char('\n');
         key = "files:" + entry.text.toUtf8();
+    } else if (pictureFirst) {
+        entry.kind = QStringLiteral("image");
+        entry.label = firstLine(text);
+        entry.pictureSize = decoded.size();
+        key = "image:" + picture;
     } else if (!firstLine(text).isEmpty()) {
         entry.kind = isLink(text) ? QStringLiteral("link") : QStringLiteral("text");
         entry.label = firstLine(text);
         entry.text = text.left(searchedChars);
         key = "text:" + textBytes;
-    } else if (!picture.isEmpty()) {
-        QBuffer buffer;
-        buffer.setData(picture);
-        entry.kind = QStringLiteral("image");
-        entry.pictureSize = QImageReader(&buffer, "png").size();
-        key = "image:" + picture;
     } else {
         qInfo("[clipboard] skipped reason=no_known_format formats=%s", qPrintable(offered.join(QLatin1Char(','))));
         return;
     }
     entry.id = hashOf(key).left(16);
+    if (!entries.isEmpty() && entries.first().id == entry.id) {
+        current = entry.id;
+        return;
+    }
     entry.added = QDateTime::currentDateTimeUtc();
 
     for (const auto& [mime, value] : std::as_const(kept)) {
@@ -300,8 +370,9 @@ void ClipboardHistory::take(const QMimeData* data, bool ours)
         entries.prepend(entry);
     }
     if (entry.kind == QLatin1String("image")) {
-        const QImage thumbnail = QImage::fromData(picture).scaled(thumbnailSide, thumbnailSide, Qt::KeepAspectRatio,
-                                                                  Qt::SmoothTransformation);
+        const QImage thumbnail = decoded.width() <= thumbnailSide && decoded.height() <= thumbnailSide
+            ? decoded
+            : decoded.scaled(thumbnailSide, thumbnailSide, Qt::KeepAspectRatio, Qt::SmoothTransformation);
         if (thumbnail.save(thumbnailPath(entry), "PNG"))
             QFile::setPermissions(thumbnailPath(entry), privateFile);
     }
@@ -321,7 +392,7 @@ void ClipboardHistory::choose(const QString& id, bool plain)
     }
     auto* data = new QMimeData;
     if (plain) {
-        data->setData(QStringLiteral("text/plain"), entries[at].text.toUtf8());
+        data->setData(QStringLiteral("text/plain"), wholeText(entries[at]).toUtf8());
     } else {
         for (const Format& format : std::as_const(entries[at].formats)) {
             QFile file(blobPath(format.blob));
@@ -487,15 +558,6 @@ void ClipboardHistory::setPaused(bool on)
     changed();
 }
 
-void ClipboardHistory::setFilter(const QString& text)
-{
-    if (text == search)
-        return;
-    search = text;
-    emit filterChanged();
-    showRows();
-}
-
 int ClipboardHistory::pinnedCount() const
 {
     return int(std::count_if(entries.cbegin(), entries.cend(), [](const Entry& e) { return e.pinned; }));
@@ -517,7 +579,7 @@ void ClipboardHistory::showRows()
     QStringList wanted;
     for (const bool pinned : {true, false})
         for (const Entry& entry : std::as_const(entries))
-            if (entry.pinned == pinned && matches(entry))
+            if (entry.pinned == pinned)
                 wanted << entry.id;
     for (qsizetype row = shown.size() - 1; row >= 0; --row) {
         if (wanted.contains(shown[row]))
@@ -573,14 +635,6 @@ void ClipboardHistory::forgetBlobs(const Entry& gone)
         QFile::remove(thumbnailPath(gone));
 }
 
-bool ClipboardHistory::matches(const Entry& entry) const
-{
-    const QStringList words = search.split(QRegularExpression(QStringLiteral("\\s+")), Qt::SkipEmptyParts);
-    const QString& haystack = entry.text.isEmpty() ? entry.label : entry.text;
-    return std::all_of(words.cbegin(), words.cend(),
-                       [&](const QString& word) { return haystack.contains(word, Qt::CaseInsensitive); });
-}
-
 int ClipboardHistory::indexOf(const QString& id) const
 {
     for (qsizetype at = 0; at < entries.size(); ++at)
@@ -597,4 +651,91 @@ QString ClipboardHistory::blobPath(const QString& blob) const
 QString ClipboardHistory::thumbnailPath(const Entry& entry) const
 {
     return storage + QStringLiteral("/thumbnails/") + entry.id + QStringLiteral(".png");
+}
+
+QString ClipboardHistory::wholeText(const Entry& entry) const
+{
+    const auto read = [&](const auto& wanted) -> std::optional<QString> {
+        for (const Format& format : entry.formats) {
+            QFile file(blobPath(format.blob));
+            if (wanted(format.mime) && file.open(QIODevice::ReadOnly))
+                return QString::fromUtf8(file.readAll());
+        }
+        return std::nullopt;
+    };
+    for (const QString& plain : {QStringLiteral("text/plain;charset=utf-8"), QStringLiteral("text/plain")})
+        if (const auto found = read([&](const QString& mime) { return mime == plain; }))
+            return *found;
+    if (entry.kind == QLatin1String("files"))
+        return entry.text;
+    return read(isTextual).value_or(entry.text);
+}
+
+bool ClipboardHistory::rowMatches(int row, const QStringList& words) const
+{
+    if (row < 0 || row >= shown.size())
+        return false;
+    const Entry& entry = entries[indexOf(shown[row])];
+    const QString& haystack = entry.text.isEmpty() ? entry.label : entry.text;
+    return std::all_of(words.cbegin(), words.cend(),
+                       [&](const QString& word) { return haystack.contains(word, Qt::CaseInsensitive); });
+}
+
+QVariantList ClipboardHistory::stack() const
+{
+    static const QMimeDatabase kinds;
+    QVariantList list;
+    for (int row = 0; row < shown.size(); ++row) {
+        const Entry& entry = entries[indexOf(shown[row])];
+        QVariantMap cell{{QStringLiteral("path"), entry.id},
+                         {QStringLiteral("kind"), entry.kind},
+                         {QStringLiteral("name"), entry.label},
+                         {QStringLiteral("pinned"), entry.pinned},
+                         {QStringLiteral("preview"), data(index(row), PreviewRole)},
+                         {QStringLiteral("picture"), data(index(row), ThumbnailRole).toUrl().toString()},
+                         {QStringLiteral("width"), entry.pictureSize.width()},
+                         {QStringLiteral("height"), entry.pictureSize.height()},
+                         {QStringLiteral("files"), entry.fileCount}};
+        if (entry.kind == QLatin1String("files")) {
+            const QString first = entry.text.section(QLatin1Char('\n'), 0, 0);
+            const QMimeType type = QFileInfo(first).isDir() ? kinds.mimeTypeForName(QStringLiteral("inode/directory"))
+                                                            : kinds.mimeTypeForFile(first, QMimeDatabase::MatchExtension);
+            cell[QStringLiteral("icon")] = type.iconName();
+            cell[QStringLiteral("genericIcon")] = type.genericIconName();
+        }
+        list << cell;
+    }
+    return list;
+}
+
+ClipboardSearch::ClipboardSearch(QObject* parent) : QSortFilterProxyModel(parent) {}
+
+void ClipboardSearch::setHistory(ClipboardHistory* history)
+{
+    if (history == source)
+        return;
+    source = history;
+    setSourceModel(history);
+    emit historyChanged();
+}
+
+void ClipboardSearch::setFilter(const QString& text)
+{
+    if (text == search)
+        return;
+    search = text;
+    beginFilterChange();
+    words = text.split(QRegularExpression(QStringLiteral("\\s+")), Qt::SkipEmptyParts);
+    endFilterChange(Direction::Rows);
+    emit filterChanged();
+}
+
+QString ClipboardSearch::idAt(int row) const
+{
+    return source && row >= 0 && row < rowCount() ? source->idAt(mapToSource(index(row, 0)).row()) : QString();
+}
+
+bool ClipboardSearch::filterAcceptsRow(int row, const QModelIndex& parent) const
+{
+    return !parent.isValid() && source && source->rowMatches(row, words);
 }

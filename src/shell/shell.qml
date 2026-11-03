@@ -172,18 +172,31 @@ ShellRoot {
     // a panel about to open a menu, so the others close theirs
     signal menuOpening(var opener)
 
-    // one history for the clipboard item on every screen
-    readonly property var clipboardChoices: (settings.config.status ?? ({})).clipboard ?? ({})
+    // one history for the clipboard item on every screen and the dock
+    readonly property var clipboardDefaults: (settings.config.status ?? ({})).clipboard ?? ({})
+    function clipboardChoice(key, fallback) {
+        return userChoices.value("clipboard", key) ?? clipboardDefaults[key] ?? fallback
+    }
     readonly property alias clipboardHistory: clipboardHistory
     ClipboardHistory {
         id: clipboardHistory
-        keepItems: shell.clipboardChoices.keep_items ?? 100
-        remember: shell.clipboardChoices.remember ?? true
-        keepImages: shell.clipboardChoices.keep_images ?? true
-        imageLimitMb: shell.clipboardChoices.image_limit_mb ?? 20
+        keepItems: Math.max(1, shell.clipboardChoice("keep_items", 100))
+        remember: shell.clipboardChoice("remember", true)
+        keepImages: shell.clipboardChoice("keep_images", true)
+        imageLimitMb: Math.max(1, shell.clipboardChoice("image_limit_mb", 20))
     }
-    // the main screen's clipboard item opens its menu
+    readonly property bool clipboardInMenuBar: {
+        const right = (settings.config.panel ?? ({})).right ?? []
+        const hidden = userChoices.value("panel", "hidden") ?? (settings.config.panel ?? ({})).hidden ?? []
+        return right.includes("clipboard") && !hidden.includes("clipboard")
+    }
+    // the main screen's clipboard item opens its menu, else the dock's stack
     signal clipboardWanted()
+    function showClipboard() {
+        if (clipboardInMenuBar || !dock.showClipboardStack()) {
+            clipboardWanted()
+        }
+    }
 
     // [panel] every_screen: every panel shows the same menus
     readonly property var panelScreens: (userChoices.value("panel", "every_screen") ?? false)
@@ -285,7 +298,7 @@ ShellRoot {
         } else if (action === "quit_app") {
             quitActiveApp()
         } else if (action === "clipboard_history") {
-            shell.clipboardWanted()
+            shell.showClipboard()
         } else {
             console.warn("shell: the config asks for an action the shell does not have:", action,
                          "- known: app_grid, volume_up, volume_down, volume_mute, lock, notification_list,",

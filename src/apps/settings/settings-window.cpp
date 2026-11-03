@@ -33,6 +33,7 @@
 #include "desktop-pane.hpp"
 #include "desktops-pane.hpp"
 #include "defaults-pane.hpp"
+#include "clipboard-pane.hpp"
 #include "dock-pane.hpp"
 #include "input-sources-pane.hpp"
 #include "keyboard-pane.hpp"
@@ -91,6 +92,7 @@ static const KnownPane known_panes[] = {
     {"desktop", "preferences-desktop-wallpaper", "Desktop",
         "wallpaper background picture image name icons files translucent menu bar"},
     {"dock", "preferences-dock", "Dock", "taskbar launcher magnification hide autohide size"},
+    {"clipboard", "edit-paste", "Clipboard", "copy paste history pictures pin super v"},
     {"sound", "preferences-desktop-sound", "Sound",
         "volume audio speaker headphones microphone input output alert beep"},
     {"trackpad", "input-touchpad", "Touchpad", "touchpad tap click scroll natural gestures"},
@@ -230,7 +232,7 @@ SettingsWindow::SettingsWindow(Choices& choices) : choices(choices)
             {
                 std::fprintf(stderr,
                     "mavernix-settings: the config asks for a pane \"%s\", "
-                    "which this program does not have; known: general, desktop, dock, icons, sound, trackpad, mouse, "
+                    "which this program does not have; known: general, desktop, dock, clipboard, icons, sound, trackpad, mouse, "
                     "energy, display, desktops, windows, extensions, network, bluetooth, keyboard, defaults, "
                     "startup, datetime\n",
                     qPrintable(name));
@@ -462,6 +464,10 @@ QWidget* SettingsWindow::makePane(const QString& name)
     if (name == QLatin1String("dock"))
     {
         return new DockPane(choices);
+    }
+    if (name == QLatin1String("clipboard"))
+    {
+        return new ClipboardPane(choices);
     }
     if (name == QLatin1String("icons"))
     {

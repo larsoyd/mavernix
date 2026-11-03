@@ -35,6 +35,9 @@ QtObject {
     readonly property int openFolderId: 8
     readonly property int settingsId: 9
     readonly property int originalSizeId: 10
+    readonly property int clipboardPauseId: 11
+    readonly property int clipboardClearId: 12
+    readonly property int clipboardSettingsId: 13
     // Ranges of ids, kept in ascending order: the dock tests them from the
     // highest down. A program's windows, a folder's orders and views, a
     // program's own entries (its desktop entry's actions), a listed folder's
@@ -81,6 +84,9 @@ QtObject {
         }
         if (place.window !== null) {
             return [entry(openId, (words.open_named ?? "Open “%1”").arg(place.window.title))]
+        }
+        if (dockFolders.isClipboard(place.custom)) {
+            return forClipboard()
         }
         if (place.custom?.folder !== undefined || dockFolders.isProgramFolder(place.custom)) {
             return forFolder(place.custom)
@@ -144,6 +150,20 @@ QtObject {
         }
         items.push(tile.running ? entry(quitId, words.quit ?? "Quit") : entry(openId, words.open ?? "Open"))
         return items
+    }
+
+    // the clipboard's menu: pausing and clearing its history, removing it
+    function forClipboard() {
+        const history = dockFolders.clipboard
+        return [
+            ticked(clipboardPauseId, words.clipboard_pause ?? "Pause Clipboard History", history?.paused ?? false),
+            entry(clipboardClearId, words.clipboard_clear ?? "Clear History",
+                  (history?.total ?? 0) > (history?.pinnedCount ?? 0)),
+            separator(),
+            entry(removeId, words.remove ?? "Remove from dock"),
+            separator(),
+            entry(clipboardSettingsId, words.clipboard_settings ?? "Clipboard Settings…")
+        ]
     }
 
     // A folder's menu: its order and view, removing it, opening it.
