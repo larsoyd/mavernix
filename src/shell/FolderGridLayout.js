@@ -84,3 +84,16 @@ function bounded(looks, entryCount, stageWidth, stageHeight, bound) {
         cellScale: scaleFor(columns, rows),
     }
 }
+
+// where a scroll rests, the next whole row the way it went so it never turns back
+function restingY(contentY, rowHeight, lowest, travel) {
+    const near = 0.5
+    const row = travel > 0 ? Math.ceil((contentY - near) / rowHeight)
+        : travel < 0 ? Math.floor((contentY + near) / rowHeight) : Math.round(contentY / rowHeight)
+    return Math.max(0, Math.min(lowest, row * rowHeight))
+}
+
+// a whole row per wheel notch, counted from the row the view is heading for
+function wheelGoal(goal, notches, rowHeight, lowest) {
+    return Math.max(0, Math.min(lowest, restingY(goal, rowHeight, lowest, -notches) + notches * rowHeight))
+}

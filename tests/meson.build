@@ -154,6 +154,14 @@ clipboard_stack_size_test = executable(
 )
 test('clipboard-stack-size', clipboard_stack_size_test, env: {'QT_QPA_PLATFORM': 'offscreen'})
 
+folder_grid_scroll_test = executable(
+    'test-folder-grid-scroll',
+    ['test-folder-grid-scroll.cpp', qt.compile_moc(sources: 'test-folder-grid-scroll.cpp', dependencies: qt_test)],
+    dependencies: [qt_test, dependency('qt6', modules: ['Core', 'Qml'])],
+    cpp_args: ['-DSHELL_DIR="' + (meson.project_source_root() / 'src' / 'shell') + '"'],
+)
+test('folder-grid-scroll', folder_grid_scroll_test, env: {'QT_QPA_PLATFORM': 'offscreen'})
+
 python = find_program('python3')
 test(
     'greeter-look',
