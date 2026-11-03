@@ -7,3 +7,6 @@ install_data('mavernix.svg', install_dir: hicolor / 'scalable' / 'apps')
 foreach size : ['16x16', '22x22', '24x24', '32x32']
     install_data('mavernix-small.svg', install_dir: hicolor / size / 'apps', rename: 'mavernix.svg')
 endforeach
+
+# the dock's clipboard history, by its name "mavernix-clipboard"
+install_data('mavernix-clipboard.svg', install_dir: hicolor / 'scalable' / 'apps')

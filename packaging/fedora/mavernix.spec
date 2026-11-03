@@ -118,3 +118,4 @@ cp src/compositor/decoration/LICENSE-wayfire LICENSE-wayfire
 %{_datadir}/mavernix/
 %{_datadir}/wayland-sessions/mavernix.desktop
 %{_datadir}/icons/hicolor/*/apps/mavernix.svg
+%{_datadir}/icons/hicolor/scalable/apps/mavernix-clipboard.svg
