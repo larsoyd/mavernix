@@ -30,6 +30,7 @@ install_data(
     'link_gimp_style.py',
     'link_mozilla_style.py',
     'link_reaper_menu.py',
+    'export_greeter_look.py',
     'log_guard.py',
     'make_app_theme.py',
     'make_default_programs.py',

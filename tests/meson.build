@@ -129,6 +129,12 @@ test('menu-bar-clock', menu_bar_clock_test, env: {'QT_QPA_PLATFORM': 'offscreen'
 
 python = find_program('python3')
 test(
+    'greeter-look',
+    python,
+    args: [files('test_greeter_look.py')],
+    env: {'SESSION_SOURCE_DIR': meson.project_source_root() / 'src' / 'session'},
+)
+test(
     'session-config',
     python,
     args: [files('test_session_config.py')],
