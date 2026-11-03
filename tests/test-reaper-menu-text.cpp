@@ -37,6 +37,19 @@ class TestReaperMenuText : public QObject
         QCOMPARE(keys("No shortcut"), QStringList());
         QCOMPARE(keys("Empty\t"), QStringList());
     }
+
+    void statusText()
+    {
+        QVERIFY(isStatusText("[audio device closed]"));
+        QVERIFY(isStatusText("[44.1kHz 24bit WAV : 0/2ch 512spls ~0.0/0.0ms Dummy Audio]"));
+        QVERIFY(isStatusText("[MSG] [audio device closed]"));
+        QVERIFY(isStatusText("(12.1GB free) [audio device closed]"));
+        QVERIFY(!isStatusText(""));
+        QVERIFY(!isStatusText("Help"));
+        QVERIFY(!isStatusText("&Help"));
+        QVERIFY(!isStatusText("7 Day Trial"));
+        QVERIFY(!isStatusText("\xc3\x89" "dition"));
+    }
 };
 
 QTEST_GUILESS_MAIN(TestReaperMenuText)

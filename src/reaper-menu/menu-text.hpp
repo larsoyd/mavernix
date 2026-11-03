@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cctype>
 #include <string>
 #include <vector>
 
@@ -47,4 +48,11 @@ inline std::vector<std::string> menuShortcut(const std::string& text)
     }
     keys.push_back(shortcutKey(shortcut.substr(start)));
     return keys;
+}
+
+// swell draws a last bar item starting like this at the right end, as reaper's status
+inline bool isStatusText(const std::string& text)
+{
+    const char first = text[0];
+    return first > 0 && first != '&' && !std::isalnum(static_cast<unsigned char>(first));
 }
