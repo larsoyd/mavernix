@@ -36,9 +36,11 @@ Scope {
     }
 
     Component.onCompleted: {
-        if (note.text() !== "")
+        // names the login, the runtime folder can outlive a logout
+        const mark = "entered " + (Quickshell.env("XDG_SESSION_ID") ?? "") + "\n"
+        if (note.text() === mark)
             return
-        note.setText("entered\n")
+        note.setText(mark)
         coveredAt = Date.now()
         covering = true
     }
