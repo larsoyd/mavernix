@@ -82,7 +82,7 @@ def plan(settings, ini, drm_driver):
     look = {
         "schema": SCHEMA, "version": 1, "id": folder.name, "name": theme.get("theme", {}).get("name", folder.name),
         "background": background,
-        "fonts": {k: interface[k] for k in ("family", "size") if k in interface},
+        "fonts": {k: interface[k] for k in ("family",) if k in interface},
         "cursor": {k: cursor[k] for k in ("theme", "size") if k in cursor},
         "keyboard": {k: ini["input"][f"xkb_{k}"] for k in XKB_KEYS if ini.has_option("input", f"xkb_{k}")},
         "display": {"outputs": outputs(ini), "main_output": config.get("display", {}).get("main_screen", "")},
