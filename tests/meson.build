@@ -119,6 +119,14 @@ quick_style_test = executable(
 )
 test('quick-style', quick_style_test, env: {'QT_QPA_PLATFORM': 'offscreen'})
 
+menu_bar_clock_test = executable(
+    'test-menu-bar-clock',
+    ['test-menu-bar-clock.cpp', qt.compile_moc(sources: 'test-menu-bar-clock.cpp', dependencies: qt_test)],
+    dependencies: [qt_test, dependency('qt6', modules: ['Core', 'Qml'])],
+    cpp_args: ['-DSHELL_DIR="' + (meson.project_source_root() / 'src' / 'shell') + '"'],
+)
+test('menu-bar-clock', menu_bar_clock_test, env: {'QT_QPA_PLATFORM': 'offscreen'})
+
 python = find_program('python3')
 test(
     'session-config',

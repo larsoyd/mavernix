@@ -8,6 +8,7 @@ import QtQuick
 import Quickshell
 import Quickshell.Wayland
 import "ApplicationName.js" as ApplicationName
+import "MenuBarClock.js" as MenuBarClock
 import "ThemeValues.js" as ThemeValues
 
 Row {
@@ -138,6 +139,18 @@ Row {
 
     readonly property string clockFormat:
         panel.choices?.value("panel", "clock_format") ?? panel.layout.clock_format ?? "hh:mm"
+    function panelChoice(key, fallback) {
+        return panel.choices?.value("panel", key) ?? panel.layout[key] ?? fallback
+    }
+    readonly property var clockChoices: ({
+        format: clockFormat,
+        showTime: panelChoice("clock_shows_time", true),
+        showDate: panelChoice("clock_shows_date", false),
+        dateStyle: panelChoice("clock_date_style", "full"),
+        regionTime: panelChoice("clock_region_time", false)
+    })
+    // off where the clock stands among titles and is spaced like them
+    property bool holdsStatus: true
     SystemClock {
         id: clock
         // Ticks each second only for a format that shows seconds ("ss",
@@ -314,15 +327,16 @@ Row {
     Component {
         id: clockItem
         Item {
-            width: clockTitle.width + row.statusGapAdjustment(parent.itemIndex)
+            width: clockTitle.width + (row.holdsStatus ? row.statusGapAdjustment(parent.itemIndex) : 0)
             height: row.height
 
             PanelTitle {
                 id: clockTitle
                 panel: row.panel
                 itemRow: row
-                boxOverhang: row.statusSpacing / 2
-                text: Qt.formatDateTime(clock.date, row.clockFormat)
+                boxOverhang: (row.holdsStatus ? row.statusSpacing : row.spacing) / 2
+                // month names follow the desktop's language, the region's formats LC_TIME
+                text: MenuBarClock.text(clock.date, row.clockChoices, Qt.locale(), Qt.locale(Qt.locale().name))
 
                 // A date line, if panel.clock_menu_date_format is set.
                 readonly property string dateFormat: row.panel.layout.clock_menu_date_format ?? ""

@@ -6,6 +6,7 @@ import QtQuick
 import Quickshell
 import Quickshell.Wayland
 import Shell.Native
+import "MenuBarClock.js" as MenuBarClock
 import "ThemeValues.js" as ThemeValues
 
 PanelWindow {
@@ -160,6 +161,9 @@ PanelWindow {
         }
     }
 
+    readonly property string clockPosition: choices?.value("panel", "clock_position") ?? layout.clock_position ?? "right"
+    readonly property var ends: MenuBarClock.placed(itemsAt("left"), itemsAt("right"), clockPosition)
+
     PanelItems {
         anchors {
             left: parent.left
@@ -167,9 +171,22 @@ PanelWindow {
             top: background.top
             bottom: background.bottom
         }
-        names: panel.itemsAt("left")
+        names: panel.ends.left
         panel: panel
-        room: rightItems.x - x - panel.looks.item_spacing
+        holdsStatus: false
+        room: (middleItems.visible ? middleItems.x : rightItems.x) - x - panel.looks.item_spacing
+    }
+
+    PanelItems {
+        id: middleItems
+        anchors {
+            horizontalCenter: parent.horizontalCenter
+            top: background.top
+            bottom: background.bottom
+        }
+        visible: names.length > 0
+        names: panel.ends.middle
+        panel: panel
     }
 
     PanelItems {
@@ -180,7 +197,7 @@ PanelWindow {
             top: background.top
             bottom: background.bottom
         }
-        names: panel.itemsAt("right")
+        names: panel.ends.right
         panel: panel
     }
 
