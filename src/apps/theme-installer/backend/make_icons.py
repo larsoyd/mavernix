@@ -627,8 +627,7 @@ def file_type_icons(database, program_icons):
         if target is None:
             target = MEDIA_FILE_ICONS.get(family)
         if target is None:
-            office = generic.get(mime_type, "").startswith("x-office-")
-            target = TEXT_FILE_ICON if is_text(mime_type, parents) and not office else ANY_FILE_ICON
+            target = TEXT_FILE_ICON if is_text(mime_type, parents) else ANY_FILE_ICON
         icons[name] = target
     return icons
 
