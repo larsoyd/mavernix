@@ -32,6 +32,15 @@ def readable_by_anyone(path):
     return all(p.stat().st_mode & stat.S_IXOTH for p in path.resolve().parents)
 
 
+def chosen_picture(settings):
+    try:
+        choices = json.loads(Path(settings.get("user_choices_file") or "").read_text())
+    except (OSError, ValueError):
+        return ""
+    picture = choices.get("desktop", {}).get("picture") if isinstance(choices, dict) else None
+    return picture if isinstance(picture, str) else ""
+
+
 def outputs(ini):
     found = []
     for section in ini.sections():
@@ -52,7 +61,9 @@ def plan(settings, ini, drm_driver):
     theme, folder = settings["theme"], Path(settings["theme_directory"])
     config, user = settings.get("config", {}), settings.get("user", {})
     files = {}
-    picture = config.get("desktop", {}).get("picture") or ""
+    picture = chosen_picture(settings) or config.get("desktop", {}).get("picture") or ""
+    if picture and not Path(picture).is_absolute():
+        picture = str(folder / picture)
     if not picture_suffix(picture):
         picture = str(folder / theme.get("desktop", {}).get("background", {}).get("image", ""))
     background = {"veil": "#00000026", "fit": "cover"}

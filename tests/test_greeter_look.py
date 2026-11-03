@@ -124,6 +124,29 @@ class Export(unittest.TestCase):
         self.assertTrue((self.inbox / "ready").exists())
         self.assertEqual(self.snapshot()["background"]["image"], "background.jpg")
 
+    def test_the_users_current_choice_wins_over_the_login_settings(self):
+        chosen = self.root / "chosen.jpg"
+        chosen.write_bytes(JPG)
+        choices = self.root / "choices.json"
+        choices.write_text(json.dumps({"desktop": {"picture": str(chosen)}}))
+        data = json.loads(self.settings.read_text())
+        data["user_choices_file"] = str(choices)
+        self.settings.write_text(json.dumps(data))
+        self.run_export()
+        self.assertEqual(self.snapshot()["background"]["image"], "background.jpg")
+        self.assertEqual((self.inbox / "snapshot" / "background.jpg").read_bytes(), JPG)
+
+    def test_a_chosen_picture_inside_the_theme(self):
+        choices = self.root / "choices.json"
+        (self.theme / "wallpapers" / "Other.png").write_bytes(PNG)
+        self.write_settings(picture=self.root / "gone.jpg")
+        choices.write_text(json.dumps({"desktop": {"picture": "wallpapers/Other.png"}}))
+        data = json.loads(self.settings.read_text())
+        data["user_choices_file"] = str(choices)
+        self.settings.write_text(json.dumps(data))
+        self.run_export()
+        self.assertEqual(self.snapshot()["background"]["image"], "background.png")
+
     def test_theme_picture_when_desktop_picture_missing(self):
         self.write_settings(picture=self.root / "gone.png")
         self.run_export()

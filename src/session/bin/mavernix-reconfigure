@@ -6,6 +6,10 @@ if [ -z "${DESKTOP_SHELL_SETTINGS:-}" ]; then
     echo "mavernix-reconfigure: DESKTOP_SHELL_SETTINGS is not set; run it inside the desktop session." >&2
     exit 1
 fi
+# a new desktop picture only needs the login screen's copy of the look
+if [ "${1:-}" = "--greeter-look" ]; then
+    exec "$(dirname "$(readlink -f "$0")")/../configure-desktop" greeter-look "$(dirname "$DESKTOP_SHELL_SETTINGS")"
+fi
 "$(dirname "$(readlink -f "$0")")/../configure-desktop" choices "$(dirname "$DESKTOP_SHELL_SETTINGS")" || exit $?
 # Blur matches are applied when surfaces map, so changing them remaps the shell.
 if [ "${1:-}" = "--restart-shell" ]; then

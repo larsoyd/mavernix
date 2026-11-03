@@ -45,6 +45,7 @@ Item {
         // FileView's watcher does not report our own writes (at least to a file
         // that did not exist before), so the compositor is told from here.
         tellCompositor(kept)
+        tellLoginScreen(kept)
     }
 
     // The file as an object; empty if missing or not valid JSON.
@@ -70,6 +71,7 @@ Item {
             const held = choices.readFile()
             choices.changed = held
             choices.tellCompositor(held)
+            choices.tellLoginScreen(held)
         }
     }
 
@@ -88,6 +90,17 @@ Item {
         if (givenToCompositor === undefined) {
             tellCompositor(readFile())
         }
+        if (givenToLoginScreen === undefined)
+            tellLoginScreen(readFile())
+    }
+
+    // the login screen copies the desktop picture, so a new one is exported to it
+    property var givenToLoginScreen: undefined
+    function tellLoginScreen(held) {
+        const text = JSON.stringify(held.desktop ?? ({}))
+        if (givenToLoginScreen !== undefined && text !== givenToLoginScreen)
+            Quickshell.execDetached(["mavernix-reconfigure", "--greeter-look"])
+        givenToLoginScreen = text
     }
 
     function tellCompositor(held) {
