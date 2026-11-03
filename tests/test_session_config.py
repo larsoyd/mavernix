@@ -1519,6 +1519,40 @@ selected_separator = "images/controls/tab-selected-separator.png"
         self.assertIn("carried on", result.stdout)
         self.assertIn("configure-desktop", result.stderr)
 
+    def exported_greeter_look(self, settings=None, environment=None):
+        inbox = self.home / "inbox"
+        (inbox / "ada").mkdir(parents=True, exist_ok=True)
+        state = self.home / "state"
+        state.mkdir(exist_ok=True)
+        (state / "session.ini").write_text("[input]\nxkb_layout = no\n\n[output:DP-1]\nscale = 1\n")
+        (state / "shell.json").write_text(settings if settings is not None else json.dumps({
+            "theme": {"theme": {"name": "Plain"}, "cursors": {}}, "theme_directory": str(THEMES_DIR / "plain"),
+            "config": {"display": {"main_screen": "DP-1"}}, "user": {"name": "ada"}}))
+        setup = (f"set -euo pipefail\nsession_dir={shlex.quote(str(SESSION_SOURCE_DIR))}\n"
+                 f"shell_settings=$state_dir/shell.json\ncompositor_settings=$state_dir/session.ini\n"
+                 f"login_log=$state_dir/login.log\nunset WLR_DRM_DEVICES\nexport_greeter_look wait\necho carried on")
+        runs = {"USER": "ada", "MAVERNIX_GREETER_INBOX_ROOT": str(inbox), **(environment or {})}
+        result = self.session_functions("export_greeter_look", setup=setup, environment=runs)
+        return result, inbox / "ada"
+
+    def test_the_login_screen_gets_the_look_without_a_gpu_choice(self):
+        result, inbox = self.exported_greeter_look()
+        self.assertIn("carried on", result.stdout)
+        look = json.loads((inbox / "snapshot" / "theme.json").read_text())
+        self.assertEqual((look["id"], look["keyboard"]), ("plain", {"layout": "no"}))
+        self.assertNotIn("drm_driver", look["display"])
+
+    def test_a_broken_settings_file_does_not_stop_the_desktop(self):
+        result, inbox = self.exported_greeter_look(settings="{")
+        self.assertIn("carried on", result.stdout)
+        self.assertIn("login screen keeps its old look", result.stderr)
+        self.assertFalse((inbox / "snapshot").exists())
+
+    def test_no_inbox_no_export(self):
+        result, inbox = self.exported_greeter_look(environment={"MAVERNIX_GREETER_INBOX_ROOT": str(self.home / "none")})
+        self.assertIn("carried on", result.stdout)
+        self.assertFalse((inbox / "snapshot").exists())
+
     def test_a_nested_desktop_leaves_reaper_alone(self):
         self.assertFalse(self.linked_reaper(environment={"DESKTOP_NESTED": "1"}).is_symlink())
 

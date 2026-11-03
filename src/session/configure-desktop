@@ -394,6 +394,25 @@ tell_services() {
     )
 }
 
+# the login screen gets this look only when mavenix-greeter made an inbox for this user
+export_greeter_look() {
+    local inbox="${MAVERNIX_GREETER_INBOX_ROOT:-/var/lib/mavenix-greeter/inbox}/${USER:-}" driver="" card
+    [[ -n "${USER:-}" && -d "$inbox" && -w "$inbox" && -z "${DESKTOP_NESTED:-}" ]] || return 0
+    card=${WLR_DRM_DEVICES:-}
+    card=${card%%:*}
+    if [[ -n "$card" && -e "/sys/class/drm/${card##*/}/device/driver" ]]; then
+        driver=$(basename "$(readlink -f "/sys/class/drm/${card##*/}/device/driver")")
+    fi
+    local -a command=(timeout 60 nice python3 "$session_dir/export_greeter_look.py" "$shell_settings" "$compositor_settings" "$inbox")
+    [[ -n "$driver" ]] && command+=(--drm-driver "$driver")
+    if [[ ${1:-} == wait ]]; then
+        "${command[@]}" >> "$login_log" 2>&1 || echo "configure-desktop: the login screen keeps its old look (message in $login_log)." >&2
+    else
+        ( "${command[@]}" >> "$login_log" 2>&1 || true ) &
+    fi
+    return 0
+}
+
 configure_everything() {
     write_shell_settings
     write_compositor_settings
@@ -404,6 +423,7 @@ configure_everything() {
     write_program_entries
     link_theme_files
     write_environment
+    export_greeter_look
 }
 
 # SIGHUP ends the shell (pid from run-shell); keep-running restarts it.
@@ -458,6 +478,7 @@ choices)
     python3 "$session_dir/make_shell_config.py" "$config" "$current_settings"
     shell_settings=$current_settings
     write_interface_settings --window-buttons-only
+    export_greeter_look wait
     ;;
 *)
     usage
