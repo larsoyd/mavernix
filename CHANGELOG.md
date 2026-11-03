@@ -10,6 +10,8 @@
 
 ### Changed
 
+- Holding the resize binding (Super and the right button) over a tiled window moves its shared edge and the windows beside it, as dragging that edge does, and a corner moves both edges. A tile alone keeps its tiling when its free edge is dragged.
+- A window tiled to a side takes the room the tiles beside it leave, by keys, by a drop on the screen's edge and in its preview, instead of a plain half that covers them.
 - An application's menus that would run into the items at the right end of the menu bar are left out from the last one, and come back when there is room.
 - Searching in System Preferences dims the window and lights the panes it finds, as on OS X, and View can organize the panes alphabetically.
 - System Preferences is laid out as on OS X: every pane has one column of labels, rows sit close together and lines part the subjects. General takes in Theme and App Style, Date & Time is new, and each menu bar item is now chosen in the pane about that thing. Sound has tabs, and the buttons in Keyboard are no longer cut off.

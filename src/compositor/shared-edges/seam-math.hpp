@@ -4,6 +4,7 @@
 #pragma once
 
 #include <cstddef>
+#include <cstdint>
 #include <optional>
 #include <vector>
 
@@ -28,6 +29,15 @@ struct window_t
     int max_height = 0;
 };
 
+// same values as wlroots' edges
+enum edge_t : uint32_t
+{
+    EDGE_TOP = 1,
+    EDGE_BOTTOM = 2,
+    EDGE_LEFT = 4,
+    EDGE_RIGHT = 8,
+};
+
 enum class side_t
 {
     LEFT,
@@ -47,19 +57,36 @@ struct seam_t
     std::vector<std::size_t> after;
 };
 
-/**
- * The seam at `side` of windows[dragged], with every window that moves with
- * it, or nothing if no other window touches that edge. Windows on the same
- * line but separated from the dragged one by a gap stay out.
- */
-std::optional<seam_t> find_seam(
-    const std::vector<window_t>& windows, std::size_t dragged, side_t side, int tolerance_px);
+// a tiled window and the work area borders it is tiled to
+struct tile_t
+{
+    box_t box;
+    uint32_t tiled_edges = 0;
+};
 
-/**
- * How far the seam may move for a pointer move of `wanted_px` (negative: left
- * or up), within every window's size limits and `floor_px`.
- */
-int limit_move(const std::vector<window_t>& windows, const seam_t& seam, int wanted_px, int floor_px);
+struct dragged_side_t
+{
+    side_t side;
+    // false for an edge on the work area's border
+    bool free;
+};
+
+// the seam at one side of the dragged window and every window joined to it, alone lets it be one sided
+std::optional<seam_t> find_seam(
+    const std::vector<window_t>& windows, std::size_t dragged, side_t side, int tolerance_px, bool alone = false);
+
+// how far the seam may follow the pointer within size limits, the floor and the work area
+int limit_move(
+    const std::vector<window_t>& windows, const seam_t& seam, int wanted_px, int floor_px, const box_t& area);
+
+// the free edges a resize drags, or the edges as asked when none is free
+std::vector<dragged_side_t> dragged_sides(uint32_t edges, uint32_t tiled_edges);
+
+// a held resize drags the free edge of each axis, the one nearer the pointer if both are free
+uint32_t held_edges(const box_t& box, uint32_t tiled_edges, int x, int y);
+
+// a new tile grows or shrinks to meet the tiles across from it instead of covering them
+box_t fit_beside(const box_t& slot, uint32_t edges, const std::vector<tile_t>& others, int floor_px);
 
 /** Where a window lies once the seam has been moved by `move_px`. */
 box_t moved_box(const window_t& window, const seam_t& seam, std::size_t index, int move_px);
