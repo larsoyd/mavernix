@@ -1,0 +1,15 @@
+#!/bin/sh
+# Brings the running session up to an installed update without a new login:
+# theme updates, its settings written again and a fresh shell. Programs that
+# are open stay open.
+#
+#   mavernix-reload
+if [ $# -ne 0 ]; then
+    echo "usage: mavernix-reload" >&2
+    exit 2
+fi
+if [ -z "${DESKTOP_SHELL_SETTINGS:-}" ]; then
+    echo "mavernix-reload: DESKTOP_SHELL_SETTINGS is not set; run it inside the desktop session." >&2
+    exit 1
+fi
+exec "$(dirname "$(readlink -f "$0")")/../configure-desktop" reload "$(dirname "$DESKTOP_SHELL_SETTINGS")"

@@ -1437,6 +1437,41 @@ selected_separator = "images/controls/tab-selected-separator.png"
         self.session_functions("environment_line", "write_environment", setup="write_environment", **options)
         return (self.home / "state" / "desktop.env").read_text()
 
+    def reload_steps(self, pid_file=True):
+        state = self.home / "state"
+        state.mkdir(parents=True, exist_ok=True)
+        hup = self.home / "hup"
+        setup = f"""
+order={shlex.quote(str(self.home / "order"))}
+refresh_themes() {{ echo themes >> "$order"; }}
+configure_everything() {{ echo configure >> "$order"; }}
+tell_services() {{ echo services >> "$order"; }}
+timeout 5 bash -c 'trap "echo hup > {hup}; exit 0" HUP; while :; do sleep 0.05; done' &
+shell=$!
+{"echo $shell > " + shlex.quote(str(state / "shell.pid")) if pid_file else ""}
+sleep 0.2
+apply_and_restart || echo "restart failed" >> "$order"
+wait $shell || true
+"""
+        self.session_functions("apply_and_restart", "restart_shell", setup=setup)
+        return (self.home / "order").read_text().split(), hup
+
+    def test_a_reload_takes_theme_updates_then_settings_then_restarts_the_shell(self):
+        order, hup = self.reload_steps()
+        self.assertEqual(order, ["themes", "configure", "services"])
+        self.assertEqual(hup.read_text().strip(), "hup")
+
+    def test_a_reload_without_a_shell_number_says_so(self):
+        order, hup = self.reload_steps(pid_file=False)
+        self.assertEqual(order, ["themes", "configure", "services", "restart", "failed"])
+        self.assertFalse(hup.exists())
+
+    def test_the_reload_command_reaches_configure_desktop(self):
+        command = (SESSION_SOURCE_DIR / "bin" / "mavernix-reload").read_text()
+        self.assertIn('configure-desktop" reload', command)
+        script = (SESSION_SOURCE_DIR / "configure-desktop").read_text()
+        self.assertRegex(script, r"\nreload\)\n(.*\n)*?    apply_and_restart\n")
+
     def test_qt_takes_the_themes_font_through_qt6ct(self):
         self.run_script("make_app_theme.py", THEMES_DIR / "plain", self.home / "app-theme")
         self.assertIn("export QT_QPA_PLATFORMTHEME=qt6ct\n", self.desktop_environment())
