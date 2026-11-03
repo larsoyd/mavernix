@@ -15,6 +15,9 @@ class TestDateTimePane : public QObject
 
   private:
     QTemporaryDir folder;
+    // a missing control fails the test and hands back a stand-in, so later steps cannot crash
+    QCheckBox missing_box;
+    QComboBox missing_popup;
 
     void start(const QString& format, QJsonObject panel = {})
     {
@@ -42,7 +45,8 @@ class TestDateTimePane : public QObject
                 return found;
             }
         }
-        return nullptr;
+        QTest::qFail(qPrintable(QStringLiteral("no tick box reads \"%1\"").arg(words)), __FILE__, __LINE__);
+        return &missing_box;
     }
 
     QComboBox* popup(QWidget& pane, const QString& value)
@@ -54,7 +58,8 @@ class TestDateTimePane : public QObject
                 return found;
             }
         }
-        return nullptr;
+        QTest::qFail(qPrintable(QStringLiteral("no popup offers %1").arg(value)), __FILE__, __LINE__);
+        return &missing_popup;
     }
 
     QVariant panelValue(const Choices& choices, const char* key)
@@ -74,8 +79,7 @@ class TestDateTimePane : public QObject
         start(QStringLiteral("ddd HH:mm"));
         Choices choices;
         DateTimePane pane(choices);
-        QCheckBox* seconds = box(pane, QStringLiteral("Show seconds"));
-        QVERIFY(seconds != nullptr);
+        QCheckBox* seconds = box(pane, QStringLiteral("Display the time with seconds"));
         QVERIFY(!seconds->isChecked());
         seconds->setChecked(true);
         QCOMPARE(choices.value(QStringLiteral("panel"), QStringLiteral("clock_format")).toString(),
@@ -90,8 +94,7 @@ class TestDateTimePane : public QObject
         start(QStringLiteral("HH:mm"));
         Choices choices;
         DateTimePane pane(choices);
-        QCheckBox* hours = box(pane, QStringLiteral("Show the time with 24 hours"));
-        QVERIFY(hours != nullptr);
+        QCheckBox* hours = box(pane, QStringLiteral("Use a 24-hour clock"));
         QVERIFY(hours->isChecked());
         hours->setChecked(false);
         QCOMPARE(choices.value(QStringLiteral("panel"), QStringLiteral("clock_format")).toString(),
@@ -107,9 +110,9 @@ class TestDateTimePane : public QObject
         Choices choices;
         DateTimePane pane(choices);
         QComboBox* position = popup(pane, QStringLiteral("middle"));
-        QVERIFY(position != nullptr);
         QCOMPARE(position->currentData().toString(), QStringLiteral("right"));
         QCOMPARE(position->count(), 3);
+        QCOMPARE(position->itemText(position->findData(QStringLiteral("middle"))), QStringLiteral("Center"));
         choose(position, QStringLiteral("left"));
         QCOMPARE(panelValue(choices, "clock_position").toString(), QStringLiteral("left"));
         choose(position, QStringLiteral("middle"));
@@ -131,7 +134,6 @@ class TestDateTimePane : public QObject
         DateTimePane pane(choices);
         QCheckBox* time = box(pane, QStringLiteral("Show the time"));
         QCheckBox* date = box(pane, QStringLiteral("Show date"));
-        QVERIFY(time != nullptr && date != nullptr);
         QVERIFY(time->isChecked() && !date->isChecked());
         QVERIFY(!time->isEnabled());
         date->setChecked(true);
@@ -140,23 +142,51 @@ class TestDateTimePane : public QObject
         time->setChecked(false);
         QCOMPARE(panelValue(choices, "clock_shows_time").toBool(), false);
         QVERIFY(!date->isEnabled());
-        QVERIFY(!box(pane, QStringLiteral("Show seconds"))->isEnabled());
+        QVERIFY(!box(pane, QStringLiteral("Display the time with seconds"))->isEnabled());
     }
 
     void theDateStyleIsChosenOnlyWhileTheDateShows()
     {
-        start(QStringLiteral("HH:mm"), {{"clock_shows_date", false}, {"clock_date_style", "full"}});
+        start(QStringLiteral("HH:mm"), {{"clock_shows_date", false}, {"clock_date_style", "medium"}});
         Choices choices;
         DateTimePane pane(choices);
-        QComboBox* style = popup(pane, QStringLiteral("numeric"));
-        QVERIFY(style != nullptr);
-        QCOMPARE(style->count(), 4);
-        QCOMPARE(style->currentData().toString(), QStringLiteral("full"));
+        QComboBox* style = popup(pane, QStringLiteral("short"));
+        QCOMPARE(style->count(), 3);
+        QCOMPARE(style->itemText(0), QStringLiteral("Long"));
+        QCOMPARE(style->itemText(1), QStringLiteral("Medium"));
+        QCOMPARE(style->itemText(2), QStringLiteral("Short"));
+        QCOMPARE(style->currentData().toString(), QStringLiteral("medium"));
         QVERIFY(!style->isEnabled());
         box(pane, QStringLiteral("Show date"))->setChecked(true);
         QVERIFY(style->isEnabled());
-        choose(style, QStringLiteral("region"));
-        QCOMPARE(panelValue(choices, "clock_date_style").toString(), QStringLiteral("region"));
+        choose(style, QStringLiteral("long"));
+        QCOMPARE(panelValue(choices, "clock_date_style").toString(), QStringLiteral("long"));
+    }
+
+    void aStyleNoLongerOfferedShowsAsLong()
+    {
+        start(QStringLiteral("HH:mm"), {{"clock_shows_date", true}, {"clock_date_style", "region"}});
+        Choices choices;
+        DateTimePane pane(choices);
+        QCOMPARE(popup(pane, QStringLiteral("short"))->currentData().toString(), QStringLiteral("long"));
+    }
+
+    void theRegionsDateFormatIsADateOption()
+    {
+        start(QStringLiteral("HH:mm"), {{"clock_shows_date", false}});
+        Choices choices;
+        DateTimePane pane(choices);
+        QCheckBox* region = box(pane, QStringLiteral("Use the region's date format"));
+        QVERIFY(!region->isChecked());
+        QVERIFY(!region->isEnabled());
+        box(pane, QStringLiteral("Show the day of the week"))->setChecked(true);
+        QVERIFY(region->isEnabled());
+        box(pane, QStringLiteral("Show the day of the week"))->setChecked(false);
+        box(pane, QStringLiteral("Show date"))->setChecked(true);
+        QVERIFY(region->isEnabled());
+        region->setChecked(true);
+        QCOMPARE(panelValue(choices, "clock_region_date").toBool(), true);
+        QVERIFY(popup(pane, QStringLiteral("short"))->isEnabled());
     }
 
     void theDayOfTheWeekGoesInFrontOfTheFormat()
@@ -165,7 +195,6 @@ class TestDateTimePane : public QObject
         Choices choices;
         DateTimePane pane(choices);
         QCheckBox* weekday = box(pane, QStringLiteral("Show the day of the week"));
-        QVERIFY(weekday != nullptr);
         QVERIFY(!weekday->isChecked());
         weekday->setChecked(true);
         QCOMPARE(panelValue(choices, "clock_format").toString(), QStringLiteral("ddd HH:mm"));
@@ -186,8 +215,7 @@ class TestDateTimePane : public QObject
         Choices choices;
         DateTimePane pane(choices);
         QCheckBox* region = box(pane, QStringLiteral("Use the region's time format"));
-        QVERIFY(region != nullptr);
-        QCheckBox* hours = box(pane, QStringLiteral("Show the time with 24 hours"));
+        QCheckBox* hours = box(pane, QStringLiteral("Use a 24-hour clock"));
         QVERIFY(hours->isEnabled());
         region->setChecked(true);
         QCOMPARE(panelValue(choices, "clock_region_time").toBool(), true);

@@ -146,8 +146,9 @@ Row {
         format: clockFormat,
         showTime: panelChoice("clock_shows_time", true),
         showDate: panelChoice("clock_shows_date", false),
-        dateStyle: panelChoice("clock_date_style", "full"),
-        regionTime: panelChoice("clock_region_time", false)
+        dateStyle: panelChoice("clock_date_style", "long"),
+        regionTime: panelChoice("clock_region_time", false),
+        regionDate: panelChoice("clock_region_date", false)
     })
     // off where the clock stands among titles and is spaced like them
     property bool holdsStatus: true
