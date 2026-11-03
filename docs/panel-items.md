@@ -19,6 +19,18 @@ right = ["tray", "bluetooth", "volume", "network", "battery", "clock"]
 
 The clock isn't a status item, but it has a menu too. It shows the date, in the format set by `clock_menu_date_format` under `[panel]`.
 
+Where the clock stands and what it shows are set under `[panel]` too, or in System Preferences, Date & Time:
+
+| Key | Meaning |
+|---|---|
+| `clock_position` | `"right"` where the config lists it, `"left"` just after the logo, or `"middle"` of the bar. Menu titles that would run into a clock in the middle are left out |
+| `clock_format` | the time, as Qt writes formats. A leading day of the week (`ddd`) also leads the date |
+| `clock_shows_time`, `clock_shows_date` | either or both |
+| `clock_date_style` | `"full"` (January 13th), `"short"` (Jan. 13th), `"numeric"` (13/01/2026, in the region's order) or `"region"`, the short date of `LC_TIME` |
+| `clock_region_time` | the time in `LC_TIME`'s own format instead of `clock_format` |
+
+Month names follow the desktop's language (`LANG`). Ordinals like 13th are English only, other languages get their own day and month.
+
 If an item's service isn't running, or it has nothing to show (say, there's no battery), it takes up no room.
 
 ## Adding one without writing a file

@@ -81,6 +81,14 @@ right = ["tray", "load", "bluetooth", "network", "volume", "battery", "clock", "
 quit_label = "Close %1"
 clock_format = "HH:mm"
 clock_menu_date_format = "d MMMM yyyy"
+# "right", "left" (after the logo) or "middle"
+clock_position = "right"
+clock_shows_time = true
+clock_shows_date = false
+# "full" (January 13th), "short" (Jan. 13th), "numeric" or "region", the LC_TIME short date
+clock_date_style = "full"
+# the time in LC_TIME's own format instead of clock_format's
+clock_region_time = false
 
 # The desktop's own menus, shown in the panel while no window is active.
 # The first menu opens from the name (Settings, Desktop changes it) and has
@@ -638,6 +646,20 @@ reset_all_question = "Reset all settings?"
 reset_all_note = "Every choice you made is replaced by the desktop's own, including the Dock's contents, app icons and names, and keyboard shortcuts. A copy is kept as %1. Some changes take effect the next time you log in."
 reset_all_button = "Reset All"
 cancel = "Cancel"
+datetime_position = "Position in menu bar:"
+datetime_position_left = "At the left"
+datetime_position_middle = "In the middle"
+datetime_position_right = "At the right"
+datetime_show_time = "Show the time"
+datetime_region_time = "Use the region's time format"
+datetime_date_options = "Date options:"
+datetime_weekday = "Show the day of the week"
+datetime_show_date = "Show date"
+datetime_date_style = "Date style:"
+datetime_style_full = "Written out, as January 13th"
+datetime_style_short = "Short, as Jan. 13th"
+datetime_style_numeric = "In numbers"
+datetime_style_region = "As the region writes it"
 menu_bar_every_screen = "Show the menu bar on every display"
 menu_bar_own_menus = "Give each display the menus of its own window"
 menu_bar_items = { tray = "Icons of running programs", load = "Computer load", bluetooth = "Bluetooth", network = "Wi-Fi", volume = "Volume", battery = "Battery", clock = "Clock", search = "Search", notifications = "Notifications", session = "Session menu" }
