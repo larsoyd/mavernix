@@ -669,15 +669,23 @@ class TestSeaLionIcons(unittest.TestCase):
     def test_a_type_mavericks_never_drew_gets_the_plain_document(self):
         word = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
         found = self.file_type_icons(
-            [word, "application/x-unheard-of", "text/csv"],
-            subclasses=f"{word} application/zip\ntext/csv text/plain\n",
-            generic_icons=f"{word}:x-office-document\ntext/csv:x-office-spreadsheet\n")
+            [word, "application/x-unheard-of"],
+            subclasses=f"{word} application/zip\n",
+            generic_icons=f"{word}:x-office-document\n")
         # being a zip file inside must not make it look like an archive
         self.assertEqual(found, {
             "application-vnd.openxmlformats-officedocument.wordprocessingml.document": "text-x-generic",
             "application-x-unheard-of": "text-x-generic",
-            "text-csv": "text-x-generic",
         })
+
+    def test_office_text_is_still_text(self):
+        # textedit claims all of public.text, spreadsheets and markup too
+        found = self.file_type_icons(
+            ["text/markdown", "text/csv", "application/x-lyx"],
+            subclasses="text/markdown text/plain\ntext/csv text/plain\napplication/x-lyx text/plain\n",
+            generic_icons="text/markdown:x-office-document\ntext/csv:x-office-spreadsheet\n"
+                          "application/x-lyx:x-office-document\n")
+        self.assertEqual(found, {name: "text-plain" for name in ("text-markdown", "text-csv", "application-x-lyx")})
 
     def test_text_gets_textedits_document_however_it_is_reached(self):
         found = self.file_type_icons(

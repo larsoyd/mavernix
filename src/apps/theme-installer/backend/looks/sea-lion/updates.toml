@@ -343,3 +343,9 @@ table = "desktop.icons"
 key = "picked"
 was = { color = "#0000004f", radius = 3, border = { color = "#ffffff3b", width = 2 } }
 now = { color = "#0000004d", radius = 4, border = { color = "#96969682", width = 2 } }
+
+[[update]]
+revision = 13
+import_brings = [
+    "Markdown, spreadsheet text and other text files get TextEdit's document icon instead of the plain one.",
+]
