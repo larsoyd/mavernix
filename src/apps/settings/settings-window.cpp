@@ -94,7 +94,7 @@ static const KnownPane known_panes[] = {
     {"desktop", "preferences-desktop-wallpaper", "Desktop",
         "wallpaper background picture image name icons files translucent menu bar"},
     {"dock", "preferences-dock", "Dock", "taskbar launcher magnification hide autohide size"},
-    {"clipboard", "edit-paste", "Clipboard", "copy paste history pictures pin super v"},
+    {"clipboard", "mavernix-clipboard", "Clipboard", "copy paste history pictures pin super v"},
     {"sound", "preferences-desktop-sound", "Sound",
         "volume audio speaker headphones microphone input output alert beep"},
     {"trackpad", "input-touchpad", "Touchpad", "touchpad tap click scroll natural gestures"},
