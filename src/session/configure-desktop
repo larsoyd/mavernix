@@ -392,9 +392,9 @@ tell_services() {
     )
 }
 
-# the login screen gets this look only when mavenix-greeter made an inbox for this user
+# the login screen gets this look only when mavernix-greeter made an inbox for this user
 export_greeter_look() {
-    local inbox="${MAVERNIX_GREETER_INBOX_ROOT:-/var/lib/mavenix-greeter/inbox}/${USER:-}" driver="" card
+    local inbox="${MAVERNIX_GREETER_INBOX_ROOT:-/var/lib/mavernix-greeter/inbox}/${USER:-}" driver="" card
     [[ -n "${USER:-}" && -d "$inbox" && -w "$inbox" && -z "${DESKTOP_NESTED:-}" ]] || return 0
     card=${WLR_DRM_DEVICES:-}
     card=${card%%:*}
