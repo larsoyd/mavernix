@@ -62,6 +62,14 @@ tests = {
         'include': test_sources / 'shell/native',
         'dependencies': [qt_native, librsvg],
     },
+    'clipboard-history': {
+        'sources': [
+            test_sources / 'shell/native/clipboard-history.cpp',
+            qt.compile_moc(headers: test_sources / 'shell/native/clipboard-history.hpp', dependencies: qt_native),
+        ],
+        'include': test_sources / 'shell/native',
+        'dependencies': [qt_native, kguiaddons],
+    },
     'screen-layout': {
         'sources': [test_sources / 'apps/settings/screen-layout.cpp'],
         'include': test_sources / 'apps/settings',
