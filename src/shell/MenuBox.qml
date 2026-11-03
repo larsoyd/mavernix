@@ -174,11 +174,15 @@ Item {
     property point lastPointer: Qt.point(-1, -1)
     // A crossed item to mark once the pointer rests, -1 for none.
     property int waitingIndex: -1
+    // rows scrolling under a resting pointer get hover moves too, which must not take the mark
+    property point pointerInWindow: Qt.point(-1, -1)
+    property real scrollAtPointer: 0
     function forgetCrossing() {
         restingOnCrossed.stop()
         waitingIndex = -1
     }
     onStillChanged: {
+        pointerInWindow = Qt.point(-1, -1)
         if (still) {
             forgetCrossing()
         }
@@ -569,6 +573,14 @@ Item {
                             if (menu.still) {
                                 return
                             }
+                            // a point property read is a live reference, so compare before writing it
+                            const inWindow = mapToItem(null, mouse.x, mouse.y)
+                            const resting = menu.pointerInWindow.x === inWindow.x && menu.pointerInWindow.y === inWindow.y
+                            menu.pointerInWindow = inWindow
+                            if (resting && menu.scrollOffset !== menu.scrollAtPointer) {
+                                return
+                            }
+                            menu.scrollAtPointer = menu.scrollOffset
                             const point = mapToItem(menu, mouse.x, mouse.y)
                             const crossing = menu.submenuIndex >= 0 && menu.submenuIndex !== row.index
                                              && menu.headsForSubmenu(point)
