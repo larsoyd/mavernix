@@ -81,6 +81,8 @@ struct Export
     int topItems = 0;
     std::string path;
     DbusmenuServer* server = nullptr;
+    std::string status;
+    DbusmenuMenuitem* statusItem = nullptr;
 };
 
 struct Shown
@@ -98,6 +100,9 @@ struct ItemPlace
 };
 
 HWND mainWindow;
+int (*registerHook)(const char*, void*);
+guint registrarWatch;
+guint overdueTimeout;
 std::string resourceFolder;
 GDBusConnection* bus;
 std::map<HWND, Export> exports;
@@ -212,15 +217,58 @@ void fill(DbusmenuMenuitem* parent, HWND holder, HMENU menu, const std::vector<i
     }
 }
 
+// reaper keeps its audio status in the bar's last item and changes only its text
+bool readStatus(HMENU menu, MenuItemInfo& info, std::string& text)
+{
+    char buffer[512] = "";
+    info = MenuItemInfo{};
+    info.size = sizeof(info);
+    info.mask = MASK_ID | MASK_STATE | MASK_TYPE | MASK_SUBMENU;
+    info.text = buffer;
+    info.length = sizeof(buffer);
+    if (!swell.GetMenuItemInfo(menu, swell.GetMenuItemCount(menu) - 1, 1, &info) || info.submenu ||
+        !isStatusText(buffer))
+        return false;
+    text = buffer;
+    return true;
+}
+
+DbusmenuMenuitem* addStatus(DbusmenuMenuitem* root, HWND holder, const MenuItemInfo& info, const std::string& text)
+{
+    DbusmenuMenuitem* item = makeItem(info, text.c_str());
+    g_signal_connect_data(item, DBUSMENU_MENUITEM_SIGNAL_ITEM_ACTIVATED, G_CALLBACK(activated),
+        new ItemPlace{holder, {}, info.id}, forgetPlace, GConnectFlags(0));
+    dbusmenu_menuitem_child_append(root, item);
+    g_object_unref(item);
+    return item;
+}
+
 void setRoot(Export& entry, HWND holder, HMENU menu)
 {
     DbusmenuMenuitem* root = dbusmenu_menuitem_new();
     fill(root, holder, menu, {});
+    MenuItemInfo info;
+    entry.status.clear();
+    entry.statusItem = readStatus(menu, info, entry.status) ? addStatus(root, holder, info, entry.status) : nullptr;
     dbusmenu_server_set_root(entry.server, root);
     g_object_unref(root);
     entry.menu = menu;
     entry.topItems = swell.GetMenuItemCount(menu);
-    fprintf(stderr, "[reaper-menu] exported path=%s top_items=%d\n", entry.path.c_str(), entry.topItems);
+    fprintf(stderr, "[reaper-menu] exported path=%s top_items=%d status=%d\n", entry.path.c_str(), entry.topItems,
+        entry.statusItem != nullptr);
+}
+
+void followStatus(Export& entry, HWND holder)
+{
+    MenuItemInfo info;
+    std::string text;
+    if (readStatus(entry.menu, info, text) != (entry.statusItem != nullptr))
+        setRoot(entry, holder, entry.menu);
+    else if (entry.statusItem && text != entry.status)
+    {
+        dbusmenu_menuitem_property_set(entry.statusItem, DBUSMENU_MENUITEM_PROP_LABEL, menuLabel(text).c_str());
+        entry.status = text;
+    }
 }
 
 const Export& exportOf(HWND holder)
@@ -234,6 +282,8 @@ const Export& exportOf(HWND holder)
     HMENU menu = swell.GetMenu(holder);
     if (menu != entry.menu || swell.GetMenuItemCount(menu) != entry.topItems)
         setRoot(entry, holder, menu);
+    else
+        followStatus(entry, holder);
     return entry;
 }
 
@@ -334,6 +384,7 @@ void timer()
 // reaper's timer stands still behind a modal dialog at startup
 gboolean registrarOverdue(gpointer)
 {
+    overdueTimeout = 0;
     if (!bus)
     {
         fprintf(stderr, "[reaper-menu] no registrar waited_s=%d\n", SECONDS_TO_WAIT_FOR_REGISTRAR);
@@ -350,8 +401,30 @@ void registrarAppeared(GDBusConnection* connection, const gchar*, const gchar* o
 
 void registrarVanished(GDBusConnection*, const gchar*, gpointer)
 {
+    if (bus)
+        fprintf(stderr, "[reaper-menu] registrar vanished windows=%zu\n", shownWindows.size());
     bus = nullptr;
     shownWindows.clear();
+}
+
+void unload()
+{
+    registerHook("-timer", reinterpret_cast<void*>(timer));
+    if (overdueTimeout)
+        g_source_remove(overdueTimeout);
+    for (const auto& [window, shown] : shownWindows)
+        unregisterWindow(shown.xid);
+    // the watcher may hold the last reference to the bus, the flush keeps it until the calls are out
+    if (bus)
+        g_dbus_connection_flush(bus, nullptr, nullptr, nullptr);
+    g_bus_unwatch_name(registrarWatch);
+    fprintf(stderr, "[reaper-menu] unloaded windows=%zu menus=%zu\n", shownWindows.size(), exports.size());
+    shownWindows.clear();
+    for (auto& [holder, entry] : exports)
+        g_object_unref(entry.server);
+    exports.clear();
+    bus = nullptr;
+    registerHook = nullptr;
 }
 
 template <typename Function> bool load(void* (*lookup)(const char*), Function& function, const char* name)
@@ -366,7 +439,11 @@ template <typename Function> bool load(void* (*lookup)(const char*), Function& f
 extern "C" __attribute__((visibility("default"))) int ReaperPluginEntry(void*, PluginInfo* info)
 {
     if (!info)
+    {
+        if (registerHook)
+            unload();
         return 0;
+    }
     auto folderOf = [info](const char* name) {
         auto function = reinterpret_cast<const char* (*)()>(info->function(name));
         return std::string(function ? function() : "");
@@ -385,10 +462,11 @@ extern "C" __attribute__((visibility("default"))) int ReaperPluginEntry(void*, P
     }
 #undef LOAD
     mainWindow = info->mainWindow;
-    g_bus_watch_name(G_BUS_TYPE_SESSION, REGISTRAR, G_BUS_NAME_WATCHER_FLAGS_NONE, registrarAppeared, registrarVanished,
-        nullptr, nullptr);
-    g_timeout_add_seconds(SECONDS_TO_WAIT_FOR_REGISTRAR, registrarOverdue, nullptr);
-    info->add("timer", reinterpret_cast<void*>(timer));
+    registrarWatch = g_bus_watch_name(G_BUS_TYPE_SESSION, REGISTRAR, G_BUS_NAME_WATCHER_FLAGS_NONE, registrarAppeared,
+        registrarVanished, nullptr, nullptr);
+    overdueTimeout = g_timeout_add_seconds(SECONDS_TO_WAIT_FOR_REGISTRAR, registrarOverdue, nullptr);
+    registerHook = info->add;
+    registerHook("timer", reinterpret_cast<void*>(timer));
     fprintf(stderr, "[reaper-menu] loaded main=%p\n", mainWindow);
     return 1;
 }

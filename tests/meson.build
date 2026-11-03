@@ -178,6 +178,14 @@ reaper_menu_test = executable('test-reaper-menu-text', 'test-reaper-menu-text.cp
     include_directories: include_directories('../src/reaper-menu'), dependencies: [qt_test])
 test('reaper-menu-text', reaper_menu_test)
 
+fake_swell = shared_module('libSwell', 'fake-swell.c', name_prefix: '', name_suffix: 'so',
+    gnu_symbol_visibility: 'hidden')
+reaper_plugin_host = executable('reaper-plugin-host', 'reaper-plugin-host.cpp',
+    dependencies: [dependency('glib-2.0')], export_dynamic: true, gnu_symbol_visibility: 'hidden')
+test('reaper-menu-plugin', python,
+    args: [files('test_reaper_menu_plugin.py'), reaper_plugin_host, meson.current_build_dir(), reaper_menu_plugin],
+    depends: fake_swell, timeout: 45)
+
 test('menu-session', python, args: files('test_menu_session.py'))
 test('gtk-global-menu', python, args: [files('test_gtk_global_menu.py'), gtk_menu_module],
     depends: borderless_maximized_plugin, timeout: 65, is_parallel: false)
