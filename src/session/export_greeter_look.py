@@ -9,7 +9,7 @@ import stat
 import sys
 from pathlib import Path
 
-SCHEMA = "mavenix-greeter.theme"
+SCHEMA = "mavernix-greeter.theme"
 PICTURES = {".png", ".jpg", ".jpeg", ".webp"}
 FONTS = {".ttf", ".otf", ".ttc", ".dfont"}
 NAME = re.compile(r"[A-Za-z0-9_][A-Za-z0-9_.+@ -]{0,95}")

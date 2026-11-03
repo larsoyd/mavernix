@@ -74,7 +74,7 @@ class Export(unittest.TestCase):
         r = self.run_export("--drm-driver", "nvidia")
         self.assertEqual(r.returncode, 0, r.stderr)
         t = self.snapshot()
-        self.assertEqual((t["schema"], t["version"], t["id"], t["name"]), ("mavenix-greeter.theme", 1, "sea-lion", "Sea Lion"))
+        self.assertEqual((t["schema"], t["version"], t["id"], t["name"]), ("mavernix-greeter.theme", 1, "sea-lion", "Sea Lion"))
         self.assertEqual(t["fonts"], {"family": ".Lucida Grande UI", "size": 13})
         self.assertEqual(t["cursor"], {"theme": "SeaLion", "size": 48})
         self.assertEqual(t["background"]["image"], "background.png")
