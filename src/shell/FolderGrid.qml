@@ -64,6 +64,7 @@ Item {
     function reset() {
         trail = []
         cells.contentY = 0
+        wheelAngle = 0
         selectedIndex = -1
         typed = ""
     }
@@ -198,13 +199,44 @@ Item {
         }
     }
 
-    // Comes to rest on the nearest whole row.
-    function snapToRow() {
-        const lowest = Math.max(0, cells.contentHeight - cells.height)
-        const goal = Math.max(0, Math.min(lowest, Math.round(cells.contentY / shownCellHeight) * shownCellHeight))
+    readonly property real lowestY: Math.max(0, cells.contentHeight - cells.height)
+
+    // rests on the next whole row the way the view last went
+    function snapToRow(travel) {
+        const goal = FolderGridLayout.restingY(cells.contentY, shownCellHeight, lowestY, travel)
         if (Math.abs(goal - cells.contentY) >= 0.5) {
             scrollTo(goal)
         }
+    }
+
+    // a notch moves a row at once, a touchpad follows the fingers and rests once they stop
+    property real wheelAngle: 0
+    property real wheelTravel: 0
+    function wheelScroll(wheel) {
+        if (!cells.interactive) {
+            return
+        }
+        // a notch on wayland carries pixels too, only a touchpad stroke has a phase
+        if (wheel.phase !== Qt.NoScrollPhase) {
+            snap.stop()
+            if (wheel.pixelDelta.y !== 0) {
+                wheelTravel = -Math.sign(wheel.pixelDelta.y)
+            }
+            cells.contentY = Math.max(0, Math.min(lowestY, cells.contentY - wheel.pixelDelta.y))
+            fingersStopped.restart()
+            return
+        }
+        wheelAngle += wheel.angleDelta.y
+        const notches = -Math.trunc(wheelAngle / 120)
+        if (notches !== 0) {
+            wheelAngle += notches * 120
+            scrollTo(FolderGridLayout.wheelGoal(snap.running ? snap.to : cells.contentY, notches, shownCellHeight, lowestY))
+        }
+    }
+    Timer {
+        id: fingersStopped
+        interval: 120
+        onTriggered: grid.snapToRow(grid.wheelTravel)
     }
 
     NumberAnimation {
@@ -269,7 +301,9 @@ Item {
         interactive: grid.rows > grid.shownRows
         boundsBehavior: Flickable.StopAtBounds
         clip: true
-        onMovementEnded: grid.snapToRow()
+        property real movedFrom: 0
+        onMovementStarted: movedFrom = contentY
+        onMovementEnded: grid.snapToRow(contentY - movedFrom)
 
         // The fade at the top and bottom: the cells drawn through fadeMask.
         layer.enabled: grid.fadeLength > 0
@@ -294,6 +328,16 @@ Item {
                 height: grid.shownCellHeight
             }
         }
+    }
+
+    // the wheel, before the cells' own flick that drifts and turns back
+    MouseArea {
+        x: cells.x
+        y: cells.y
+        width: cells.width
+        height: cells.height
+        acceptedButtons: Qt.NoButton
+        onWheel: wheel => grid.wheelScroll(wheel)
     }
 
     FolderGridText {
