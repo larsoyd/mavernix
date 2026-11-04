@@ -13,6 +13,8 @@
 // and hands the key to the window, as it would any other.
 
 #include <fnmatch.h>
+#include <fstream>
+#include <regex>
 #include <sstream>
 #include <string>
 
@@ -70,17 +72,62 @@ static bool is_x11(wayfire_view view)
 #endif
 }
 
+static bool is_steam_id(const std::string& text)
+{
+    static const std::regex number{"[1-9][0-9]*"};
+    return std::regex_match(text, number);
+}
+
+// the same marks the dock reads to name a game window
+static bool started_as_game(pid_t pid)
+{
+    std::ifstream environ{"/proc/" + std::to_string(pid) + "/environ", std::ios::binary};
+    std::string entry;
+    while (std::getline(environ, entry, '\0'))
+    {
+        const auto equals = entry.find('=');
+        const std::string name = entry.substr(0, equals);
+        const std::string value = entry.substr(equals + 1);
+        if (((name == "SteamAppId" || name == "SteamGameId") && is_steam_id(value)) ||
+            (name == "GAME_NAME" && !value.empty()))
+        {
+            return true;
+        }
+    }
+    return false;
+}
+
+static pid_t client_pid(wayfire_view view)
+{
+    wlr_surface* surface = view->get_wlr_surface();
+    if (!surface)
+    {
+        return 0;
+    }
+#if WF_HAS_XWAYLAND
+    if (auto* xsurface = wlr_xwayland_surface_try_from_wlr_surface(surface))
+    {
+        return xsurface->pid;
+    }
+#endif
+    pid_t pid = 0;
+    wl_client_get_credentials(wl_resource_get_client(surface->resource), &pid, nullptr, nullptr);
+    return pid;
+}
+
 class plugin_t : public wf::plugin_interface_t
 {
     // "KEY_F3 KEY_F4 KEY_F11", written by make_wayfire_config.py.
     wf::option_wrapper_t<std::string> keys{"game-keys/keys"};
     wf::option_wrapper_t<std::string> programs{"game-keys/programs"};
     wf::option_wrapper_t<bool> all_x11{"game-keys/all_x11"};
+    wf::option_wrapper_t<std::string> not_games{"game-keys/not_games"};
     bool switched_off = false;
 
     bool is_game(wayfire_view view)
     {
-        if (!view)
+        // what steam or lutris started counts too, not_games never does
+        if (!view || matches_any(not_games, view->get_app_id()))
         {
             return false;
         }
@@ -88,7 +135,8 @@ class plugin_t : public wf::plugin_interface_t
         {
             return true;
         }
-        return matches_any(programs, view->get_app_id()) || (all_x11 && is_x11(view));
+        return matches_any(programs, view->get_app_id()) || (all_x11 && is_x11(view)) ||
+               started_as_game(client_pid(view));
     }
 
     bool is_listed(uint32_t code)

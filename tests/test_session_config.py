@@ -1178,11 +1178,40 @@ class TestGameKeys(SessionTestCase):
             "commands": {"terminal": {"key": "KEY_F12", "run": ["foot"]}, "gone": None},
         })
         self.assertEqual(section, ["[game-keys]", "keys = KEY_F3 KEY_F4 KEY_F12",
-                                   "programs = steam_app_* Minecraft*", "all_x11 = false"])
+                                   "programs = steam_app_* Minecraft*", "all_x11 = false",
+                                   "not_games = "])
         own = make_wayfire_config.game_keys_section({"game_keys": {"games": ["osu!"], "all_x11": True}})
-        self.assertEqual(own[2:], ["programs = osu!", "all_x11 = true"])
+        self.assertEqual(own[2:], ["programs = osu!", "all_x11 = true", "not_games = "])
         with self.assertRaises(SystemExit):
             make_wayfire_config.game_keys_section({"game_keys": {"games": "steam_app_*"}})
+
+    def game_keys(self, config):
+        sys.path[:0] = [self.folder.name, str(SESSION_SOURCE_DIR)]
+        try:
+            import make_wayfire_config
+        finally:
+            del sys.path[:2]
+        return make_wayfire_config.game_keys_section(config)
+
+    def test_listed_games_and_exceptions_are_written(self):
+        section = self.game_keys({"games": {"programs": ["com.mojang.minecraft", "org.example.game"],
+                                            "not_games": ["org.example.video"]}})
+        self.assertIn("programs = steam_app_* Minecraft* com.mojang.minecraft org.example.game", section)
+        self.assertIn("not_games = org.example.video", section)
+
+    def test_every_desktop_lists_minecraft(self):
+        desktops = sorted(CONFIG_DIR.glob("*.toml"))
+        self.assertTrue(desktops)
+        for desktop in desktops:
+            with open(desktop, "rb") as file:
+                section = self.game_keys(tomllib.load(file))
+            games = next((line for line in section if line.startswith("programs = ")), "")
+            self.assertIn("com.mojang.minecraft", games.split(), desktop.name)
+
+    def test_app_id_that_cannot_be_listed_is_refused(self):
+        for bad in (["two words"], [""], "com.mojang.minecraft", [3]):
+            with self.assertRaises(SystemExit, msg=repr(bad)):
+                self.game_keys({"games": {"programs": bad}})
 
 
 class TestShellBlur(SessionTestCase):
