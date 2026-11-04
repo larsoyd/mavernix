@@ -304,6 +304,14 @@ next_desktop = "<ctrl> <alt> KEY_RIGHT"
 # window_to_previous_desktop = "<ctrl> <shift> KEY_LEFT"
 # window_to_next_desktop = "<ctrl> <shift> KEY_RIGHT"
 
+[games]
+# Windows that get the function keys among the shortcuts, such as F3, even
+# when not full screen, by app id. X11 programs and Steam and Lutris games
+# count already.
+programs = ["com.mojang.minecraft"]
+# Windows that always leave those keys to the desktop, even full screen.
+not_games = []
+
 [desktops]
 # Virtual desktops: how many there are, and the most allowed.
 count = 2

@@ -38,7 +38,7 @@ The keys aren't the same on every desktop, so the table below has one column for
 | a terminal | Super+Enter | Super+Enter |
 | end the session right away | Ctrl+Alt+Backspace | Ctrl+Alt+Backspace |
 
-In a game, F3, F4 and F11 are the game's. Sea Lion's function keys go to the window in front when it's full screen or an X11 program (Minecraft, Wine and Steam games); Ctrl+Up still opens all windows there.
+In a game, F3, F4 and F11 are the game's. Sea Lion's function keys go to the window in front when it's a game: full screen, an X11 program (Wine and most Steam games), started by Steam or Lutris, or listed under `[games]` in the config, which lists Minecraft. Ctrl+Up still opens all windows there.
 
 Screenshots are saved to the desktop and also copied, so you can paste them right away. The screenshot keys need `grim`, `slurp` and `wl-clipboard`. If pressing them does nothing, one of those is probably missing.
 

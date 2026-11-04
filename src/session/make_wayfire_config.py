@@ -927,8 +927,16 @@ def game_keys_section(config):
         fail("[game_keys] games must be a list of app IDs or patterns without spaces, such as \"steam_app_*\"")
     if not isinstance(all_x11, bool):
         fail("[game_keys] all_x11 must be true or false")
-    return ["[game-keys]", f"keys = {' '.join(keys)}", f"programs = {' '.join(games)}",
-            f"all_x11 = {yes_or_no(all_x11)}"]
+    listed = config.get("games", {})
+    return ["[game-keys]", f"keys = {' '.join(keys)}", f"programs = {' '.join(games + app_ids(listed, 'programs'))}",
+            f"all_x11 = {yes_or_no(all_x11)}", f"not_games = {' '.join(app_ids(listed, 'not_games'))}"]
+
+
+def app_ids(games, key):
+    ids = games.get(key, [])
+    if not isinstance(ids, list) or not all(isinstance(i, str) and re.fullmatch(r"\S+", i) for i in ids):
+        fail(f"games.{key} must be a list of app ids without spaces")
+    return ids
 
 
 def shell_actions(theme):

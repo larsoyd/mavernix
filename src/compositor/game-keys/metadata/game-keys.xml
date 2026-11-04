@@ -2,7 +2,7 @@
 <wayfire>
 	<plugin name="game-keys">
 		<_short>Game Keys</_short>
-		<_long>Lets the function keys among the desktop's shortcuts through to games: pressed alone while a full screen window or a game is focused, such a key goes to that window instead of doing the shortcut.</_long>
+		<_long>Lets the function keys among the desktop's shortcuts through to games: pressed alone while a full screen window or a game is focused, such a key goes to that window instead of doing the shortcut. Programs started by Steam or Lutris count as games.</_long>
 		<category>Input</category>
 		<option name="keys" type="string">
 			<_short>Keys</_short>
@@ -18,6 +18,11 @@
 			<_short>Every X11 program</_short>
 			<_long>Every X11 program gets the keys, as games run under Wine do.</_long>
 			<default>false</default>
+		</option>
+		<option name="not_games" type="string">
+			<_short>Not games</_short>
+			<_long>App IDs that always leave the keys to the desktop, even full screen; * matches anything.</_long>
+			<default></default>
 		</option>
 	</plugin>
 </wayfire>

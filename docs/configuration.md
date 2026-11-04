@@ -32,7 +32,7 @@ A desktop based on another one shares its file. So whatever you set under one st
 
 In the config, keys are under `[shortcuts]` and `[commands]`, touchpad gestures under `[gestures]`, and the touchpad itself under `[input]`. The Keyboard pane in Settings changes keys without you having to edit any files.
 
-Some games need the function keys that are also the desktop's shortcuts, like Sea Lion's F3, F4 and F11. Pressed alone, these keys go to the game instead when its window is full screen, or when its app ID (an X11 program's WM_CLASS) matches `[game_keys] games`. By default that list is Steam's games (`"steam_app_*"`) and Minecraft. `[game_keys] all_x11 = true` (Settings, Keyboard) sends them to every X11 program, which suits games run under Wine.
+Some games need the function keys that are also the desktop's shortcuts, like Sea Lion's F3, F4 and F11. Pressed alone, these keys go to the game instead when its window is full screen, or when its app ID (an X11 program's WM_CLASS) matches `[game_keys] games`. By default that list is Steam's games (`"steam_app_*"`) and Minecraft. `[game_keys] all_x11 = true` (Settings, Keyboard) sends them to every X11 program, which suits games run under Wine. Programs started by Steam or Lutris count as games too, `[games] programs` adds more app IDs, and `[games] not_games` lists windows that always leave those keys to the desktop, even full screen.
 
 Closing and quitting work like this:
 - `close_window` closes the front window.
