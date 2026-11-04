@@ -40,6 +40,7 @@ class ClipboardHistory : public QAbstractListModel, public QQmlParserStatus
         FileCountRole,
         PreviewRole,
         AddedRole,
+        ExcerptRole,
     };
     Q_ENUM(Role)
 

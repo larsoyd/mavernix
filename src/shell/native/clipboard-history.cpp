@@ -30,6 +30,7 @@ constexpr int labelChars = 200;
 constexpr int thumbnailSide = 256;
 constexpr int previewLines = 12;
 constexpr int previewChars = 120;
+constexpr int excerptChars = 2000;
 
 QString hashOf(const QByteArray& bytes)
 {
@@ -75,6 +76,20 @@ QString previewOf(const QString& text)
     while (!lines.isEmpty() && lines.last().isEmpty())
         lines.removeLast();
     return lines.join(QLatin1Char('\n'));
+}
+
+// enough of the copy to read in a preview, line breaks kept, cut with an ellipsis
+QString excerptOf(const QString& text)
+{
+    QString shown = text.left(excerptChars + 1);
+    shown.replace(QLatin1Char('\t'), QStringLiteral("    "));
+    while (shown.startsWith(QLatin1Char('\n')) || shown.startsWith(QLatin1Char('\r')))
+        shown.remove(0, 1);
+    if (text.size() > excerptChars)
+        shown = shown.left(excerptChars - 1) + QChar(0x2026);
+    while (!shown.isEmpty() && shown.back().isSpace())
+        shown.chop(1);
+    return shown;
 }
 
 // plain text under a kind of its own, such as code or json, but not markup
@@ -141,6 +156,8 @@ QVariant ClipboardHistory::data(const QModelIndex& index, int role) const
         return entry.kind == QLatin1String("image") ? QString() : previewOf(entry.text);
     case AddedRole:
         return entry.added;
+    case ExcerptRole:
+        return entry.kind == QLatin1String("image") ? QString() : excerptOf(entry.text);
     }
     return {};
 }
@@ -149,7 +166,8 @@ QHash<int, QByteArray> ClipboardHistory::roleNames() const
 {
     return {{IdRole, "entryId"},       {KindRole, "kind"},           {LabelRole, "label"},
             {PinnedRole, "pinned"},    {SectionRole, "section"},     {ThumbnailRole, "thumbnail"},
-            {PictureSizeRole, "pictureSize"}, {FileCountRole, "fileCount"}, {PreviewRole, "preview"}, {AddedRole, "added"}};
+            {PictureSizeRole, "pictureSize"}, {FileCountRole, "fileCount"}, {PreviewRole, "preview"}, {AddedRole, "added"},
+            {ExcerptRole, "excerpt"}};
 }
 
 void ClipboardHistory::componentComplete()
@@ -692,6 +710,8 @@ QVariantList ClipboardHistory::stack() const
                          {QStringLiteral("name"), entry.label},
                          {QStringLiteral("pinned"), entry.pinned},
                          {QStringLiteral("preview"), data(index(row), PreviewRole)},
+                         {QStringLiteral("excerpt"), data(index(row), ExcerptRole)},
+                         {QStringLiteral("added"), entry.added},
                          {QStringLiteral("picture"), data(index(row), ThumbnailRole).toUrl().toString()},
                          {QStringLiteral("width"), entry.pictureSize.width()},
                          {QStringLiteral("height"), entry.pictureSize.height()},

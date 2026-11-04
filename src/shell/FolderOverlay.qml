@@ -21,6 +21,9 @@ PanelWindow {
     property string emptyLabel: ""
     property string moreLabel: "%1"
     property var bound: null
+    // a clipboard stack previews the copy rested on, in these words
+    property bool previews: false
+    property var previewWords: ({})
 
     // The middle of the folder tile's top edge, on the screen.
     property real anchorX: 0
@@ -146,6 +149,8 @@ PanelWindow {
         openLabel: overlay.openLabel
         emptyLabel: overlay.emptyLabel
         bound: overlay.bound
+        previews: overlay.previews
+        previewRestMs: preview.restMs
 
         readonly property var boxLooks: looks.box ?? overlay.plainBoxLooks
         readonly property real pointerLength: boxLooks.pointer_height ?? boxLooks.pointer?.height ?? 0
@@ -180,5 +185,25 @@ PanelWindow {
 
         onFileChosen: path => overlay.fileChosen(path)
         onFolderChosen: overlay.folderChosen()
+    }
+
+    // beside the box on the side with room, or over it when neither side has any
+    ClipboardPreview {
+        id: preview
+        looks: overlay.plainBoxLooks
+        face: overlay.settings.theme.fonts.menu
+        words: overlay.previewWords
+        file: overlay.open && overlay.view === "grid" ? grid.previewedFile : null
+        readonly property real gap: 8
+        readonly property real leftRoom: grid.x - 2 * gap
+        readonly property real rightRoom: overlay.width - grid.x - grid.width - 2 * gap
+        readonly property bool beside: Math.max(leftRoom, rightRoom) >= 150
+        mostWidth: Math.min(380, beside ? Math.max(leftRoom, rightRoom) : overlay.width - 2 * gap)
+        mostHeight: lowest - highest
+        readonly property real highest: (overlay.settings.theme.panel?.height ?? 0) + gap
+        readonly property real lowest: Math.min(grid.y + grid.height, overlay.height - overlay.dockThickness - gap)
+        x: Math.round(!beside ? Math.max(gap, Math.min(overlay.width - gap - width, grid.x + (grid.width - width) / 2))
+                              : rightRoom >= leftRoom ? grid.x + grid.width + gap : grid.x - gap - width)
+        y: Math.round(Math.max(highest, Math.min(lowest - height, grid.y + grid.previewedTop)))
     }
 }

@@ -612,6 +612,23 @@ class ClipboardHistoryTest : public QObject
         QVERIFY(!preview.contains('\t'));
     }
 
+    void an_excerpt_holds_a_long_line_whole_and_stops_with_an_ellipsis()
+    {
+        ClipboardHistory history;
+        begin(history);
+        const QString line = QString("a long single line of copied text that keeps going ").repeated(8).trimmed();
+        take(history, textData("\n\n" + line + "\n\tsecond line"));
+        QCOMPARE(history.data(history.index(0), ClipboardHistory::ExcerptRole).toString(),
+                 line + "\n    second line");
+        take(history, textData(QString("word ").repeated(20000)));
+        const QString cut = history.data(history.index(0), ClipboardHistory::ExcerptRole).toString();
+        QVERIFY2(cut.size() <= 2001 && cut.size() > 1900, qPrintable(QString::number(cut.size())));
+        QVERIFY(cut.endsWith(QChar(0x2026)));
+        const QVariantMap cell = history.stack()[0].toMap();
+        QCOMPARE(cell["excerpt"].toString(), cut);
+        QVERIFY(cell["added"].toDateTime().isValid());
+    }
+
     void the_stack_lists_rows_with_what_a_cell_draws()
     {
         ClipboardHistory history;

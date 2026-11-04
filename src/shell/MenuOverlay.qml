@@ -47,6 +47,15 @@ PanelWindow {
     property real mostMenuHeight: 0
     property bool startsAtEnd: false
 
+    // once the mark rests on an item, its id, and what shows beside the box for it
+    property Component beside: null
+    property int besideRestMs: 500
+    property int restingId: -1
+    readonly property real besideGap: 8
+    readonly property real besideRoom: Math.max(box.x, width - box.x - box.width) - 2 * besideGap
+    readonly property real besideTop: (settings.theme.panel?.height ?? 0) + besideGap
+    readonly property real besideTallRoom: box.y + box.height - besideTop
+
     property real passX: 0
     property real passY: 0
     property real passWidth: 0
@@ -81,6 +90,7 @@ PanelWindow {
 
     onOpenChanged: {
         goingAway.stop()
+        restingId = -1
         if (open) {
             shownItems = items
             box.forgetMarks()
@@ -260,6 +270,34 @@ PanelWindow {
             }
             onSubmenuWanted: id => overlay.submenuWanted(id)
             onSlid: (id, value) => overlay.slid(id, value)
+        }
+
+        Timer {
+            id: besideRest
+            interval: overlay.besideRestMs
+            onTriggered: overlay.restingId = box.hoveredIndex >= 0 ? (overlay.shownItems[box.hoveredIndex]?.id ?? -1) : -1
+        }
+        Connections {
+            target: box
+            enabled: overlay.beside !== null
+            function onHoveredIndexChanged() {
+                overlay.restingId = -1
+                besideRest.restart()
+            }
+            function onScrollOffsetChanged() {
+                overlay.restingId = -1
+                besideRest.restart()
+            }
+        }
+
+        // on the side with more room, level with the rested row, never below the box or over the panel
+        Loader {
+            id: besideBox
+            active: overlay.beside !== null && overlay.popover === null
+            sourceComponent: overlay.beside
+            readonly property bool rightSide: overlay.width - box.x - box.width >= box.x
+            x: Math.round(rightSide ? box.x + box.width + overlay.besideGap : box.x - overlay.besideGap - width)
+            y: Math.round(Math.max(overlay.besideTop, Math.min(box.y + box.height - height, box.y + box.rowTop(box.hoveredIndex))))
         }
 
         Item {
