@@ -271,6 +271,12 @@ class wayfire_decoration : public wf::plugin_interface_t
     {
         if (auto toplevel = wf::toplevel_cast(view))
         {
+            // initial frames belong to the map transaction, before that this may still become a popup
+            if (!toplevel->toplevel()->pending().mapped)
+            {
+                return;
+            }
+
             const bool wants_decoration = should_decorate_view(toplevel);
             if (wants_decoration != is_toplevel_decorated(toplevel->toplevel()))
             {
