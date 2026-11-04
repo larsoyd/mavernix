@@ -308,6 +308,12 @@ Item {
     readonly property bool moreAbove: scrolls && scrollOffset > 0.5
     readonly property bool moreBelow: scrolls && scrollOffset < scrollRange - 0.5
 
+    // the top of a row in the box, where it shows now
+    function rowTop(index) {
+        const row = rowItems.itemAt(index)
+        return row !== null ? row.mapToItem(menu, 0, 0).y : 0
+    }
+
     function scrollTo(offset) {
         scrollOffset = Math.max(0, Math.min(scrollRange, offset))
     }

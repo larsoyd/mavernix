@@ -1505,6 +1505,7 @@ PanelWindow {
 
     // a list newest first opens at its top, a folder's next to the dock
     property bool menuStartsAtTop: false
+    readonly property var clipboardWords: (settings.config.status ?? ({})).clipboard ?? ({})
     // the clipboard list's size, empty for a menu as long as the screen allows
     property string menuSize: ""
 
@@ -1658,6 +1659,22 @@ PanelWindow {
 
         onChosen: id => dock.menuChosen(id)
         onDismissed: dock.closeMenu()
+
+        // a copy in the clipboard's list shows whole beside it after a rest
+        beside: dock.menuSize !== "" ? clipboardBeside : null
+        besideRestMs: dock.clipboardWords.preview_delay_ms ?? 500
+        Component {
+            id: clipboardBeside
+            ClipboardPreview {
+                looks: dock.menuLooks
+                face: dock.settings.theme.fonts.menu
+                words: dock.clipboardWords
+                mostWidth: Math.min(380, placeMenu.besideRoom)
+                mostHeight: placeMenu.besideTallRoom
+                readonly property int fileAt: placeMenu.restingId - menus.fileBaseId
+                file: placeMenu.open && fileAt >= 0 && fileAt < dock.listedFiles.length ? dock.listedFiles[fileAt] : null
+            }
+        }
     }
 
     // --- Folders in the dock ------------------------------------------------------
@@ -1735,6 +1752,8 @@ PanelWindow {
         openLabel: clipboard ? "" : folders.openWholeLabel(folders.listedFolder)
         emptyLabel: dock.words.clipboard_empty ?? "No Copied Items"
         bound: clipboard ? StackSize.bounds(folders.listedFolder.size) : null
+        previews: clipboard
+        previewWords: dock.clipboardWords
         moreLabel: dock.words.more_in_file_manager ?? "%1 more"
 
         readonly property var tile: dock.folderIndex >= 0 ? tiles.itemAt(dock.folderIndex) : null

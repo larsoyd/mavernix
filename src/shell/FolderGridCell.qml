@@ -134,7 +134,7 @@ Item {
     readonly property var expandedLooks: looks.label_expanded ?? null
     Item {
         id: wholeName
-        visible: press.containsMouse && name.truncated && cell.expandedLooks !== null
+        visible: press.containsMouse && name.truncated && cell.expandedLooks !== null && !cell.folderGrid.previews
         readonly property real padding: cell.expandedLooks?.padding ?? 8
         // as wide as the box allows and no wider, so a long copy is cut, never off screen
         readonly property real widest: cell.folderGrid.width - cell.folderGrid.sidePadding
@@ -168,5 +168,12 @@ Item {
         anchors.fill: parent
         hoverEnabled: true
         onClicked: cell.folderGrid.open(cell.index)
+        onContainsMouseChanged: {
+            if (containsMouse) {
+                cell.folderGrid.pointedIndex = cell.index
+            } else if (cell.folderGrid.pointedIndex === cell.index) {
+                cell.folderGrid.pointedIndex = -1
+            }
+        }
     }
 }

@@ -79,22 +79,8 @@ StatusItem {
             }
             Timer {
                 id: resting
-                interval: clipboardItem.words.preview_delay_ms ?? 700
+                interval: preview.restMs
                 onTriggered: box.previewed = box.contextFor === "" ? box.marked : -1
-            }
-
-            function ago(when) {
-                const seconds = (Date.now() - when.getTime()) / 1000
-                if (seconds < 60) {
-                    return clipboardItem.words.copied_now ?? "Copied just now"
-                }
-                if (seconds < 3600) {
-                    return (clipboardItem.words.copied_minutes ?? "Copied %1 min ago").arg(Math.floor(seconds / 60))
-                }
-                if (seconds < 86400) {
-                    return (clipboardItem.words.copied_hours ?? "Copied %1 h ago").arg(Math.floor(seconds / 3600))
-                }
-                return (clipboardItem.words.copied_on ?? "Copied %1").arg(Qt.formatDateTime(when, "d MMM, HH:mm"))
             }
 
             Connections {
@@ -276,6 +262,7 @@ StatusItem {
                         required property size pictureSize
                         required property int fileCount
                         required property string preview
+                        required property string excerpt
                         required property date added
 
                         readonly property bool marked: box.marked === index
@@ -436,73 +423,20 @@ StatusItem {
             }
 
             // the whole of the rested-on row beside the menu, on the side with room
-            Item {
+            ClipboardPreview {
                 id: preview
-                readonly property var row: box.previewed >= 0 ? list.itemAtIndex(box.previewed) : null
-                readonly property bool picture: row?.kind === "image"
-                readonly property real inset: 10
-                visible: row !== null && box.contextFor === ""
-                width: Math.round(Math.max(footer.implicitWidth, picture ? shot.width : body.width) + 2 * inset)
-                height: Math.round((picture ? shot.height : body.height) + footer.implicitHeight + 3 * inset)
-                x: {
-                    const leftRoom = row !== null ? box.mapToItem(null, 0, 0).x : 0
-                    return leftRoom >= width + 8 ? -width - 8 : box.width + 8
-                }
-                y: row ? Math.max(0, Math.min(row.mapToItem(box, 0, 0).y - inset, box.height - height)) : 0
-                opacity: visible ? 1 : 0
-                Behavior on opacity {
-                    NumberAnimation { duration: 120 }
-                }
-
-                BoxFrame {
-                    looks: box.looks
-                }
-                Text {
-                    id: body
-                    visible: !preview.picture
-                    x: preview.inset
-                    y: preview.inset
-                    width: Math.min(implicitWidth, 380)
-                    text: preview.row?.preview ?? ""
-                    font.family: box.face.family
-                    font.pixelSize: Math.round(box.face.size * 0.85)
-                    color: ThemeValues.color(box.looks.text_color)
-                    elide: Text.ElideRight
-                    textFormat: Text.PlainText
-                    lineHeight: 1.1
-                }
-                Image {
-                    id: shot
-                    visible: preview.picture
-                    x: preview.inset
-                    y: preview.inset
-                    readonly property size whole: preview.row?.pictureSize ?? Qt.size(1, 1)
-                    readonly property real fit: Math.min(1, 256 / Math.max(1, whole.width), 256 / Math.max(1, whole.height))
-                    width: Math.max(1, Math.round(whole.width * fit))
-                    height: Math.max(1, Math.round(whole.height * fit))
-                    fillMode: Image.PreserveAspectFit
-                    asynchronous: true
-                    source: visible ? preview.row.thumbnail : ""
-                }
-                Text {
-                    id: footer
-                    x: preview.inset
-                    y: (preview.picture ? shot.y + shot.height : body.y + body.height) + preview.inset
-                    text: {
-                        const row = preview.row
-                        if (row === null) {
-                            return ""
-                        }
-                        const when = box.ago(row.added)
-                        if (row.kind === "image") {
-                            return when + " · " + row.pictureSize.width + " × " + row.pictureSize.height
-                        }
-                        return when
-                    }
-                    font.family: box.face.family
-                    font.pixelSize: Math.round(box.face.size * 0.8)
-                    color: ThemeValues.color(box.looks.disabled_text_color)
-                }
+                readonly property var row: box.previewed >= 0 && box.contextFor === "" ? list.itemAtIndex(box.previewed) : null
+                looks: box.looks
+                face: box.face
+                words: clipboardItem.words
+                file: row === null ? null : { kind: row.kind, excerpt: row.excerpt, picture: row.thumbnail.toString(),
+                                              width: row.pictureSize.width, height: row.pictureSize.height, added: row.added }
+                // read again for each row, a mapped place does not follow the box
+                readonly property real leftRoom: row !== null ? box.mapToItem(null, 0, 0).x : 0
+                readonly property real rightRoom: (clipboardItem.panel.screen?.width ?? 1920) - leftRoom - box.width
+                mostWidth: Math.min(380, Math.max(leftRoom, rightRoom) - 16)
+                x: leftRoom >= width + 8 ? -width - 8 : box.width + 8
+                y: row ? Math.max(0, Math.min(row.mapToItem(box, 0, 0).y - inset, box.height - height)) : y
             }
 
             // a press outside the small menu closes it

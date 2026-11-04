@@ -60,11 +60,37 @@ Item {
     readonly property var shownEntries: trail.length > 0 ? trail[trail.length - 1].folder.entries : entries
     readonly property string shownTitle: trail.length > 0 ? trail[trail.length - 1].folder.name : title
 
+    // --- Preview ---------------------------------------------------------------------
+
+    // the entry shown whole beside the box after a rest on it, the pointer's first, else the keys'
+    property bool previews: false
+    property int previewRestMs: 500
+    property int pointedIndex: -1
+    readonly property int restingOn: pointedIndex >= 0 ? pointedIndex : selectedIndex
+    property int previewedIndex: -1
+    function restAgain() {
+        previewedIndex = -1
+        previewRest.restart()
+    }
+    onRestingOnChanged: restAgain()
+    Timer {
+        id: previewRest
+        interval: grid.previewRestMs
+        onTriggered: grid.previewedIndex = grid.restingOn
+    }
+    readonly property var previewedFile: previews && previewedIndex >= 0 && previewedIndex < shownEntries.length
+        ? shownEntries[previewedIndex] : null
+    // its row's top in the box
+    readonly property real previewedTop: previewedIndex >= 0
+        ? cells.y + Math.floor(previewedIndex / columns) * shownCellHeight - cells.contentY : 0
+
     // Back to the start, as when the folder opens.
     function reset() {
         trail = []
         cells.contentY = 0
         wheelAngle = 0
+        pointedIndex = -1
+        previewedIndex = -1
         selectedIndex = -1
         typed = ""
     }
@@ -304,6 +330,7 @@ Item {
         property real movedFrom: 0
         onMovementStarted: movedFrom = contentY
         onMovementEnded: grid.snapToRow(contentY - movedFrom)
+        onContentYChanged: grid.restAgain()
 
         // The fade at the top and bottom: the cells drawn through fadeMask.
         layer.enabled: grid.fadeLength > 0
