@@ -1,19 +1,22 @@
-"""Qt 6.12 can free a string stored in a WeakMap during incremental marking."""
+"""Qt 6.12 can drop a live WeakMap from its sweep list and keep freed keys in it."""
 
 import re
 import unittest
 from pathlib import Path
 
 SHELL = Path(__file__).resolve().parent.parent / "src" / "shell"
-HOLDS_ONLY_NUMBERS = {"windowNumbers"}
 
 
 class ShellWeakMaps(unittest.TestCase):
-    def test_weak_maps_hold_only_numbers(self):
-        found = set()
-        for source in SHELL.rglob("*.qml"):
-            found |= set(re.findall(r"property var (\w+): new WeakMap\(\)", source.read_text()))
-        self.assertEqual(found - HOLDS_ONLY_NUMBERS, set())
+    def test_shell_uses_no_weak_collections(self):
+        found = []
+        for source in sorted(SHELL.rglob("*")):
+            if source.suffix not in (".qml", ".js"):
+                continue
+            for number, line in enumerate(source.read_text().splitlines(), 1):
+                if re.search(r"\bWeak(Map|Set)\b", line):
+                    found.append(f"{source.relative_to(SHELL)}:{number}: {line.strip()}")
+        self.assertEqual(found, [])
 
 
 if __name__ == "__main__":
