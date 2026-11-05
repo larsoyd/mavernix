@@ -2,6 +2,7 @@
 
 #include <linux/input-event-codes.h>
 
+#include <algorithm>
 #include <cmath>
 #include <map>
 #include <vector>
@@ -85,6 +86,17 @@ bool is_tiled_and_resizable(wayfire_toplevel_view view)
            (view->get_allowed_actions() & wf::VIEW_ALLOW_RESIZE);
 }
 
+// the seam pointer, the four way one where two seams cross
+std::string seam_cursor(bool upright, bool across)
+{
+    if (upright && across)
+    {
+        return "move";
+    }
+
+    return upright ? "col-resize" : "row-resize";
+}
+
 shared_edges::box_t to_box(wf::geometry_t geometry)
 {
     return {int(geometry.x), int(geometry.y), int(geometry.width), int(geometry.height)};
@@ -121,7 +133,7 @@ class seam_strip_node_t : public wf::scene::node_t, public wf::pointer_interacti
     struct hit_t
     {
         wayfire_toplevel_view view;
-        uint32_t edge;
+        uint32_t edges;
     };
 
     std::function<std::optional<hit_t>(wf::output_t*, wf::pointf_t)> seam_at;
@@ -161,7 +173,8 @@ class seam_strip_node_t : public wf::scene::node_t, public wf::pointer_interacti
     {
         if (const auto hit = seam_at(output, at))
         {
-            wf::get_core().set_cursor(wlr_xcursor_get_resize_name((wlr_edges)hit->edge));
+            wf::get_core().set_cursor(
+                seam_cursor(hit->edges & (WLR_EDGE_LEFT | WLR_EDGE_RIGHT), hit->edges & (WLR_EDGE_TOP | WLR_EDGE_BOTTOM)));
         }
     }
 };
@@ -395,7 +408,9 @@ class shared_edges_t : public wf::plugin_interface_t,
         input_grab->grab_input(wf::scene::layer::OVERLAY);
         grab_interface.cancel = [=]() { end_drag(); };
 
-        wf::get_core().set_cursor(wlr_xcursor_get_resize_name((wlr_edges)edges));
+        const auto upright = [](const shared_edges::seam_t& seam) { return seam.vertical; };
+        wf::get_core().set_cursor(seam_cursor(std::any_of(seams.begin(), seams.end(), upright),
+            !std::all_of(seams.begin(), seams.end(), upright)));
         return true;
     }
 
@@ -443,16 +458,18 @@ class shared_edges_t : public wf::plugin_interface_t,
         std::vector<shared_edges::window_t> windows;
         std::size_t dragged = 0;
         tiled_windows(view, candidates, windows, dragged);
+        uint32_t edges = 0;
         for (const auto& [edge, distance] : distances)
         {
             const auto side = shared_edges::dragged_sides(edge, 0).front().side;
-            if ((std::abs(distance) < grip_px) && shared_edges::find_seam(windows, dragged, side, tolerance_px))
+            // past the box is the window's own resize margin, and a press there drags the seam too
+            if ((distance < grip_px) && shared_edges::find_seam(windows, dragged, side, tolerance_px))
             {
-                return seam_strip_node_t::hit_t{view, edge};
+                edges |= edge;
             }
         }
 
-        return {};
+        return edges ? std::optional{seam_strip_node_t::hit_t{view, edges}} : std::nullopt;
     }
 
     void end_drag()
@@ -544,7 +561,7 @@ class shared_edges_t : public wf::plugin_interface_t,
         new_output->connect(&on_tile_request);
         auto strip = std::make_shared<seam_strip_node_t>(new_output);
         strip->seam_at = [=](wf::output_t* on, wf::pointf_t at) { return seam_at(on, at); };
-        strip->pressed = [=](const seam_strip_node_t::hit_t& hit) { take_over(hit.view, hit.edge); };
+        strip->pressed = [=](const seam_strip_node_t::hit_t& hit) { take_over(hit.view, hit.edges); };
         wf::scene::add_front(new_output->node_for_layer(wf::scene::layer::WORKSPACE), strip);
         strips[new_output] = strip;
     }
