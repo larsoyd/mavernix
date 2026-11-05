@@ -1048,6 +1048,8 @@ def steam_titlebar_css(theme, theme_directory):
     # the friends list and chat tabs make room for the buttons now at their left
     buttons_bottom = (STEAM_TITLE_BAR + height) // 2
     lines += rule([".friendListHeaderContainer .currentUserContainer"], f"padding-top: {buttons_bottom - 2}px;")
+    # the status glow starts where the header's content does unless told otherwise
+    lines += rule([".friendListHeaderContainer .statusHeaderGlow"], "top: 0;")
     lines += rule([".chatTabSetContainer.inclient"], f"padding-inline-start: {row_width + 2:g}px;")
     return "\n".join(lines)
 

@@ -1959,6 +1959,11 @@ class TestSteamTitlebar(TitlebarStyleCase):
         self.assertIn(f"flex: 0 0 {row}px !important;", self.rule(css, slot))
         self.assertIn(f"padding-inline-start: {row + 2}px !important;", self.rule(css, ".chatTabSetContainer.inclient"))
 
+    def test_the_friends_header_glow_reaches_up_behind_the_buttons(self):
+        css = (self.picture_theme(self.PICTURE_BUTTONS) / self.STYLE).read_text()
+        self.assertIn("padding-top: 21px !important;", self.rule(css, ".friendListHeaderContainer .currentUserContainer"))
+        self.assertIn("top: 0 !important;", self.rule(css, ".friendListHeaderContainer .statusHeaderGlow"))
+
     def test_buttons_hover_alone_unless_the_theme_says_together(self):
         css = (self.picture_theme(self.PICTURE_BUTTONS.replace("hover_together = true\n", "")) / self.STYLE).read_text()
         self.rule(css, f"{self.ROW} .closeButton:hover::before")
