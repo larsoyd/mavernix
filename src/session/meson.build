@@ -46,6 +46,7 @@ install_data(
     'user_choices.py',
     'write_interface_settings.py',
     'run_xsettings.py',
+    'steam_window_buttons.py',
     'kded5rc',
     install_dir: session_dir,
 )

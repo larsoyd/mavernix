@@ -16,10 +16,12 @@ import os
 import re
 import shlex
 import shutil
+import socket
 import struct
 import subprocess
 import sys
 import tempfile
+import time
 import tomllib
 import unittest
 import unittest.mock
@@ -1842,7 +1844,7 @@ class TestAutostartWaitsForTray(unittest.TestCase):
             patcher.start()
             self.addCleanup(patcher.stop)
         for name in ("hand_login_to_wallet", "tell_services", "start_xsettings",
-                     "start_listed_programs", "offer_new_theme_imports"):
+                     "start_listed_programs", "offer_new_theme_imports", "set_up_steam_buttons"):
             patcher = unittest.mock.patch(f"at_login.{name}")
             patcher.start()
             self.addCleanup(patcher.stop)
@@ -1944,9 +1946,7 @@ class TestGtkWindowButtons(SessionTestCase):
             self.assertIn("assets/window-close-normal.png", (gtk / "gtk.css").read_text())
 
 
-class TestMozillaTitlebar(SessionTestCase):
-    STYLE = "share/themes/DesktopTheme/mozilla/titlebar.css"
-
+class TitlebarStyleCase(SessionTestCase):
     def picture_theme(self, buttons_table):
         from PIL import Image
 
@@ -1985,6 +1985,10 @@ normal   = { image = "dot.png" }
 normal   = { image = "dot.png" }
 
 """
+
+
+class TestMozillaTitlebar(TitlebarStyleCase):
+    STYLE = "share/themes/DesktopTheme/mozilla/titlebar.css"
 
     def test_colours_of_every_state_reach_every_button(self):
         output = self.home / "app-theme"
@@ -2044,6 +2048,432 @@ normal   = { image = "dot.png" }
         self.assertIn('url("../gtk-3.0/assets/', css)
         self.assertNotIn('url("assets/', css)
         self.assertIn("padding: 0", self.rule(css, "button.titlebutton.close"))
+
+
+class TestSteamTitlebar(TitlebarStyleCase):
+    STYLE = "share/themes/DesktopTheme/steam/window-buttons.css"
+    ROW = ".title-bar-actions.window-controls"
+
+    def picture_data(self, name):
+        import base64
+        return "data:image/png;base64," + base64.b64encode((self.home / "theme" / name).read_bytes()).decode()
+
+    def test_pictures_are_carried_inside_at_both_densities(self):
+        css = (self.picture_theme(self.PICTURE_BUTTONS) / self.STYLE).read_text()
+        body = self.rule(css, f"{self.ROW} .closeButton::before")
+        self.assertIn(f'image-set(url("{self.picture_data("dot.png")}") 1x, url("{self.picture_data("dot@2x.png")}") 2x)', body)
+        self.assertIn("background-size: 16px 14px !important;", body)
+        self.assertEqual(re.findall(r'url\("(?!data:image/png;base64,)', css), [])
+
+    def test_every_state_has_its_rule(self):
+        css = (self.picture_theme(self.PICTURE_BUTTONS) / self.STYLE).read_text()
+        self.rule(css, f".title-area:not(.WindowFocus) > {self.ROW} .closeButton::before")
+        self.rule(css, f"{self.ROW}:hover .closeButton::before")
+        self.rule(css, f"{self.ROW} .closeButton:active::before")
+        self.assertNotIn(f"{self.ROW} .closeButton:hover::before", css)
+        self.assertIn(self.picture_data("dot.png"), self.rule(css, f".title-area:not(.WindowFocus) > {self.ROW} .minimizeButton::before"))
+        for button in ("maximizeButton", "restoreButton"):
+            self.rule(css, f"{self.ROW} .{button}:active::before")
+
+    def test_pointing_at_a_background_window_still_lights_its_buttons(self):
+        css = (self.picture_theme(self.PICTURE_BUTTONS) / self.STYLE).read_text()
+        inactive = f".title-area:not(.WindowFocus) > {self.ROW}"
+        self.rule(css, f"{inactive}:hover .closeButton::before")
+        self.rule(css, f"{inactive} .closeButton:active::before")
+        places = [css.index(f"{inactive} .closeButton::before"), css.index(f"{inactive}:hover .closeButton::before"),
+                  css.index(f"{inactive} .closeButton:active::before")]
+        self.assertEqual(places, sorted(places))
+
+    def test_colours_and_corners_reach_the_buttons(self):
+        output = self.home / "app-theme"
+        self.run_script("make_app_theme.py", THEMES_DIR / "plain", output)
+        css = (output / self.STYLE).read_text()
+        self.assertIn("background-color: #d0d0d0 !important;", self.rule(css, f"{self.ROW} .closeButton::before"))
+        self.assertIn("border-radius: 3px !important;", self.rule(css, f"{self.ROW} .closeButton::before"))
+        self.assertIn("background-color: #e06060 !important;", self.rule(css, f"{self.ROW} .closeButton:hover::before"))
+        self.assertIn("background-color: #e0e0e0 !important;", self.rule(css, f".title-area:not(.WindowFocus) > {self.ROW} .minimizeButton::before"))
+
+    def test_buttons_sit_at_the_left_in_mac_order(self):
+        css = (self.picture_theme(self.PICTURE_BUTTONS) / self.STYLE).read_text()
+        self.assertIn("order: -1 !important;", self.rule(css, f".title-area > {self.ROW}"))
+        slot = f":has(> .tool-tip-source) ~ :has(> .title-area > {self.ROW})"
+        self.assertIn("order: -1 !important;", self.rule(css, slot))
+        self.assertIn("left: 0 !important;", self.rule(css, f"{slot} > .title-area"))
+        for button, place in (("closeButton", 1), ("minimizeButton", 2), ("maximizeButton", 3), ("restoreButton", 3)):
+            self.assertIn(f"order: {place} !important;", self.rule(css, f"{self.ROW} .{button}"))
+        self.assertIn("display: none !important;", self.rule(css, f"{self.ROW} .windowControlButton > *"))
+
+    def test_the_row_takes_the_themes_size_spacing_and_inset(self):
+        css = (self.picture_theme(self.PICTURE_BUTTONS) / self.STYLE).read_text()
+        self.assertIn("padding: 0 7px !important;", self.rule(css, self.ROW))
+        self.assertIn("width: 20px !important;", self.rule(css, f"{self.ROW} .windowControlButton"))
+        before = self.rule(css, f"{self.ROW} .windowControlButton::before")
+        self.assertIn("width: 16px !important;", before)
+        self.assertIn("height: 14px !important;", before)
+        row = 3 * 20 + 2 * 7
+        slot = f":has(> .tool-tip-source) ~ :has(> .title-area > {self.ROW})"
+        self.assertIn(f"flex: 0 0 {row}px !important;", self.rule(css, slot))
+        self.assertIn(f"padding-inline-start: {row + 2}px !important;", self.rule(css, ".chatTabSetContainer.inclient"))
+
+    def test_buttons_hover_alone_unless_the_theme_says_together(self):
+        css = (self.picture_theme(self.PICTURE_BUTTONS.replace("hover_together = true\n", "")) / self.STYLE).read_text()
+        self.rule(css, f"{self.ROW} .closeButton:hover::before")
+        self.assertNotIn(f"{self.ROW}:hover .closeButton::before", css)
+
+    def test_no_buttons_in_the_theme_writes_no_style(self):
+        self.assertFalse((self.picture_theme("") / self.STYLE).exists())
+
+
+class FakeSteam:
+    """Steam's debugging port as far as the window button helper uses it."""
+
+    AGENT = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Valve Steam Client Safari/537.36"
+
+    def __init__(self, pages, agent=AGENT, port=0):
+        import threading
+        self.pages, self.agent = pages, agent
+        self.evaluated, self.attached, self.lock = [], [], threading.Lock()
+        self.server = socket.create_server(("127.0.0.1", port))
+        self.port = self.server.getsockname()[1]
+        self.peer = None
+        threading.Thread(target=self.accept, daemon=True).start()
+
+    def accept(self):
+        import threading
+        while True:
+            try:
+                connection, _ = self.server.accept()
+            except OSError:
+                return
+            threading.Thread(target=self.answer, args=(connection,), daemon=True).start()
+
+    def answer(self, connection):
+        import base64, hashlib
+        request = b""
+        while b"\r\n\r\n" not in request:
+            chunk = connection.recv(4096)
+            if not chunk:
+                return
+            request += chunk
+        head = request.decode().split("\r\n")
+        if head[0].startswith("GET /json/version "):
+            body = json.dumps({"Browser": "Chrome/126.0.6478.183", "User-Agent": self.agent,
+                               "webSocketDebuggerUrl": f"ws://127.0.0.1:{self.port}/devtools/browser/fake"}).encode()
+            connection.sendall(b"HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: %d\r\n\r\n" % len(body) + body)
+            connection.close()
+            return
+        key = next(line.split(": ", 1)[1] for line in head if line.lower().startswith("sec-websocket-key"))
+        accept = base64.b64encode(hashlib.sha1((key + "258EAFA5-E914-47DA-95CA-C5AB0DC85B11").encode()).digest()).decode()
+        connection.sendall(("HTTP/1.1 101 WebSocket Protocol Handshake\r\nUpgrade: WebSocket\r\nConnection: Upgrade\r\n"
+                            f"Sec-WebSocket-Accept: {accept}\r\n\r\n").encode())
+        self.peer = connection
+        try:
+            while True:
+                self.handle(json.loads(self.read_frame(connection)))
+        except (OSError, ValueError):
+            pass
+
+    def read_frame(self, connection):
+        def take(count):
+            data = b""
+            while len(data) < count:
+                chunk = connection.recv(count - len(data))
+                if not chunk:
+                    raise OSError("closed")
+                data += chunk
+            return data
+        first, second = take(2)
+        length = second & 0x7F
+        if length == 126:
+            length = struct.unpack("!H", take(2))[0]
+        elif length == 127:
+            length = struct.unpack("!Q", take(8))[0]
+        mask = take(4)
+        return bytes(byte ^ mask[i % 4] for i, byte in enumerate(take(length)))
+
+    def send(self, message):
+        data = json.dumps(message).encode()
+        length = len(data)
+        head = struct.pack("!BB", 0x81, length) if length < 126 else (
+            struct.pack("!BBH", 0x81, 126, length) if length < 65536 else struct.pack("!BBQ", 0x81, 127, length))
+        with self.lock:
+            self.peer.sendall(head + data)
+
+    def handle(self, message):
+        method, params = message["method"], message.get("params", {})
+        if method == "Target.setDiscoverTargets":
+            self.send({"id": message["id"], "result": {}})
+            for page in self.pages:
+                self.send({"method": "Target.targetCreated", "params": {"targetInfo": {**page, "attached": False}}})
+        elif method == "Target.attachToTarget":
+            page = next(page for page in self.pages if page["targetId"] == params["targetId"])
+            self.attached.append(page["targetId"])
+            self.send({"id": message["id"], "result": {"sessionId": "session-" + page["targetId"]}})
+            self.send({"method": "Target.attachedToTarget",
+                       "params": {"sessionId": "session-" + page["targetId"], "targetInfo": page, "waitingForDebugger": False}})
+        elif method == "Runtime.evaluate":
+            self.evaluated.append((message["sessionId"].removeprefix("session-"), params["expression"]))
+            self.send({"id": message["id"], "sessionId": message["sessionId"], "result": {"result": {"type": "number", "value": 1}}})
+
+    def navigate(self, target, url, title="Steam"):
+        page = next(page for page in self.pages if page["targetId"] == target)
+        page.update(url=url, title=title)
+        self.send({"method": "Target.targetInfoChanged", "params": {"targetInfo": {**page, "attached": True}}})
+
+    def close(self):
+        # a thread blocked on a socket keeps it open past close, shutdown frees it
+        for open_socket in filter(None, (self.server, self.peer)):
+            with contextlib.suppress(OSError):
+                open_socket.shutdown(socket.SHUT_RDWR)
+            open_socket.close()
+
+
+def steam_page(target, url, kind="page", title="Steam"):
+    return {"targetId": target, "type": kind, "url": url, "title": title}
+
+
+class TestSteamWindowButtonsHelper(unittest.TestCase):
+    MAIN = "about:blank?createflags=18&minwidth=1010&minheight=600&pid=0&browser=-1&browserType=4"
+    SHARED = "https://steamloopback.host/index.html?IN_CLIENT=true&PLATFORM=linux"
+
+    def setUp(self):
+        folder = tempfile.TemporaryDirectory()
+        self.addCleanup(folder.cleanup)
+        self.style = Path(folder.name) / "window-buttons.css"
+        self.style.write_text(".title-bar-actions { order: -1 !important; }\n")
+        self.log = Path(folder.name) / "helper.log"
+        self.session = subprocess.Popen(["sleep", "120"])
+        self.addCleanup(self.end_session)
+
+    def end_session(self):
+        if self.session.poll() is None:
+            self.session.kill()
+            self.session.wait(5)
+
+    def start(self, port):
+        output = self.log.open("w")
+        self.addCleanup(output.close)
+        helper = subprocess.Popen([sys.executable, str(SESSION_SOURCE_DIR / "steam_window_buttons.py"), str(self.style), str(port)],
+                                  env={**os.environ, "DESKTOP_SESSION_PID": str(self.session.pid)},
+                                  stderr=output, stdout=subprocess.DEVNULL)
+
+        def stop():
+            if helper.poll() is None:
+                helper.kill()
+                helper.wait(5)
+        self.addCleanup(stop)
+        return helper
+
+    def wait_for(self, condition, what, seconds=10):
+        deadline = time.monotonic() + seconds
+        while time.monotonic() < deadline:
+            if condition():
+                return
+            time.sleep(0.05)
+        self.fail(f"{what} did not happen within {seconds} s; helper said:\n{self.log.read_text()}")
+
+    def styled(self, steam):
+        return [target for target, _ in steam.evaluated]
+
+    def test_every_steam_window_gets_the_style_and_nothing_else(self):
+        steam = FakeSteam([steam_page("main", self.MAIN), steam_page("shared", self.SHARED, title="SharedJSContext"),
+                           steam_page("store", "https://store.steampowered.com/"),
+                           steam_page("worker", self.SHARED, kind="service_worker")])
+        self.addCleanup(steam.close)
+        self.start(steam.port)
+        self.wait_for(lambda: sorted(self.styled(steam)) == ["main", "shared"], "styling both Steam windows")
+        time.sleep(0.3)
+        self.assertEqual(sorted(steam.attached), ["main", "shared"])
+        script = steam.evaluated[0][1]
+        self.assertIn(json.dumps(self.style.read_text()), script)
+        self.assertIn("mavernix-window-buttons", script)
+        self.wait_for(lambda: 'result=styled window="SharedJSContext"' in self.log.read_text(), "logging the styled window")
+
+    def test_a_window_that_loads_a_new_page_is_styled_again(self):
+        steam = FakeSteam([steam_page("main", self.MAIN)])
+        self.addCleanup(steam.close)
+        self.start(steam.port)
+        self.wait_for(lambda: self.styled(steam) == ["main"], "the first styling")
+        steam.navigate("main", self.MAIN, title="Steam - Library")
+        time.sleep(0.5)
+        self.assertEqual(self.styled(steam), ["main"])
+        steam.navigate("main", self.SHARED)
+        self.wait_for(lambda: self.styled(steam) == ["main", "main"], "styling the new page")
+        self.assertEqual(steam.attached, ["main"])
+
+    def test_a_port_that_is_not_steams_is_left_alone(self):
+        stranger = FakeSteam([steam_page("main", self.MAIN)], agent="Mozilla/5.0 Chrome/126 Safari/537.36")
+        self.addCleanup(stranger.close)
+        self.start(stranger.port)
+        self.wait_for(lambda: "result=refused" in self.log.read_text(), "the refusal")
+        self.assertIsNone(stranger.peer)
+        self.assertEqual(stranger.evaluated, [])
+
+    def test_steam_started_again_is_styled_again(self):
+        steam = FakeSteam([steam_page("main", self.MAIN)])
+        port = steam.port
+        self.start(port)
+        self.wait_for(lambda: self.styled(steam) == ["main"], "styling the first Steam")
+        steam.close()
+        self.wait_for(lambda: "result=disconnected" in self.log.read_text(), "noticing Steam is gone")
+        again = FakeSteam([steam_page("main", self.MAIN)], port=port)
+        self.addCleanup(again.close)
+        self.wait_for(lambda: self.styled(again) == ["main"], "styling the second Steam")
+
+    def test_a_changed_style_reaches_open_windows(self):
+        steam = FakeSteam([steam_page("main", self.MAIN)])
+        self.addCleanup(steam.close)
+        self.start(steam.port)
+        self.wait_for(lambda: self.styled(steam) == ["main"], "the first styling")
+        time.sleep(0.05)
+        self.style.write_text(".title-bar-actions { order: 5 !important; }\n")
+        self.wait_for(lambda: len(steam.evaluated) == 2, "styling with the new style")
+        self.assertIn("order: 5", steam.evaluated[1][1])
+
+    def test_it_ends_with_the_session(self):
+        helper = self.start(1)
+        self.wait_for(lambda: "result=waiting" in self.log.read_text(), "waiting for Steam")
+        self.end_session()
+        self.assertEqual(helper.wait(10), 0)
+        self.assertIn("result=session_over", self.log.read_text())
+
+    def test_it_ends_with_the_session_while_holding_off_a_stranger(self):
+        stranger = FakeSteam([], agent="Mozilla/5.0 Chrome/126 Safari/537.36")
+        self.addCleanup(stranger.close)
+        helper = self.start(stranger.port)
+        self.wait_for(lambda: "result=refused" in self.log.read_text(), "the refusal")
+        self.end_session()
+        self.assertEqual(helper.wait(5), 0)
+
+    def test_it_ends_with_the_session_while_connected(self):
+        steam = FakeSteam([steam_page("main", self.MAIN)])
+        self.addCleanup(steam.close)
+        helper = self.start(steam.port)
+        self.wait_for(lambda: self.styled(steam) == ["main"], "the styling")
+        self.end_session()
+        self.assertEqual(helper.wait(10), 0)
+
+
+class TestSteamDebuggingSwitch(unittest.TestCase):
+    def setUp(self):
+        folder = tempfile.TemporaryDirectory()
+        self.addCleanup(folder.cleanup)
+        self.home = Path(folder.name)
+        sys.path.insert(0, str(SESSION_SOURCE_DIR))
+        try:
+            import steam_window_buttons
+        finally:
+            sys.path.remove(str(SESSION_SOURCE_DIR))
+        self.addCleanup(sys.modules.pop, "steam_window_buttons", None)
+        self.module = steam_window_buttons
+        environment = unittest.mock.patch.dict(os.environ, {"HOME": str(self.home), "XDG_DATA_HOME": str(self.home / "data")})
+        environment.start()
+        self.addCleanup(environment.stop)
+        self.native = self.home / "data" / "Steam"
+        self.flatpak = self.home / ".var/app/com.valvesoftware.Steam/.local/share/Steam"
+
+    def flag(self, folder):
+        return folder / ".cef-enable-remote-debugging"
+
+    def test_on_marks_each_installed_steam(self):
+        for folder in (self.native, self.flatpak):
+            folder.mkdir(parents=True)
+        (self.home / ".steam").mkdir()
+        (self.home / ".steam" / "steam").symlink_to(self.native)
+        self.module.switch_debugging(True)
+        for folder in (self.native, self.flatpak):
+            self.assertEqual(self.flag(folder).read_text(), self.module.OUR_MARK)
+
+    def test_no_steam_gets_no_folder(self):
+        self.module.switch_debugging(True)
+        self.assertFalse((self.home / "data").exists())
+        self.assertFalse((self.home / ".var").exists())
+
+    def test_off_takes_back_only_our_flag(self):
+        for folder in (self.native, self.flatpak):
+            folder.mkdir(parents=True)
+        self.flag(self.native).write_text(self.module.OUR_MARK)
+        self.flag(self.flatpak).write_text("")
+        self.module.switch_debugging(False)
+        self.assertFalse(self.flag(self.native).exists())
+        self.assertEqual(self.flag(self.flatpak).read_text(), "")
+
+    def test_on_leaves_the_users_own_flag_as_it_is(self):
+        self.native.mkdir(parents=True)
+        self.flag(self.native).write_text("")
+        self.module.switch_debugging(True)
+        self.assertEqual(self.flag(self.native).read_text(), "")
+
+
+class TestSteamButtonsAtLogin(unittest.TestCase):
+    def setUp(self):
+        folder = tempfile.TemporaryDirectory()
+        self.addCleanup(folder.cleanup)
+        self.state = Path(folder.name)
+        (self.state / "paths.py").write_text("from pathlib import Path\nLIBRARY_DIR = Path('/nowhere')\n")
+        sys.path[:0] = [str(self.state), str(SESSION_SOURCE_DIR)]
+        sys.modules.pop("paths", None)
+        try:
+            import at_login
+        finally:
+            del sys.path[:2]
+            sys.modules.pop("paths", None)
+        self.addCleanup(sys.modules.pop, "at_login", None)
+        self.addCleanup(sys.modules.pop, "steam_window_buttons", None)
+        self.at_login = at_login
+        self.settings = self.state / "shell.json"
+        self.style = self.state / "app-theme/share/themes/DesktopTheme/steam/window-buttons.css"
+        self.style.parent.mkdir(parents=True)
+        self.style.write_text("/* style */\n")
+        self.calls = unittest.mock.Mock()
+        for name in ("start", "switch_debugging"):
+            patcher = unittest.mock.patch(f"at_login.{name}", getattr(self.calls, name))
+            patcher.start()
+            self.addCleanup(patcher.stop)
+
+    def set_up(self, config):
+        self.at_login.set_up_steam_buttons(config, str(self.settings))
+        return [(call[0], call[1]) for call in self.calls.mock_calls]
+
+    def test_on_opens_the_port_and_starts_the_helper(self):
+        calls = self.set_up({"steam": {"window_buttons": True}})
+        self.assertEqual(calls[0], ("switch_debugging", (True,)))
+        self.assertEqual(calls[1][0], "start")
+        command = calls[1][1][0]
+        self.assertEqual(command[1:], [str(SESSION_SOURCE_DIR / "steam_window_buttons.py"), str(self.style)])
+
+    def test_off_closes_the_port(self):
+        for config in ({}, {"steam": {"window_buttons": False}}):
+            self.calls.reset_mock()
+            self.assertEqual(self.set_up(config), [("switch_debugging", (False,))])
+
+    def test_a_theme_without_buttons_closes_the_port(self):
+        self.style.unlink()
+        self.assertEqual(self.set_up({"steam": {"window_buttons": True}}), [("switch_debugging", (False,))])
+
+    def test_programs_kept_in_their_own_look_close_the_port(self):
+        calls = self.set_up({"steam": {"window_buttons": True}, "gtk": {"use_theme": False}})
+        self.assertEqual(calls, [("switch_debugging", (False,))])
+
+    def test_the_port_is_set_before_any_program_starts(self):
+        calls = unittest.mock.Mock()
+        self.settings.write_text(json.dumps({"config": {"steam": {"window_buttons": True}}}))
+        for name in ("set_up_steam_buttons", "start_listed_programs", "start_users_programs", "wait_for_tray",
+                     "place_launchers_once", "hand_login_to_wallet", "tell_services", "start_xsettings",
+                     "offer_new_theme_imports"):
+            patcher = unittest.mock.patch(f"at_login.{name}", getattr(calls, name))
+            patcher.start()
+            self.addCleanup(patcher.stop)
+        with unittest.mock.patch.object(sys, "argv", ["at_login.py", str(self.settings)]), \
+             unittest.mock.patch.dict(os.environ, {"DESKTOP_NESTED": ""}):
+            self.at_login.main()
+        names = [call[0] for call in calls.mock_calls]
+        self.assertLess(names.index("set_up_steam_buttons"), names.index("start_listed_programs"))
+        self.assertLess(names.index("set_up_steam_buttons"), names.index("start_users_programs"))
+
+    def test_a_failing_switch_does_not_stop_the_login(self):
+        self.calls.switch_debugging.side_effect = PermissionError("read-only")
+        self.assertEqual(self.set_up({"steam": {"window_buttons": True}})[-1][0], "switch_debugging")
 
 
 class TestGimpTitlebar(SessionTestCase):

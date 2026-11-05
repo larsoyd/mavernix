@@ -18,6 +18,7 @@ import sys
 import time
 
 from paths import LIBRARY_DIR
+from steam_window_buttons import switch_debugging
 
 ENVIRONMENT_FOR_SERVICES = ["WAYLAND_DISPLAY", "DISPLAY", "XDG_CURRENT_DESKTOP", "XDG_SESSION_TYPE"]
 
@@ -199,6 +200,23 @@ def start_xsettings(settings_path):
             start([sys.executable, script, config])
 
 
+def set_up_steam_buttons(config, settings_path):
+    """Steam's window buttons in the theme's look, through Steam's debugging port."""
+    here = os.path.dirname(os.path.abspath(__file__))
+    style = os.path.join(os.path.dirname(os.path.abspath(settings_path)),
+                         "app-theme", "share", "themes", "DesktopTheme", "steam", "window-buttons.css")
+    wanted = (config.get("steam", {}).get("window_buttons") is True
+              and config.get("gtk", {}).get("use_theme", True)
+              and os.path.isfile(style))
+    try:
+        switch_debugging(wanted)
+    except OSError as error:
+        say(f"could not switch Steam's debugging port, its window buttons stay as they are: {error}")
+        return
+    if wanted:
+        start([sys.executable, os.path.join(here, "steam_window_buttons.py"), style])
+
+
 def tray_host_is_up():
     try:
         result = subprocess.run(TRAY_HOST_QUESTION, capture_output=True, text=True, timeout=1)
@@ -319,6 +337,7 @@ def main():
     hand_login_to_wallet()
     tell_services(config, os.path.dirname(os.path.abspath(sys.argv[1])))
     start_xsettings(sys.argv[1])
+    set_up_steam_buttons(config, sys.argv[1])
     start_listed_programs(config)
     if config.get("session", {}).get("users_autostart", True):
         wait_for_tray(config)

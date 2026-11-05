@@ -212,7 +212,7 @@ To take an application out of the app grid, right-click it there and choose Hide
 
 ## The icon theme
 
-Every theme brings an icon theme (its `[icons]` table, see [other applications](themes/other-applications.md#icons)). Settings, App Style, picks other ones from those installed, for example Papirus or Breeze: one for programs, and one for the dock, the menu bar and the rest of the desktop's own parts (the app grid, the program switcher, the search). So Dolphin can show Papirus while the dock keeps Sea Lion's icons. The lists mark the one you picked in Plasma (`~/.config/kdeglobals`) or GNOME (dconf), if it's installed, so you can find yours again. Each is saved by the icon theme's folder name:
+Every theme brings an icon theme (its `[icons]` table, see [other applications](themes/other-applications.md#icons)). Settings, General, picks other ones from those installed, for example Papirus or Breeze: one for programs, and one for the dock, the menu bar and the rest of the desktop's own parts (the app grid, the program switcher, the search). So Dolphin can show Papirus while the dock keeps Sea Lion's icons. The lists mark the one you picked in Plasma (`~/.config/kdeglobals`) or GNOME (dconf), if it's installed, so you can find yours again. Each is saved by the icon theme's folder name:
 
 ```toml
 [icons]
@@ -222,7 +222,19 @@ dock_and_menu_bar = "SeaLion"   # the desktop's own parts
 
 Icons you gave single applications in App Icons & Names still win in the dock. Choosing it rewrites the desktop's settings the way switching desktops does: the dock and menu bar start again, and programs that are open keep their icons until you start them again. If a picked icon theme is uninstalled later, the desktop uses one that's there (Adwaita, Breeze, Papirus or hicolor).
 
-KDE programs such as Dolphin read their icon theme from `kdeglobals`. If you ever used Plasma, yours in `~/.config/kdeglobals` names Plasma's icon theme. So the session's own `kdeglobals` locks the choice (`[Icons][$i]`), and KDE programs show the same icons as other programs. That lock only applies inside this session; Plasma keeps its own choice.
+KDE programs such as Dolphin read their icon theme from `kdeglobals`. If you ever used Plasma, yours in `~/.config/kdeglobals` names Plasma's icon theme. So the session's own `kdeglobals` locks the choice (`Theme[$i]` in `[Icons]`), and KDE programs show the same icons as other programs. That lock only applies inside this session; Plasma keeps its own choice.
+
+
+## Steam's window buttons
+
+Steam draws its own close, minimize and zoom buttons at the right of its windows. With `[steam] window_buttons = true`, they take the theme's look and move to the left, in the Mac's order, in the main window, the friends list, chats and Steam's other windows:
+
+```toml
+[steam]
+window_buttons = true
+```
+
+It takes effect from the next login, once Steam starts again. Steam has no setting for its buttons, so the session turns on Steam's remote debugging and a small helper adds the style to each Steam window as it opens. Remote debugging listens on 127.0.0.1:8080, and any program running on this computer, under any user, can use it to control Steam. That's why it's off unless you ask for it. Setting it back to `false` takes the debugging flag away again at the next login, unless you had put it there yourself. The helper logs its work to the session's `login.log` as `[steam-buttons]` lines.
 
 ## The desktop's menus
 
