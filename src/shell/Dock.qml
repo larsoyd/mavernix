@@ -411,6 +411,7 @@ PanelWindow {
     readonly property var minimizeOrder: []
     function keepMinimizeOrder() {
         minimizeOrder.splice(0, minimizeOrder.length, ...minimizedWindows)
+        forgetClosedWindows()
     }
     onMinimizedWindowsChanged: keepMinimizeOrder()
     Component.onCompleted: {
@@ -436,7 +437,8 @@ PanelWindow {
     }
 
     // titles change while a window waits here, a tile named after one would grow in anew
-    readonly property var windowNumbers: new WeakMap()
+    // a plain map pruned by hand since qt 6.12 can lose a weak one from its sweep and keep freed keys
+    readonly property var windowNumbers: new Map()
     readonly property var nextWindowNumber: ({ value: 0 })
     function windowNumber(window) {
         if (!windowNumbers.has(window)) {
@@ -444,6 +446,15 @@ PanelWindow {
             windowNumbers.set(window, nextWindowNumber.value)
         }
         return windowNumbers.get(window)
+    }
+    function forgetClosedWindows() {
+        const open = ToplevelManager.toplevels.values
+        for (const [window, number] of Array.from(windowNumbers)) {
+            if (!open.includes(window)) {
+                windowNumbers.delete(window)
+                delete lastPictures[number]
+            }
+        }
     }
 
     // Tells apart windows with the same application and title.
@@ -454,7 +465,7 @@ PanelWindow {
     }
 
     // a new title gets here before the native module knows it, the last picture stands in
-    // by number since qt can free strings kept in a WeakMap while it marks
+    // by number since qt can free strings kept in a weak map while it marks
     readonly property var lastPictures: ({})
     function windowPicture(window, entry) {
         // Read so that bindings follow the pictures.
