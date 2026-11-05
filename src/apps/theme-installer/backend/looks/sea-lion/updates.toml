@@ -287,28 +287,6 @@ was = ["#00000000"]
 now = ["#000000"]
 
 [[update]]
-revision = 15
-themes = ["sea-lion", "sea-lion-dark"]
-
-[[update.corrections]]
-table = "dock.reflection"
-key = "blur"
-was = 0.0469
-now = 0.09
-
-[[update.corrections]]
-table = "dock.shelf"
-key = "surface"
-was = ["#ffffffba", "#d7d7d7a6", "#aaaaaa8f"]
-now = ["#ffffffd5", "#d7d7d7c7", "#aaaaaab6"]
-
-[[update.corrections]]
-table = "dock.shelf"
-key = "surface"
-was = ["#4a4a4aba", "#333333a6", "#2a2a2a8f"]
-now = ["#4a4a4ad5", "#333333c7", "#2a2a2ab6"]
-
-[[update]]
 revision = 9
 import_brings = [
     "Every kind of file gets a Mavericks icon in file managers: text TextEdit's document, anything Mavericks never drew the plain document, packages Installer's, instead of the fallback theme's.",
@@ -374,3 +352,26 @@ table = "animation.dock_folder"
 key = "close_duration_ms"
 was = 110
 now = 250
+
+# The dock glass of 0.5.8, whose revision 9 this branch already used.
+[[update]]
+revision = 15
+themes = ["sea-lion", "sea-lion-dark"]
+
+[[update.corrections]]
+table = "dock.reflection"
+key = "blur"
+was = 0.0469
+now = 0.09
+
+[[update.corrections]]
+table = "dock.shelf"
+key = "surface"
+was = ["#ffffffba", "#d7d7d7a6", "#aaaaaa8f"]
+now = ["#ffffffd5", "#d7d7d7c7", "#aaaaaab6"]
+
+[[update.corrections]]
+table = "dock.shelf"
+key = "surface"
+was = ["#4a4a4aba", "#333333a6", "#2a2a2a8f"]
+now = ["#4a4a4ad5", "#333333c7", "#2a2a2ab6"]
