@@ -304,6 +304,13 @@ next_desktop = "<ctrl> <alt> KEY_RIGHT"
 # window_to_previous_desktop = "<ctrl> <shift> KEY_LEFT"
 # window_to_next_desktop = "<ctrl> <shift> KEY_RIGHT"
 
+[steam]
+# Steam's window buttons in the theme's look, at the left as on a Mac, from
+# the next login and Steam's next start. It turns on Steam's debugging port
+# on 127.0.0.1:8080, which any program on this computer can use to control
+# Steam, so it is off unless asked for.
+window_buttons = false
+
 [games]
 # Windows that get the function keys among the shortcuts, such as F3, even
 # when not full screen, by app id. X11 programs and Steam and Lutris games

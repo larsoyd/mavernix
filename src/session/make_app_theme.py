@@ -10,6 +10,7 @@ gtk.css for GTK 3 and 4, plus KDE and GTK settings, written to:
     OUTPUT/share/themes/DesktopTheme/gtk-4.0/gtk.css
     OUTPUT/share/themes/DesktopTheme/mozilla/titlebar.css
     OUTPUT/share/themes/DesktopTheme/mozilla/global-menu.css
+    OUTPUT/share/themes/DesktopTheme/steam/window-buttons.css
     OUTPUT/xdg/Kvantum/kvantum.kvconfig      (names the Kvantum theme)
     OUTPUT/xdg/gtk-3.0/settings.ini          (names the icon theme, if any)
     OUTPUT/xdg/kdeglobals                    (the same, and the colours, for KDE's programs)
@@ -986,6 +987,79 @@ def write_mozilla_style(theme, output_directory):
     (folder / "global-menu.css").write_text("#toolbar-menubar { visibility: collapse !important; }\n")
 
 
+STEAM_ROW = ".title-bar-actions.window-controls"
+# the main window keeps its buttons in a slot after the title bar's tool buttons
+STEAM_SLOT = f":has(> .tool-tip-source) ~ :has(> .title-area > {STEAM_ROW})"
+STEAM_TITLE_BAR = 32
+STEAM_BUTTONS = {"close": (["closeButton"], 1), "minimize": (["minimizeButton"], 2),
+                 "maximize": (["maximizeButton", "restoreButton"], 3)}
+
+
+def file_as_data(path):
+    kind = "image/svg+xml" if path.suffix == ".svg" else "image/png"
+    return f"data:{kind};base64," + base64.b64encode(path.read_bytes()).decode("ascii")
+
+
+def steam_picture(theme_directory, file_name):
+    picture = theme_directory / file_name
+    return f'image-set(url("{file_as_data(picture)}") 1x, url("{file_as_data(double_density(picture))}") 2x)'
+
+
+def steam_titlebar_css(theme, theme_directory):
+    """Steam draws its window buttons in web pages that cannot read the theme's files."""
+    buttons = theme["window"]["buttons"]
+    width, height = buttons["size"]
+    spacing, inset = buttons["spacing"], buttons["edge_inset"]
+    edge = inset - spacing / 2
+    row_width = 3 * (width + spacing) + 2 * edge
+
+    def rule(selectors, *declarations):
+        # a data url holds a semicolon of its own
+        strong = [re.sub(r";(?=\s|$)", " !important;", declaration) for declaration in declarations]
+        return [", ".join(selectors) + " {", *(f"  {declaration}" for declaration in strong), "}", ""]
+
+    lines = ["/* Written by make_app_theme.py from the desktop theme. Do not edit. */", ""]
+    lines += rule([f".title-area > {STEAM_ROW}"], "order: -1;")
+    lines += rule([STEAM_SLOT], "order: -1;", f"flex: 0 0 {row_width:g}px;")
+    lines += rule([f"{STEAM_SLOT} > .title-area"], "left: 0;", "right: auto;")
+    lines += rule([STEAM_ROW], "position: relative;", "z-index: 10;", "flex-direction: row;",
+                  "justify-content: flex-start;", "align-items: stretch;", "margin: 0;", "gap: 0;",
+                  f"padding: 0 {edge:g}px;")
+    lines += rule([f"{STEAM_ROW} .windowControlButton"], "display: flex;", "align-items: center;",
+                  "justify-content: center;", f"width: {width + spacing}px;", "min-width: 0;", "height: auto;",
+                  "padding: 0;", "margin: 0;", "border-radius: 0;", "background: transparent;")
+    lines += rule([f"{STEAM_ROW} .windowControlButton > *"], "display: none;")
+    lines += rule([f"{STEAM_ROW} .windowControlButton::before"], 'content: "";', "flex: none;",
+                  f"width: {width}px;", f"height: {height}px;")
+    inactive_row = f".title-area:not(.WindowFocus) > {STEAM_ROW}"
+    hover = "{row}:hover .{button}::before" if buttons.get("hover_together") else "{row} .{button}:hover::before"
+    for name, (classes, place) in STEAM_BUTTONS.items():
+        looks = buttons[name]
+        lines += rule([f"{STEAM_ROW} .{button}" for button in classes], f"order: {place};")
+        # hover and pressed also outrank the inactive look, as on a window in the background
+        for state, selector, rows in (("normal", "{row} .{button}::before", [STEAM_ROW]),
+                                      ("inactive", "{row} .{button}::before", [inactive_row]),
+                                      ("hover", hover, [STEAM_ROW, inactive_row]),
+                                      ("pressed", "{row} .{button}:active::before", [STEAM_ROW, inactive_row])):
+            fill = looks.get(state, looks["normal"])
+            picture = steam_picture(theme_directory, fill["image"]) if "image" in fill else None
+            selectors = [selector.format(row=row, button=button) for row in rows for button in classes]
+            lines += rule(selectors, *button_look(fill, picture, width, height))
+    # the friends list and chat tabs make room for the buttons now at their left
+    buttons_bottom = (STEAM_TITLE_BAR + height) // 2
+    lines += rule([".friendListHeaderContainer .currentUserContainer"], f"padding-top: {buttons_bottom - 2}px;")
+    lines += rule([".chatTabSetContainer.inclient"], f"padding-inline-start: {row_width + 2:g}px;")
+    return "\n".join(lines)
+
+
+def write_steam_style(theme, theme_directory, output_directory):
+    if not theme.get("window", {}).get("buttons"):
+        return
+    folder = output_directory / "share" / "themes" / APP_THEME_NAME / "steam"
+    folder.mkdir(parents=True, exist_ok=True)
+    (folder / "window-buttons.css").write_text(steam_titlebar_css(theme, theme_directory))
+
+
 def gimp_titlebar_css(theme):
     """GIMP's own stylesheet outranks the GTK theme and leaves its title bar buttons blank."""
     rules = "\n".join(gtk_window_buttons(theme, "gtk-3.0"))
@@ -1160,6 +1234,7 @@ def main():
     write_gtk_settings(theme, arguments.output)
     write_mozilla_style(theme, arguments.output)
     write_gimp_style(theme, arguments.output)
+    write_steam_style(theme, arguments.theme, arguments.output)
     write_kde_settings(theme, arguments.output)
     write_qt6ct_settings(theme, arguments.output)
     toolkits = "Qt and GTK" if wrote_qt else "GTK only"

@@ -192,6 +192,17 @@ An empty value, or Use Original, brings back the application's own.
 
 To take an application out of the app grid, right-click it there and choose Hide from the App Grid, or untick Show in the app grid in Settings, App Icons & Names. That's also where you bring it back. The search and the dock's Programs folder still list it. It's saved as `[app_grid] hidden = ["htop", ...]`, by desktop entry ID.
 
+## Steam's window buttons
+
+Steam draws its own close, minimize and zoom buttons at the right of its windows. With `[steam] window_buttons = true`, they take the theme's look and move to the left, in the Mac's order, in the main window, the friends list, chats and Steam's other windows:
+
+```toml
+[steam]
+window_buttons = true
+```
+
+It takes effect from the next login, once Steam starts again. Steam has no setting for its buttons, so the session turns on Steam's remote debugging and a small helper adds the style to each Steam window as it opens. Remote debugging listens on 127.0.0.1:8080, and any program running on this computer, under any user, can use it to control Steam. That's why it's off unless you ask for it. Setting it back to `false` takes the debugging flag away again at the next login, unless you had put it there yourself. The helper logs its work to the session's `login.log` as `[steam-buttons]` lines.
+
 ## The desktop's menus
 
 When no window is active, the panel shows the desktop's own name and menus, just like a program would. That's where things like New Folder, Go to Home or Downloads, and Empty Wastebasket live. They're set up under `[desktop_menus]`:
