@@ -202,6 +202,12 @@ test(
     args: [files('test_cursors.py')],
 )
 
+test(
+    'make-icons',
+    python,
+    args: [files('test_make_icons.py')],
+)
+
 menu_test_sources = files('../src/shell/native/application-menu.cpp', '../src/shell/native/menu-registrar.cpp',
     '../src/shell/native/gmenu-reader.cpp')
 menu_test_headers = files('../src/shell/native/application-menu.hpp', '../src/shell/native/menu-registrar.hpp',

@@ -977,6 +977,16 @@ LIGHT_ICON_THEME = "SeaLion"
 ICON_PARENTS = "breeze-dark,Adwaita,hicolor"
 
 
+def without_actions(index):
+    """The light theme's index less its toolbar folders, whose dark grey glyphs suit a light bar only."""
+    sections = index.split("\n\n")
+    kept = [section for section in sections if not re.match(r"\[[^\]]*/actions\]", section)]
+    folders = re.search(r"^Directories=(.*)$", kept[0], flags=re.M).group(1).split(",")
+    folders = ",".join(folder for folder in folders if not folder.endswith("/actions"))
+    kept[0] = re.sub(r"^Directories=.*$", lambda _: f"Directories={folders}", kept[0], count=1, flags=re.M)
+    return "\n\n".join(kept)
+
+
 def make_icon_theme(light_dir, output_dir):
     light_icons = light_dir / "share" / "icons" / LIGHT_ICON_THEME
     share = output_dir / "share"
@@ -990,6 +1000,7 @@ def make_icon_theme(light_dir, output_dir):
                 Path("../../../..") / light_dir.name / "share" / "icons" / LIGHT_ICON_THEME / folder.name)
 
     index = (light_icons / "index.theme").read_text()
+    index = without_actions(index)
     index = re.sub(r"^Name=.*$", f"Name={ICON_THEME}", index, count=1, flags=re.M)
     index = re.sub(r"^Comment=.*$", "Comment=Sea Lion's icons, with Breeze's dark set for the "
                    "one-colour ones; made by make_dark_theme.py", index, count=1, flags=re.M)
