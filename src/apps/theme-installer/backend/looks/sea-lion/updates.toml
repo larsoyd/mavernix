@@ -383,3 +383,15 @@ import_brings = [
     "New folders can take an emblem in Mavericks' engraved style, for bookmarks, cloud, games, mail, printing, archives, temporary files and important things.",
     "Every folder in a KDE side bar gets Finder's blue grey glyph, the public folder and emblem folders included.",
 ]
+
+# Finder's back and forward buttons show no arrow, their history opens on press and hold.
+[[update]]
+revision = 17
+
+[update.settings."controls.tool_button"]
+hold_menu_arrow = false
+
+[update.settings."controls.tooltip"]
+color = "#ffffc7f2"
+text_color = "#000000"
+padding = 2
