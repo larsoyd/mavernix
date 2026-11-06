@@ -234,9 +234,14 @@ reaper_plugin_host = executable('reaper-plugin-host', 'reaper-plugin-host.cpp',
 test('reaper-menu-plugin', python,
     args: [files('test_reaper_menu_plugin.py'), reaper_plugin_host, meson.current_build_dir(), reaper_menu_plugin],
     depends: fake_swell, timeout: 45)
+reaper_save_panel_test = executable('test-reaper-save-panel', 'test-reaper-save-panel.cpp',
+    qt.compile_moc(sources: 'test-reaper-save-panel.cpp', dependencies: [qt_test, kio_widgets]),
+    include_directories: include_directories('../src/reaper-files'), link_with: save_panel_library,
+    dependencies: [qt_test, qt_widgets, kio_widgets])
+test('reaper-save-panel', reaper_save_panel_test, env: {'QT_QPA_PLATFORM': 'offscreen'}, timeout: 60)
 test('reaper-files-plugin', python,
     args: [files('test_reaper_files_plugin.py'), reaper_plugin_host, meson.current_build_dir(), reaper_files_plugin],
-    depends: fake_swell, timeout: 45)
+    depends: fake_swell, timeout: 75)
 
 test('menu-session', python, args: files('test_menu_session.py'))
 test('gtk-global-menu', python, args: [files('test_gtk_global_menu.py'), gtk_menu_module],

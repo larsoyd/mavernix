@@ -30,6 +30,7 @@ Fedora 44 and 45 have an older Wayfire and Quickshell than Mavernix needs, so `p
 | [Wayfire](https://github.com/WayfireWM/wayfire) | 0.11.0 (0.11 is required) | `wayfire` | the compositor |
 | [Quickshell](https://quickshell.org) | 0.3.2 | `quickshell` | runs the shell's QML |
 | Qt: Base, Declarative, Multimedia, Wayland, SVG | 6.12.0 | `qt6-base` `qt6-declarative` `qt6-multimedia` `qt6-wayland` `qt6-svg` | the shell, the Settings window, sounds, and icons that are drawings |
+| KDE Frameworks: GuiAddons, KIO | 6.31.0 | `kguiaddons` `kio` | the clipboard history, and REAPER's Save Project dialog |
 | [toml++](https://github.com/marzer/tomlplusplus) | 3.4.0 | `tomlplusplus` | reading themes in the compositor |
 | GLib with GIO, and GVfs | 2.90.1, 1.62.0 | `glib2` `gvfs` | knowing which program opens which file, and the trash |
 | librsvg | 2.63.4 | `librsvg` | icons that are drawings |
@@ -48,7 +49,7 @@ On Arch, you can grab all of it at once:
 ```sh
 # to build
 sudo pacman -S --needed base-devel meson ninja wayfire glm vulkan-headers qt6-shadertools tomlplusplus \
-    qt6-base qt6-declarative qt6-multimedia qt6-wayland librsvg glib2
+    qt6-base qt6-declarative qt6-multimedia qt6-wayland librsvg glib2 kguiaddons kio
 
 # to run
 sudo pacman -S --needed quickshell python python-pillow qt6-svg kvantum qt6ct \

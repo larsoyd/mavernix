@@ -5,6 +5,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <initializer_list>
 #include <map>
 #include <memory>
 #include <sstream>
@@ -71,6 +72,13 @@ struct Control
     std::vector<std::string> items;
     int selection = -1;
     DialogProc proc = nullptr;
+    long resource = 0;
+    int x = 0, y = 0, width = 0, height = 0;
+};
+
+struct Rect
+{
+    int left, top, right, bottom;
 };
 
 enum
@@ -84,6 +92,7 @@ enum
     CB_GETCURSEL = 0x147,
     CB_GETLBTEXT = 0x148,
     CB_SETCURSEL = 0x14e,
+    EN_CHANGE = 0x300,
     GW_HWNDNEXT = 2,
     GW_CHILD = 5,
     GWL_ID = -12,
@@ -97,7 +106,7 @@ std::map<long, Control> controls;
 long nextControl = 1000;
 HWND foreground;
 int messageAnswer = 1;
-std::string nested;
+std::vector<std::string> nested;
 std::string swellFolder;
 std::string resourceFolder;
 void (*timer)();
@@ -153,7 +162,42 @@ std::string templateState(long window)
             state += std::to_string(control.id) + ":" + std::to_string(control.check) + " ";
         else if (control.parent == window && control.kind == "combobox")
             state += std::to_string(control.id) + ":#" + std::to_string(control.selection) + " ";
+        else if (control.parent == window && control.kind == "Edit")
+            state += std::to_string(control.id) + ":=" + control.text + " ";
     return state;
+}
+
+Control* childOf(long window, long id)
+{
+    for (auto& [number, control] : controls)
+        if (control.parent == window && control.id == id)
+            return &control;
+    return nullptr;
+}
+
+// reaper's save project procedure, ticks wake controls and format runs a modal loop
+void saveProjectCommand(long window, unsigned long id)
+{
+    auto wake = [window](std::initializer_list<long> ids, bool on) {
+        for (long each : ids)
+            childOf(window, each)->enabled = on;
+    };
+    if (id == 1043)
+        wake({1057}, childOf(window, 1043)->check);
+    else if (id == 1057)
+        wake({1056, 1058, 1577, 1578}, childOf(window, 1057)->check && childOf(window, 1057)->enabled);
+    else if (id == 1044)
+        wake({1045}, childOf(window, 1044)->check);
+    else if (id == 1056)
+    {
+        printf("[host] template modal start\n");
+        fflush(stdout);
+        const gint64 end = g_get_monotonic_time() + 300000;
+        while (g_get_monotonic_time() < end)
+            if (!g_main_context_iteration(nullptr, FALSE))
+                g_usleep(5000);
+        printf("[host] template modal end\n");
+    }
 }
 
 // stands in for reaper's own dialog procedure behind a browse template
@@ -162,7 +206,11 @@ long templateProc(HWND window, unsigned message, unsigned long command, long)
     if (message == WM_INITDIALOG)
         printf("[host] template init window=%ld\n", reinterpret_cast<long>(window));
     else if (message == WM_COMMAND)
+    {
         printf("[host] template command id=%lu code=%lu\n", command & 0xffff, command >> 16);
+        if (controlOf(window)->resource == 5)
+            saveProjectCommand(reinterpret_cast<long>(window), command & 0xffff);
+    }
     else if (message == WM_DESTROY)
         printf("[host] template destroy state=%s\n", templateState(reinterpret_cast<long>(window)).c_str());
     return 0;
@@ -178,8 +226,35 @@ Control widget(const char* kind, const char* text, long id, unsigned long style)
     return control;
 }
 
+Control placed(Control control, int x, int y, int width, int height, bool enabled = true)
+{
+    control.x = x;
+    control.y = y;
+    control.width = width;
+    control.height = height;
+    control.enabled = enabled;
+    return control;
+}
+
+// template 0xb9 as reaper 7.83 builds it, plus a hidden control and a label that needs escaping
+void fillSaveProject(long window)
+{
+    addControl(window, placed(widget("Button", "Create subdirectory for project", 1042, 0x40010003), 8, 2, 209, 19));
+    addControl(window, placed(widget("Button", "Copy all media into project directory, using:", 1043, 0x40010003), 8, 23, 277, 19));
+    addControl(window, placed(widget("Button", "Convert media", 1057, 0x40010003), 291, 23, 112, 19, false));
+    addControl(window, placed(widget("Button", "Format...", 1056, 0x40000000), 403, 21, 68, 23, false));
+    addControl(window, placed(widget("Button", "Trim media, tail size:", 1058, 0x40010003), 479, 23, 142, 19, false));
+    addControl(window, placed(widget("Edit", "500", 1577, 0x40002080), 625, 21, 66, 23, false));
+    addControl(window, placed(widget("Static", "ms", 1578, 0x40000000), 695, 25, 19, 15, false));
+    addControl(window, placed(widget("Button", "Move all media into project directory", 1044, 0x40010003), 8, 46, 245, 19));
+    addControl(window, placed(widget("Button", "Copy \\ rather\tthan move", 1045, 0x40010003), 260, 46, 431, 19, false));
+    controls[addControl(window, placed(widget("Button", "Hidden option", 1046, 0x40010003), 8, 70, 100, 19))].visible = false;
+}
+
 void fillTemplate(long window, long kind)
 {
+    if (kind == 5)
+        return fillSaveProject(window);
     addControl(window, widget("Button", "Open in new &tab", 1042, 0x40010003));
     controls[addControl(window, widget("Button", "Open read-only", 1043, 0x40010003))].check = 1;
     controls[addControl(window, widget("Button", "Hidden option", 1044, 0x40010003))].visible = false;
@@ -351,7 +426,11 @@ void run(const std::string& line)
     else if (command == "answer")
         words >> messageAnswer;
     else if (command == "nest")
-        std::getline(words >> std::ws, nested);
+    {
+        std::string line;
+        std::getline(words >> std::ws, line);
+        nested.push_back(line);
+    }
     else if (command == "unload")
         entry(nullptr, nullptr);
     else if (command == "quit")
@@ -494,11 +573,10 @@ __attribute__((visibility("default"))) int fake_EnableWindow(HWND window, int en
 
 __attribute__((visibility("default"))) void fake_SWELL_RunMessageLoop()
 {
-    if (nested.empty())
-        return;
-    const std::string line = nested;
+    const std::vector<std::string> lines = std::move(nested);
     nested.clear();
-    run(line);
+    for (const std::string& line : lines)
+        run(line);
 }
 
 __attribute__((visibility("default"))) int fake_MessageBox(HWND, const char* text, const char* caption, int)
@@ -518,6 +596,7 @@ __attribute__((visibility("default"))) HWND fake_SWELL_CreateDialog(void*, const
         return nullptr;
     const long window = addControl(reinterpret_cast<long>(parent), widget(kind ? "dialog" : "container", "", 0, 0x40000000));
     controls[window].proc = proc;
+    controls[window].resource = kind;
     if (kind)
         fillTemplate(window, kind);
     printf("[host] dialog created window=%ld template=%ld parent=%ld\n", window, kind, reinterpret_cast<long>(parent));
@@ -576,6 +655,27 @@ __attribute__((visibility("default"))) bool fake_GetDlgItemText(HWND window, int
     Control* control = item ? nullptr : controlOf(window);
     g_strlcpy(out, control ? control->text.c_str() : "", size);
     return control != nullptr;
+}
+
+__attribute__((visibility("default"))) bool fake_SetDlgItemText(HWND window, int item, const char* text)
+{
+    Control* control = item ? nullptr : controlOf(window);
+    if (control)
+        control->text = text;
+    return control != nullptr;
+}
+
+// dialogs sit at 300,200 on the screen so a plugin has to make its rects relative
+__attribute__((visibility("default"))) bool fake_GetWindowRect(HWND window, Rect* out)
+{
+    Control* control = controlOf(window);
+    if (!control)
+        return false;
+    Control* parent = controls.count(control->parent) ? &controls[control->parent] : nullptr;
+    const int left = parent && parent->resource ? 300 + control->x : 300, top = parent && parent->resource ? 200 + control->y : 200;
+    const bool dialog = !parent || !parent->resource;
+    *out = {left, top, left + (dialog ? 723 : control->width), top + (dialog ? 68 : control->height)};
+    return true;
 }
 
 __attribute__((visibility("default"))) long fake_GetWindowLong(HWND window, int index)
