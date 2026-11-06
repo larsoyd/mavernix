@@ -18,7 +18,7 @@ import sys
 import time
 
 from paths import LIBRARY_DIR
-from steam_window_buttons import switch_debugging
+from steam_window_buttons import patch_every_steam, read_style, take_back_debugging
 
 ENVIRONMENT_FOR_SERVICES = ["WAYLAND_DISPLAY", "DISPLAY", "XDG_CURRENT_DESKTOP", "XDG_SESSION_TYPE"]
 
@@ -201,7 +201,7 @@ def start_xsettings(settings_path):
 
 
 def set_up_steam_buttons(config, settings_path):
-    """Steam's window buttons in the theme's look, through Steam's debugging port."""
+    """Steam's window buttons in the theme's look, patched in before Steam can start."""
     here = os.path.dirname(os.path.abspath(__file__))
     style = os.path.join(os.path.dirname(os.path.abspath(settings_path)),
                          "app-theme", "share", "themes", "DesktopTheme", "steam", "window-buttons.css")
@@ -209,9 +209,10 @@ def set_up_steam_buttons(config, settings_path):
               and config.get("gtk", {}).get("use_theme", True)
               and os.path.isfile(style))
     try:
-        switch_debugging(wanted)
+        take_back_debugging()
+        patch_every_steam(read_style(style) if wanted else None, {})
     except OSError as error:
-        say(f"could not switch Steam's debugging port, its window buttons stay as they are: {error}")
+        say(f"could not patch Steam, its window buttons stay as they are: {error}")
         return
     if wanted:
         start([sys.executable, os.path.join(here, "steam_window_buttons.py"), style])

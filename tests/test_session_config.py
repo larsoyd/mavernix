@@ -16,7 +16,6 @@ import os
 import re
 import shlex
 import shutil
-import socket
 import struct
 import subprocess
 import sys
@@ -2129,145 +2128,259 @@ class TestSteamTitlebar(TitlebarStyleCase):
         self.assertFalse((self.picture_theme("") / self.STYLE).exists())
 
 
-class FakeSteam:
-    """Steam's debugging port as far as the window button helper uses it."""
-
-    AGENT = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Valve Steam Client Safari/537.36"
-
-    def __init__(self, pages, agent=AGENT, port=0):
-        import threading
-        self.pages, self.agent = pages, agent
-        self.evaluated, self.attached, self.lock = [], [], threading.Lock()
-        self.server = socket.create_server(("127.0.0.1", port))
-        self.port = self.server.getsockname()[1]
-        self.peer = None
-        threading.Thread(target=self.accept, daemon=True).start()
-
-    def accept(self):
-        import threading
-        while True:
-            try:
-                connection, _ = self.server.accept()
-            except OSError:
-                return
-            threading.Thread(target=self.answer, args=(connection,), daemon=True).start()
-
-    def answer(self, connection):
-        import base64, hashlib
-        request = b""
-        while b"\r\n\r\n" not in request:
-            chunk = connection.recv(4096)
-            if not chunk:
-                return
-            request += chunk
-        head = request.decode().split("\r\n")
-        if head[0].startswith("GET /json/version "):
-            body = json.dumps({"Browser": "Chrome/126.0.6478.183", "User-Agent": self.agent,
-                               "webSocketDebuggerUrl": f"ws://127.0.0.1:{self.port}/devtools/browser/fake"}).encode()
-            connection.sendall(b"HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: %d\r\n\r\n" % len(body) + body)
-            connection.close()
-            return
-        key = next(line.split(": ", 1)[1] for line in head if line.lower().startswith("sec-websocket-key"))
-        accept = base64.b64encode(hashlib.sha1((key + "258EAFA5-E914-47DA-95CA-C5AB0DC85B11").encode()).digest()).decode()
-        connection.sendall(("HTTP/1.1 101 WebSocket Protocol Handshake\r\nUpgrade: WebSocket\r\nConnection: Upgrade\r\n"
-                            f"Sec-WebSocket-Accept: {accept}\r\n\r\n").encode())
-        self.peer = connection
-        try:
-            while True:
-                self.handle(json.loads(self.read_frame(connection)))
-        except (OSError, ValueError):
-            pass
-
-    def read_frame(self, connection):
-        def take(count):
-            data = b""
-            while len(data) < count:
-                chunk = connection.recv(count - len(data))
-                if not chunk:
-                    raise OSError("closed")
-                data += chunk
-            return data
-        first, second = take(2)
-        length = second & 0x7F
-        if length == 126:
-            length = struct.unpack("!H", take(2))[0]
-        elif length == 127:
-            length = struct.unpack("!Q", take(8))[0]
-        mask = take(4)
-        return bytes(byte ^ mask[i % 4] for i, byte in enumerate(take(length)))
-
-    def send(self, message):
-        data = json.dumps(message).encode()
-        length = len(data)
-        head = struct.pack("!BB", 0x81, length) if length < 126 else (
-            struct.pack("!BBH", 0x81, 126, length) if length < 65536 else struct.pack("!BBQ", 0x81, 127, length))
-        with self.lock:
-            self.peer.sendall(head + data)
-
-    def handle(self, message):
-        method, params = message["method"], message.get("params", {})
-        if method == "Target.setDiscoverTargets":
-            self.send({"id": message["id"], "result": {}})
-            for page in self.pages:
-                self.send({"method": "Target.targetCreated", "params": {"targetInfo": {**page, "attached": False}}})
-        elif method == "Target.attachToTarget":
-            page = next(page for page in self.pages if page["targetId"] == params["targetId"])
-            self.attached.append(page["targetId"])
-            self.send({"id": message["id"], "result": {"sessionId": "session-" + page["targetId"]}})
-            self.send({"method": "Target.attachedToTarget",
-                       "params": {"sessionId": "session-" + page["targetId"], "targetInfo": page, "waitingForDebugger": False}})
-        elif method == "Runtime.evaluate":
-            self.evaluated.append((message["sessionId"].removeprefix("session-"), params["expression"]))
-            self.send({"id": message["id"], "sessionId": message["sessionId"], "result": {"result": {"type": "number", "value": 1}}})
-
-    def navigate(self, target, url, title="Steam"):
-        page = next(page for page in self.pages if page["targetId"] == target)
-        page.update(url=url, title=title)
-        self.send({"method": "Target.targetInfoChanged", "params": {"targetInfo": {**page, "attached": True}}})
-
-    def close(self):
-        # a thread blocked on a socket keeps it open past close, shutdown frees it
-        for open_socket in filter(None, (self.server, self.peer)):
-            with contextlib.suppress(OSError):
-                open_socket.shutdown(socket.SHUT_RDWR)
-            open_socket.close()
+def import_steam_window_buttons(case):
+    sys.path.insert(0, str(SESSION_SOURCE_DIR))
+    try:
+        import steam_window_buttons
+    finally:
+        sys.path.remove(str(SESSION_SOURCE_DIR))
+    case.addCleanup(sys.modules.pop, "steam_window_buttons", None)
+    return steam_window_buttons
 
 
-def steam_page(target, url, kind="page", title="Steam"):
-    return {"targetId": target, "type": kind, "url": url, "title": title}
-
-
-class TestSteamWindowButtonsHelper(unittest.TestCase):
-    MAIN = "about:blank?createflags=18&minwidth=1010&minheight=600&pid=0&browser=-1&browserType=4"
-    SHARED = "https://steamloopback.host/index.html?IN_CLIENT=true&PLATFORM=linux"
+class SteamFolderCase(unittest.TestCase):
+    # Steam's own sheet starts with a selector, minified
+    STEAM_SHEET = b"button.DialogButton{color:#fff}" + b".Panel{display:flex}" * 60
+    STYLE = ".title-bar-actions { order: -1 !important; }\n"
 
     def setUp(self):
         folder = tempfile.TemporaryDirectory()
         self.addCleanup(folder.cleanup)
-        self.style = Path(folder.name) / "window-buttons.css"
-        self.style.write_text(".title-bar-actions { order: -1 !important; }\n")
-        self.log = Path(folder.name) / "helper.log"
+        self.home = Path(folder.name)
+        environment = unittest.mock.patch.dict(os.environ, {"HOME": str(self.home), "XDG_DATA_HOME": str(self.home / "data")})
+        environment.start()
+        self.addCleanup(environment.stop)
+        self.native = self.home / "data" / "Steam"
+        self.flatpak = self.home / ".var/app/com.valvesoftware.Steam/.local/share/Steam"
+
+    def install(self, folder, sheet=STEAM_SHEET):
+        css = folder / "steamui" / "css"
+        css.mkdir(parents=True, exist_ok=True)
+        (css / "library.css").write_bytes(sheet)
+        (css / "library.css").chmod(0o755)
+        return css / "library.css"
+
+    def original(self, folder):
+        return folder / "steamui" / "css" / "library.mavernix-original.css"
+
+    def ours(self, folder):
+        return folder / "steamui" / "mavernix" / "window-buttons.css"
+
+
+class TestSteamSheetPatch(SteamFolderCase):
+    def setUp(self):
+        super().setUp()
+        self.module = import_steam_window_buttons(self)
+        settle = unittest.mock.patch.object(self.module, "SETTLE_SECONDS", 0)
+        settle.start()
+        self.addCleanup(settle.stop)
+
+    def test_the_stub_imports_steams_sheet_and_the_style_at_the_same_size(self):
+        sheet = self.install(self.native)
+        self.assertEqual(self.module.patch(self.native, self.STYLE), "patched")
+        stub = sheet.read_bytes()
+        self.assertEqual(len(stub), len(self.STEAM_SHEET))
+        self.assertEqual(stub.rstrip(b" "), self.module.HEADER
+                         + b'@import url("library.mavernix-original.css");\n@import url("../mavernix/window-buttons.css");\n')
+        self.assertEqual(self.original(self.native).read_bytes(), self.STEAM_SHEET)
+        self.assertEqual(self.ours(self.native).read_text(), self.STYLE)
+        self.assertEqual(sheet.stat().st_mode & 0o777, 0o755)
+
+    def test_patching_again_writes_nothing(self):
+        sheet = self.install(self.native)
+        self.module.patch(self.native, self.STYLE)
+        before = sheet.stat().st_ino, self.ours(self.native).stat().st_ino, self.original(self.native).stat().st_ino
+        self.assertEqual(self.module.patch(self.native, self.STYLE), "unchanged")
+        self.assertEqual(before, (sheet.stat().st_ino, self.ours(self.native).stat().st_ino,
+                                  self.original(self.native).stat().st_ino))
+
+    def test_a_sheet_steam_wrote_again_is_patched_again(self):
+        sheet = self.install(self.native)
+        self.module.patch(self.native, self.STYLE)
+        update = b"button.DialogButton{color:#eee}" + b".Panel{display:grid}" * 90
+        sheet.write_bytes(update)
+        self.assertEqual(self.module.patch(self.native, self.STYLE), "patched")
+        self.assertEqual(self.original(self.native).read_bytes(), update)
+        self.assertEqual(len(sheet.read_bytes()), len(update))
+        self.assertTrue(sheet.read_bytes().startswith(self.module.HEADER))
+
+    def test_a_sheet_from_another_program_is_left_alone(self):
+        for foreign in (b'/* Adwaita-for-Steam */\n@import url("library.original.css");' + b" " * 900,
+                        b'@import url("theme.css");' + b" " * 900):
+            sheet = self.install(self.native, foreign)
+            self.assertEqual(self.module.patch(self.native, self.STYLE), "foreign_sheet")
+            self.assertEqual(sheet.read_bytes(), foreign)
+            self.assertFalse(self.original(self.native).exists())
+            self.assertFalse(self.ours(self.native).exists())
+
+    def test_a_sheet_still_being_written_waits(self):
+        sheet = self.install(self.native)
+        with unittest.mock.patch.object(self.module, "SETTLE_SECONDS", 60):
+            self.assertEqual(self.module.patch(self.native, self.STYLE), "settling")
+        self.assertEqual(sheet.read_bytes(), self.STEAM_SHEET)
+        self.assertFalse(self.ours(self.native).exists())
+        self.assertEqual(self.module.patch(self.native, self.STYLE), "patched")
+
+    def test_steam_restamping_an_old_time_does_not_hide_a_fresh_write(self):
+        sheet = self.install(self.native)
+        os.utime(sheet, (1_000_000_000, 1_000_000_000))
+        with unittest.mock.patch.object(self.module, "SETTLE_SECONDS", 60):
+            self.assertEqual(self.module.patch(self.native, self.STYLE), "settling")
+
+    def test_a_sheet_too_small_for_the_stub_is_left_alone(self):
+        sheet = self.install(self.native, b"a{b:c}")
+        self.assertEqual(self.module.patch(self.native, self.STYLE), "sheet_too_small")
+        self.assertEqual(sheet.read_bytes(), b"a{b:c}")
+
+    def test_no_sheet_writes_nothing(self):
+        self.native.mkdir(parents=True)
+        self.assertEqual(self.module.patch(self.native, self.STYLE), "no_sheet")
+        self.assertEqual(list(self.native.iterdir()), [])
+
+    def test_a_new_style_reaches_steam(self):
+        self.install(self.native)
+        self.module.patch(self.native, self.STYLE)
+        self.assertEqual(self.module.patch(self.native, ".closeButton { order: 9; }\n"), "style_updated")
+        self.assertEqual(self.ours(self.native).read_text(), ".closeButton { order: 9; }\n")
+
+    def test_a_lost_original_lets_steam_repair_the_sheet(self):
+        # a stub of another size fails Steam's size check, so its next start writes the sheet again
+        for undo in ("patch", "unpatch"):
+            sheet = self.install(self.native)
+            self.module.patch(self.native, self.STYLE)
+            self.original(self.native).unlink()
+            self.assertEqual(getattr(self.module, undo)(self.native, *((self.STYLE,) if undo == "patch" else ())),
+                             "original_lost")
+            self.assertNotEqual(len(sheet.read_bytes()), len(self.STEAM_SHEET))
+
+    def test_unpatch_gives_steam_its_sheet_back(self):
+        sheet = self.install(self.native)
+        self.module.patch(self.native, self.STYLE)
+        self.assertEqual(self.module.unpatch(self.native), "restored")
+        self.assertEqual(sheet.read_bytes(), self.STEAM_SHEET)
+        self.assertEqual(sheet.stat().st_mode & 0o777, 0o755)
+        self.assertFalse(self.original(self.native).exists())
+        self.assertFalse(self.ours(self.native).parent.exists())
+
+    def test_unpatch_after_a_steam_update_drops_only_our_files(self):
+        sheet = self.install(self.native)
+        self.module.patch(self.native, self.STYLE)
+        sheet.write_bytes(self.STEAM_SHEET + b"x")
+        self.assertEqual(self.module.unpatch(self.native), "restored")
+        self.assertEqual(sheet.read_bytes(), self.STEAM_SHEET + b"x")
+        self.assertFalse(self.original(self.native).exists())
+        self.assertFalse(self.ours(self.native).parent.exists())
+
+    def test_unpatch_leaves_sheets_that_are_not_ours(self):
+        for sheet_bytes in (self.STEAM_SHEET, b"/* Adwaita-for-Steam */\n" + b" " * 900):
+            sheet = self.install(self.native, sheet_bytes)
+            self.assertEqual(self.module.unpatch(self.native), "unchanged")
+            self.assertEqual(sheet.read_bytes(), sheet_bytes)
+
+    def test_every_steam_is_patched_and_each_change_logged_once(self):
+        for folder in (self.native, self.flatpak):
+            self.install(folder)
+        (self.home / ".steam").mkdir()
+        (self.home / ".steam" / "steam").symlink_to(self.native)
+        last = {}
+        with contextlib.redirect_stderr(io.StringIO()) as said:
+            self.module.patch_every_steam(self.STYLE, last)
+            self.module.patch_every_steam(self.STYLE, last)
+        for folder in (self.native, self.flatpak):
+            self.assertTrue((folder / "steamui/css/library.css").read_bytes().startswith(self.module.HEADER))
+        self.assertEqual(said.getvalue().count("result=patched"), 2, said.getvalue())
+        self.assertNotIn("unchanged", said.getvalue())
+
+    def test_a_lasting_refusal_is_logged_once(self):
+        self.install(self.native, b"/* Adwaita-for-Steam */\n" + b" " * 900)
+        last = {}
+        with contextlib.redirect_stderr(io.StringIO()) as said:
+            for _ in range(3):
+                self.module.patch_every_steam(self.STYLE, last)
+        self.assertEqual(said.getvalue().count("result=foreign_sheet"), 1, said.getvalue())
+
+    def test_without_a_style_every_steam_gets_its_sheet_back(self):
+        for folder in (self.native, self.flatpak):
+            self.install(folder)
+            self.module.patch(folder, self.STYLE)
+        with contextlib.redirect_stderr(io.StringIO()) as said:
+            self.module.patch_every_steam(None, {})
+        for folder in (self.native, self.flatpak):
+            self.assertEqual((folder / "steamui/css/library.css").read_bytes(), self.STEAM_SHEET)
+        self.assertEqual(said.getvalue().count("result=restored"), 2, said.getvalue())
+
+    def test_a_failing_folder_is_logged_and_the_others_still_patched(self):
+        for folder in (self.native, self.flatpak):
+            self.install(folder)
+        (self.native / "steamui" / "css").chmod(0o555)
+        self.addCleanup((self.native / "steamui" / "css").chmod, 0o755)
+        with contextlib.redirect_stderr(io.StringIO()) as said:
+            self.module.patch_every_steam(self.STYLE, {})
+        self.assertIn("result=failed", said.getvalue())
+        self.assertIn(json.dumps(str(self.native)), said.getvalue())
+        self.assertTrue((self.flatpak / "steamui/css/library.css").read_bytes().startswith(self.module.HEADER))
+
+    def test_no_steam_gets_no_folder(self):
+        self.module.patch_every_steam(self.STYLE, {})
+        self.module.take_back_debugging()
+        self.assertFalse((self.home / "data").exists())
+        self.assertFalse((self.home / ".var").exists())
+
+
+class TestSteamDebuggingFlag(SteamFolderCase):
+    def setUp(self):
+        super().setUp()
+        self.module = import_steam_window_buttons(self)
+
+    def flag(self, folder):
+        return folder / ".cef-enable-remote-debugging"
+
+    def test_our_old_flag_is_taken_back_and_the_users_kept(self):
+        for folder in (self.native, self.flatpak):
+            folder.mkdir(parents=True)
+        self.flag(self.native).write_text(self.module.OUR_MARK)
+        self.flag(self.flatpak).write_text("")
+        with contextlib.redirect_stderr(io.StringIO()) as said:
+            self.module.take_back_debugging()
+        self.assertFalse(self.flag(self.native).exists())
+        self.assertEqual(self.flag(self.flatpak).read_text(), "")
+        self.assertIn("result=debugging_off", said.getvalue())
+
+    def test_nothing_opens_the_port(self):
+        self.install(self.native)
+        self.module.patch_every_steam(self.STYLE, {})
+        self.module.take_back_debugging()
+        self.assertFalse(self.flag(self.native).exists())
+
+
+class TestSteamButtonsWatcher(SteamFolderCase):
+    def setUp(self):
+        super().setUp()
+        self.style = self.home / "window-buttons.css"
+        self.style.write_text(self.STYLE)
+        self.log = self.home / "watcher.log"
         self.session = subprocess.Popen(["sleep", "120"])
         self.addCleanup(self.end_session)
+        self.sheet = self.install(self.native)
 
     def end_session(self):
         if self.session.poll() is None:
             self.session.kill()
             self.session.wait(5)
 
-    def start(self, port):
+    def start(self):
         output = self.log.open("w")
         self.addCleanup(output.close)
-        helper = subprocess.Popen([sys.executable, str(SESSION_SOURCE_DIR / "steam_window_buttons.py"), str(self.style), str(port)],
-                                  env={**os.environ, "DESKTOP_SESSION_PID": str(self.session.pid)},
-                                  stderr=output, stdout=subprocess.DEVNULL)
+        watcher = subprocess.Popen([sys.executable, str(SESSION_SOURCE_DIR / "steam_window_buttons.py"), str(self.style)],
+                                   env={**os.environ, "DESKTOP_SESSION_PID": str(self.session.pid)},
+                                   stderr=output, stdout=subprocess.DEVNULL)
 
         def stop():
-            if helper.poll() is None:
-                helper.kill()
-                helper.wait(5)
+            if watcher.poll() is None:
+                watcher.kill()
+                watcher.wait(5)
         self.addCleanup(stop)
-        return helper
+        return watcher
 
     def wait_for(self, condition, what, seconds=10):
         deadline = time.monotonic() + seconds
@@ -2275,139 +2388,34 @@ class TestSteamWindowButtonsHelper(unittest.TestCase):
             if condition():
                 return
             time.sleep(0.05)
-        self.fail(f"{what} did not happen within {seconds} s; helper said:\n{self.log.read_text()}")
+        self.fail(f"{what} did not happen within {seconds} s; the watcher said:\n{self.log.read_text()}")
 
-    def styled(self, steam):
-        return [target for target, _ in steam.evaluated]
+    def patched(self):
+        return self.sheet.read_bytes().startswith(b"/* mavernix")
 
-    def test_every_steam_window_gets_the_style_and_nothing_else(self):
-        steam = FakeSteam([steam_page("main", self.MAIN), steam_page("shared", self.SHARED, title="SharedJSContext"),
-                           steam_page("store", "https://store.steampowered.com/"),
-                           steam_page("worker", self.SHARED, kind="service_worker")])
-        self.addCleanup(steam.close)
-        self.start(steam.port)
-        self.wait_for(lambda: sorted(self.styled(steam)) == ["main", "shared"], "styling both Steam windows")
-        time.sleep(0.3)
-        self.assertEqual(sorted(steam.attached), ["main", "shared"])
-        script = steam.evaluated[0][1]
-        self.assertIn(json.dumps(self.style.read_text()), script)
-        self.assertIn("mavernix-window-buttons", script)
-        self.wait_for(lambda: 'result=styled window="SharedJSContext"' in self.log.read_text(), "logging the styled window")
+    def test_a_steam_update_is_patched_again(self):
+        self.start()
+        self.wait_for(self.patched, "the first patch")
+        update = self.STEAM_SHEET + b".New{}"
+        self.sheet.write_bytes(update)
+        self.wait_for(self.patched, "patching Steam's new sheet")
+        self.assertEqual(self.original(self.native).read_bytes(), update)
+        self.assertEqual(self.log.read_text().count("result=patched"), 2, self.log.read_text())
 
-    def test_a_window_that_loads_a_new_page_is_styled_again(self):
-        steam = FakeSteam([steam_page("main", self.MAIN)])
-        self.addCleanup(steam.close)
-        self.start(steam.port)
-        self.wait_for(lambda: self.styled(steam) == ["main"], "the first styling")
-        steam.navigate("main", self.MAIN, title="Steam - Library")
-        time.sleep(0.5)
-        self.assertEqual(self.styled(steam), ["main"])
-        steam.navigate("main", self.SHARED)
-        self.wait_for(lambda: self.styled(steam) == ["main", "main"], "styling the new page")
-        self.assertEqual(steam.attached, ["main"])
-
-    def test_a_port_that_is_not_steams_is_left_alone(self):
-        stranger = FakeSteam([steam_page("main", self.MAIN)], agent="Mozilla/5.0 Chrome/126 Safari/537.36")
-        self.addCleanup(stranger.close)
-        self.start(stranger.port)
-        self.wait_for(lambda: "result=refused" in self.log.read_text(), "the refusal")
-        self.assertIsNone(stranger.peer)
-        self.assertEqual(stranger.evaluated, [])
-
-    def test_steam_started_again_is_styled_again(self):
-        steam = FakeSteam([steam_page("main", self.MAIN)])
-        port = steam.port
-        self.start(port)
-        self.wait_for(lambda: self.styled(steam) == ["main"], "styling the first Steam")
-        steam.close()
-        self.wait_for(lambda: "result=disconnected" in self.log.read_text(), "noticing Steam is gone")
-        again = FakeSteam([steam_page("main", self.MAIN)], port=port)
-        self.addCleanup(again.close)
-        self.wait_for(lambda: self.styled(again) == ["main"], "styling the second Steam")
-
-    def test_a_changed_style_reaches_open_windows(self):
-        steam = FakeSteam([steam_page("main", self.MAIN)])
-        self.addCleanup(steam.close)
-        self.start(steam.port)
-        self.wait_for(lambda: self.styled(steam) == ["main"], "the first styling")
-        time.sleep(0.05)
-        self.style.write_text(".title-bar-actions { order: 5 !important; }\n")
-        self.wait_for(lambda: len(steam.evaluated) == 2, "styling with the new style")
-        self.assertIn("order: 5", steam.evaluated[1][1])
+    def test_a_changed_style_reaches_steam(self):
+        self.start()
+        self.wait_for(self.patched, "the first patch")
+        self.style.write_text(".closeButton { order: 9; }\n")
+        self.wait_for(lambda: self.ours(self.native).read_text() == ".closeButton { order: 9; }\n", "copying the new style")
+        self.assertIn("result=style_updated", self.log.read_text())
 
     def test_it_ends_with_the_session(self):
-        helper = self.start(1)
-        self.wait_for(lambda: "result=waiting" in self.log.read_text(), "waiting for Steam")
+        watcher = self.start()
+        self.wait_for(self.patched, "the first patch")
         self.end_session()
-        self.assertEqual(helper.wait(10), 0)
+        self.assertEqual(watcher.wait(10), 0)
         self.assertIn("result=session_over", self.log.read_text())
-
-    def test_it_ends_with_the_session_while_holding_off_a_stranger(self):
-        stranger = FakeSteam([], agent="Mozilla/5.0 Chrome/126 Safari/537.36")
-        self.addCleanup(stranger.close)
-        helper = self.start(stranger.port)
-        self.wait_for(lambda: "result=refused" in self.log.read_text(), "the refusal")
-        self.end_session()
-        self.assertEqual(helper.wait(5), 0)
-
-    def test_it_ends_with_the_session_while_connected(self):
-        steam = FakeSteam([steam_page("main", self.MAIN)])
-        self.addCleanup(steam.close)
-        helper = self.start(steam.port)
-        self.wait_for(lambda: self.styled(steam) == ["main"], "the styling")
-        self.end_session()
-        self.assertEqual(helper.wait(10), 0)
-
-
-class TestSteamDebuggingSwitch(unittest.TestCase):
-    def setUp(self):
-        folder = tempfile.TemporaryDirectory()
-        self.addCleanup(folder.cleanup)
-        self.home = Path(folder.name)
-        sys.path.insert(0, str(SESSION_SOURCE_DIR))
-        try:
-            import steam_window_buttons
-        finally:
-            sys.path.remove(str(SESSION_SOURCE_DIR))
-        self.addCleanup(sys.modules.pop, "steam_window_buttons", None)
-        self.module = steam_window_buttons
-        environment = unittest.mock.patch.dict(os.environ, {"HOME": str(self.home), "XDG_DATA_HOME": str(self.home / "data")})
-        environment.start()
-        self.addCleanup(environment.stop)
-        self.native = self.home / "data" / "Steam"
-        self.flatpak = self.home / ".var/app/com.valvesoftware.Steam/.local/share/Steam"
-
-    def flag(self, folder):
-        return folder / ".cef-enable-remote-debugging"
-
-    def test_on_marks_each_installed_steam(self):
-        for folder in (self.native, self.flatpak):
-            folder.mkdir(parents=True)
-        (self.home / ".steam").mkdir()
-        (self.home / ".steam" / "steam").symlink_to(self.native)
-        self.module.switch_debugging(True)
-        for folder in (self.native, self.flatpak):
-            self.assertEqual(self.flag(folder).read_text(), self.module.OUR_MARK)
-
-    def test_no_steam_gets_no_folder(self):
-        self.module.switch_debugging(True)
-        self.assertFalse((self.home / "data").exists())
-        self.assertFalse((self.home / ".var").exists())
-
-    def test_off_takes_back_only_our_flag(self):
-        for folder in (self.native, self.flatpak):
-            folder.mkdir(parents=True)
-        self.flag(self.native).write_text(self.module.OUR_MARK)
-        self.flag(self.flatpak).write_text("")
-        self.module.switch_debugging(False)
-        self.assertFalse(self.flag(self.native).exists())
-        self.assertEqual(self.flag(self.flatpak).read_text(), "")
-
-    def test_on_leaves_the_users_own_flag_as_it_is(self):
-        self.native.mkdir(parents=True)
-        self.flag(self.native).write_text("")
-        self.module.switch_debugging(True)
-        self.assertEqual(self.flag(self.native).read_text(), "")
+        self.assertTrue(self.patched())
 
 
 class TestSteamButtonsAtLogin(unittest.TestCase):
@@ -2431,7 +2439,7 @@ class TestSteamButtonsAtLogin(unittest.TestCase):
         self.style.parent.mkdir(parents=True)
         self.style.write_text("/* style */\n")
         self.calls = unittest.mock.Mock()
-        for name in ("start", "switch_debugging"):
+        for name in ("start", "take_back_debugging", "patch_every_steam"):
             patcher = unittest.mock.patch(f"at_login.{name}", getattr(self.calls, name))
             patcher.start()
             self.addCleanup(patcher.stop)
@@ -2440,27 +2448,29 @@ class TestSteamButtonsAtLogin(unittest.TestCase):
         self.at_login.set_up_steam_buttons(config, str(self.settings))
         return [(call[0], call[1]) for call in self.calls.mock_calls]
 
-    def test_on_opens_the_port_and_starts_the_helper(self):
+    def test_on_patches_steam_then_starts_the_watcher(self):
         calls = self.set_up({"steam": {"window_buttons": True}})
-        self.assertEqual(calls[0], ("switch_debugging", (True,)))
-        self.assertEqual(calls[1][0], "start")
-        command = calls[1][1][0]
-        self.assertEqual(command[1:], [str(SESSION_SOURCE_DIR / "steam_window_buttons.py"), str(self.style)])
+        self.assertEqual(calls[0], ("take_back_debugging", ()))
+        self.assertEqual(calls[1], ("patch_every_steam", ("/* style */\n", {})))
+        self.assertEqual(calls[2][0], "start")
+        self.assertEqual(calls[2][1][0][1:], [str(SESSION_SOURCE_DIR / "steam_window_buttons.py"), str(self.style)])
+        self.assertEqual(len(calls), 3)
 
-    def test_off_closes_the_port(self):
+    def test_off_restores_steam(self):
         for config in ({}, {"steam": {"window_buttons": False}}):
             self.calls.reset_mock()
-            self.assertEqual(self.set_up(config), [("switch_debugging", (False,))])
+            self.assertEqual(self.set_up(config), [("take_back_debugging", ()), ("patch_every_steam", (None, {}))])
 
-    def test_a_theme_without_buttons_closes_the_port(self):
+    def test_a_theme_without_buttons_restores_steam(self):
         self.style.unlink()
-        self.assertEqual(self.set_up({"steam": {"window_buttons": True}}), [("switch_debugging", (False,))])
+        self.assertEqual(self.set_up({"steam": {"window_buttons": True}}),
+                         [("take_back_debugging", ()), ("patch_every_steam", (None, {}))])
 
-    def test_programs_kept_in_their_own_look_close_the_port(self):
+    def test_programs_kept_in_their_own_look_restore_steam(self):
         calls = self.set_up({"steam": {"window_buttons": True}, "gtk": {"use_theme": False}})
-        self.assertEqual(calls, [("switch_debugging", (False,))])
+        self.assertEqual(calls, [("take_back_debugging", ()), ("patch_every_steam", (None, {}))])
 
-    def test_the_port_is_set_before_any_program_starts(self):
+    def test_steam_is_patched_before_any_program_starts(self):
         calls = unittest.mock.Mock()
         self.settings.write_text(json.dumps({"config": {"steam": {"window_buttons": True}}}))
         for name in ("set_up_steam_buttons", "start_listed_programs", "start_users_programs", "wait_for_tray",
@@ -2476,9 +2486,24 @@ class TestSteamButtonsAtLogin(unittest.TestCase):
         self.assertLess(names.index("set_up_steam_buttons"), names.index("start_listed_programs"))
         self.assertLess(names.index("set_up_steam_buttons"), names.index("start_users_programs"))
 
-    def test_a_failing_switch_does_not_stop_the_login(self):
-        self.calls.switch_debugging.side_effect = PermissionError("read-only")
-        self.assertEqual(self.set_up({"steam": {"window_buttons": True}})[-1][0], "switch_debugging")
+    def test_a_failure_does_not_stop_the_login(self):
+        self.calls.take_back_debugging.side_effect = PermissionError("read-only")
+        with contextlib.redirect_stderr(io.StringIO()) as said:
+            self.assertEqual(self.set_up({"steam": {"window_buttons": True}}), [("take_back_debugging", ())])
+        self.assertIn("read-only", said.getvalue())
+
+    def test_the_real_steps_run_without_steam_or_optional_settings(self):
+        real = sys.modules["steam_window_buttons"]
+        with tempfile.TemporaryDirectory() as home, \
+             unittest.mock.patch.dict(os.environ, {"HOME": home}), \
+             unittest.mock.patch("at_login.take_back_debugging", real.take_back_debugging), \
+             unittest.mock.patch("at_login.patch_every_steam", real.patch_every_steam), \
+             contextlib.redirect_stderr(io.StringIO()):
+            for name in ("XDG_DATA_HOME", "DESKTOP_SESSION_PID"):
+                os.environ.pop(name, None)
+            calls = self.set_up({"steam": {"window_buttons": True}})
+            self.assertEqual(os.listdir(home), [])
+        self.assertEqual([name for name, _ in calls], ["start"])
 
 
 class TestGimpTitlebar(SessionTestCase):
