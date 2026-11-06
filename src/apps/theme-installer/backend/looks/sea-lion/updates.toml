@@ -375,3 +375,11 @@ table = "dock.shelf"
 key = "surface"
 was = ["#4a4a4aba", "#333333a6", "#2a2a2a8f"]
 now = ["#4a4a4ad5", "#333333c7", "#2a2a2ab6"]
+
+[[update]]
+revision = 16
+import_brings = [
+    "Toolbars in KDE programs and file dialogs get Mavericks' own buttons, such as back, forward and the view modes, instead of Breeze's.",
+    "New folders can take an emblem in Mavericks' engraved style, for bookmarks, cloud, games, mail, printing, archives, temporary files and important things.",
+    "Every folder in a KDE side bar gets Finder's blue grey glyph, the public folder and emblem folders included.",
+]

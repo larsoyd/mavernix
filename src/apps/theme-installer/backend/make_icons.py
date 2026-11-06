@@ -4,15 +4,18 @@ Run it after make_theme.py:
 
     python make_icons.py WORK OUTPUT/sea-lion
 
-WORK is the folder holding the unpacked installer under root/. The icons
-that have a freedesktop.org name, and every program's and System Preferences
-pane's under its bundle identifier, are converted from .icns and written as
-an icon theme into OUTPUT/share/icons/SeaLion/. So are links giving every
-other file type of shared-mime-info the nearest of those; other names fall
-back to INHERITS.
+WORK is the folder holding the unpacked installer under root/ and the decoded
+shared artwork under artwork/sartfile. The icons that have a freedesktop.org
+name, and every program's and System Preferences pane's under its bundle
+identifier, are converted from .icns and written as an icon theme into
+OUTPUT/share/icons/SeaLion/. So are toolbar icons from AppKit's template
+pictures, folders with the emblems in folder-emblems/ engraved as Mavericks
+engraves its own, and links giving every other file type of shared-mime-info
+the nearest of those; other names fall back to INHERITS.
 """
 
 import argparse
+import io
 import plistlib
 import re
 import shutil
@@ -21,7 +24,9 @@ import sys
 import tempfile
 from pathlib import Path
 
-from PIL import Image
+from PIL import Image, ImageChops, ImageFilter, ImageMath
+
+import make_theme
 
 ICON_THEME_NAME = "SeaLion"
 
@@ -432,6 +437,15 @@ SIDE_BAR_ICONS = {
     "folder-network": ("places", "SidebarNetwork.icns"),
     "network-workgroup": ("places", "SidebarNetwork.icns"),
     "folder-root": ("places", "SidebarInternalDisk.icns"),
+    # KDE falls back to it for any folder-*-symbolic a user picks for a place
+    "folder-symbolic": ("places", "SidebarGenericFolder.icns"),
+    "inode-directory": ("places", "SidebarGenericFolder.icns"),
+    "folder-open-recent": ("places", "SidebarRecents.icns"),
+    "folder-saved-search-symbolic": ("places", "SidebarSmartFolder.icns"),
+    "folder-applications": ("places", "SidebarApplicationsFolder.icns"),
+    "folder-utilities": ("places", "SidebarUtilitiesFolder.icns"),
+    "folder-development": ("places", "SidebarUtilitiesFolder.icns"),
+    "folder-publicshare": ("places", "SidebarDropBoxFolder.icns"),
     "document-open-recent": ("places", "SidebarRecents.icns"),
     "view-calendar-day": ("places", "SidebarRecents.icns"),
     "drive-harddisk": ("devices", "SidebarInternalDisk.icns"),
@@ -440,6 +454,11 @@ SIDE_BAR_ICONS = {
     "media-optical": ("devices", "SidebarOpticalDisk.icns"),
     "computer": ("devices", "SidebarLaptop.icns"),
 }
+
+# finder's side bar glyph paint, measured on its generic folder
+SIDE_BAR_GLYPH_TOP = (116, 126, 140)
+SIDE_BAR_GLYPH_BOTTOM = (102, 113, 128)
+SIDE_BAR_GLYPH_EMBOSS = {1: (255, 255, 255, 150), 2: (255, 255, 255, 64)}
 
 # mavericks draws few file types: text is TextEdit's, the rest the plain document
 MIME_DATABASE = Path("/usr/share/mime")
@@ -497,6 +516,40 @@ SIZES = [16, 32, 48, 64, 128, 256, 512]
 
 # Sizes from this one up are declared scalable.
 SMALLEST_SCALABLE_SIZE = 128
+
+# toolbar icons, by shared art entry: AppKit's black templates, painted as a toolbar paints them
+ACTION_TEMPLATES = {
+    "go-previous": 127, "go-next": 128, "go-up": 126, "view-refresh": 290,
+    "view-list-icons": 353, "view-list-details": 351, "view-list-text": 351, "view-list-tree": 354,
+    "view-split-left-right": 351, "view-preview": 178, "view-sort": 331,
+    "bookmarks": 138, "bookmark-new": 138, "folder-new": 188,
+    "configure": 334, "application-menu": 169, "edit-find": 295,
+    "dialog-ok": 145, "dialog-ok-apply": 145, "object-locked": 182, "object-unlocked": 183,
+}
+IMAGE_KIT = "System/Library/Frameworks/Quartz.framework/Versions/A/Frameworks/ImageKit.framework/Versions/A/Resources"
+# drawn in their own colours: the search field's clear button and the zoom slider's ends
+ACTION_PICTURES = {
+    "edit-clear": 239, "edit-clear-locationbar-rtl": 239, "edit-clear-locationbar-ltr": 239,
+    "zoom-out": f"{IMAGE_KIT}/ik_zoomp_small.tiff", "zoom-in": f"{IMAGE_KIT}/ik_zoomp_big.tiff",
+}
+ACTION_SIZES = [16, 22]
+
+EMBLEM_FOLDERS = Path(__file__).resolve().parent / "folder-emblems"
+# fitted on mavericks' music, developer and utilities folders, by size
+# a channel's fill (k, b, across, down), then the dark and light edge as (offset, blur, opacity)
+ENGRAVINGS = {
+    512: (((1.008, -44.4, 19.4, 14.2), (1.064, -61.3, 25.1, 24.0), (1.052, -60.6, 27.0, 26.6)),
+          (2.57, 1.93, 0.05), (2.0, 0.75, 0.29)),
+    256: (((0.998, -41.9, 19.3, 12.9), (1.054, -58.8, 24.9, 23.2), (1.026, -54.1, 26.7, 25.3)),
+          (0.72, 0.88, 0.1), (0.41, 0.49, 0.4)),
+    128: (((0.922, -19.8, 8.8, 0.5), (1.171, -78.6, 18.5, 22.7), (1.094, -63.5, 22.2, 21.3)),
+          (0.44, 0.94, 0.27), (0.77, 0.09, 0.31)),
+    64: (((1, -25.0, 0, 0), (1, -21.7, 0, 0), (1, -19.0, 0, 0)), (0.41, 0.22, 0.25), (0.34, 0.06, 0.37)),
+    32: (((1, -37.8, 0, 0), (1, -32.3, 0, 0), (1, -27.2, 0, 0)), (0.17, 0.09, 0.35), (0.19, 0.03, 0.28)),
+    16: (((1, -49.0, 0, 0), (1, -42.7, 0, 0), (1, -34.0, 0, 0)), (0.09, 0.05, 0.36), (0.06, 0.02, 0.46)),
+}
+# apple draws small emblems on whole pixels, a soft edge there reads too faint
+CRISP_EMBLEM_UP_TO = 32
 
 
 def fail(message):
@@ -640,13 +693,150 @@ def write_file_type_links(theme_directory, icons):
                 (folder / f"{name}.png").symlink_to(f"{target}.png")
 
 
-def write_centred(picture, square_size, target):
-    """Writes a picture into the middle of a transparent square."""
-    drawing = Image.open(picture).convert("RGBA")
+def centred(drawing, square_size):
     square = Image.new("RGBA", (square_size, square_size), (0, 0, 0, 0))
     square.paste(drawing, ((square_size - drawing.width) // 2, (square_size - drawing.height) // 2))
+    return square
+
+
+def write_centred(picture, square_size, target):
+    """Writes a picture into the middle of a transparent square."""
     target.parent.mkdir(parents=True, exist_ok=True)
-    square.save(target)
+    centred(Image.open(picture).convert("RGBA"), square_size).save(target)
+
+
+def shared_art(work, entry, density):
+    """A shared art entry at density 1 or 2, or None when it has only the single size."""
+    path = work / "artwork" / "sartfile" / f"{entry:03d}-{density}x.png"
+    if not path.is_file():
+        if density == 2 and (work / "artwork" / "sartfile" / f"{entry:03d}-1x.png").is_file():
+            return None
+        fail(f"{path} is missing. Decode SArtFile.bin first.")
+    return Image.open(path).convert("RGBA")
+
+
+def action_picture(work, source, density, painted):
+    """One toolbar picture at density 1 or 2, or None where the installer has no such size."""
+    if isinstance(source, str):
+        path = work / "root" / source
+        if not path.is_file():
+            fail(f"{path} is missing")
+        return Image.open(path).convert("RGBA") if density == 1 else None
+    shape = shared_art(work, source, density)
+    if shape is None or not painted:
+        return shape
+    return make_theme.paint_glyph(shape, make_theme.TOOLBAR_GLYPH_TOP, make_theme.TOOLBAR_GLYPH_BOTTOM,
+                                  make_theme.TOOLBAR_GLYPH_EMBOSS, density)
+
+
+def write_action_icons(work, theme_directory, templates, pictures):
+    """Writes toolbar icons unscaled in the middle of each square they fit, as a toolbar shows them.
+    Returns the (size, scale) folders written."""
+    written = set()
+    sources = [(name, source, True) for name, source in templates.items()]
+    sources += [(name, source, False) for name, source in pictures.items()]
+    for name, source, painted in sources:
+        for scale in (1, 2):
+            picture = action_picture(work, source, scale, painted)
+            if picture is None:
+                continue
+            for size in ACTION_SIZES:
+                square = size * scale
+                if picture.width > square or picture.height > square:
+                    continue
+                target = theme_directory / folder_name(size, scale) / "actions" / f"{name}.png"
+                target.parent.mkdir(parents=True, exist_ok=True)
+                centred(picture, square).save(target)
+                written.add((size, scale))
+    return written
+
+
+def shifted(mask, dy):
+    return mask.transform(mask.size, Image.AFFINE, (1, 0, 0, 0, 1, -dy), resample=Image.BILINEAR)
+
+
+def blurred(mask, radius):
+    return mask.filter(ImageFilter.GaussianBlur(radius)) if radius > 0.05 else mask
+
+
+def engraved_fill(folder, fill):
+    width, height = folder.size
+    across = Image.linear_gradient("L").rotate(90).resize((width, height))
+    down = Image.linear_gradient("L").resize((width, height))
+    bands = []
+    for band, (k, b, along_x, along_y) in zip(folder.split()[:3], fill):
+        bands.append(ImageMath.lambda_eval(
+            lambda a: a["v"] * k + b + a["x"] * (along_x / 255) + a["y"] * (along_y / 255),
+            v=band.convert("F"), x=across.convert("F"), y=down.convert("F")).convert("L"))
+    return Image.merge("RGBA", bands + [folder.getchannel("A")])
+
+
+def engrave(folder, mask, size):
+    """The folder with `mask` pressed into it as Mavericks presses its emblems."""
+    if size not in ENGRAVINGS:
+        fail(f"no engraving was fitted for {size} pixel folders")
+    fill, (shadow_dy, shadow_blur, shadow_opacity), (light_dy, light_blur, light_opacity) = ENGRAVINGS[size]
+    out = Image.composite(engraved_fill(folder, fill), folder, mask)
+    shadow = ImageChops.multiply(mask, ImageChops.invert(blurred(shifted(mask, shadow_dy), shadow_blur)))
+    out = Image.composite(Image.new("RGBA", out.size, (0, 0, 0, 255)), out,
+                          shadow.point(lambda value: value * shadow_opacity))
+    light = ImageChops.multiply(blurred(shifted(mask, light_dy), light_blur), ImageChops.invert(mask))
+    light = ImageChops.multiply(light, folder.getchannel("A"))
+    out = Image.composite(Image.new("RGBA", out.size, (255, 255, 255, 255)), out,
+                          light.point(lambda value: value * light_opacity))
+    out.putalpha(folder.getchannel("A"))
+    return out
+
+
+def emblem_mask(artwork, size):
+    result = subprocess.run(["rsvg-convert", "-w", str(size), "-h", str(size), str(artwork)],
+                            capture_output=True, timeout=30)
+    if result.returncode != 0:
+        fail(f"rsvg-convert could not draw {artwork}: {result.stderr.decode(errors='replace').strip()}")
+    mask = Image.open(io.BytesIO(result.stdout)).getchannel("A")
+    if size <= CRISP_EMBLEM_UP_TO:
+        mask = mask.point(lambda value: min(255, max(0, (value - 51) * 255 // 153)))
+    return mask
+
+
+def write_side_bar_emblems(theme_directory):
+    """Each emblem on its own as a side bar glyph, so a place given an emblem folder's name
+    matches its neighbours. Returns the (size, scale) folders written."""
+    written = set()
+    for artwork in sorted(EMBLEM_FOLDERS.glob("*.svg")):
+        shape = emblem_mask(artwork, 512)
+        shape = shape.crop(shape.getbbox())
+        for scale in (1, 2):
+            fit = SIDE_BAR_DRAWING_SIZE * scale / max(shape.size)
+            mask = shape.resize((round(shape.width * fit), round(shape.height * fit)), Image.LANCZOS)
+            glyph = Image.new("RGBA", mask.size, (0, 0, 0, 255))
+            glyph.putalpha(mask)
+            painted = make_theme.paint_glyph(glyph, SIDE_BAR_GLYPH_TOP, SIDE_BAR_GLYPH_BOTTOM,
+                                             SIDE_BAR_GLYPH_EMBOSS[scale], scale)
+            target = theme_directory / folder_name(SIDE_BAR_SIZE, scale) / "places" / f"{artwork.stem}.png"
+            target.parent.mkdir(parents=True, exist_ok=True)
+            centred(painted, SIDE_BAR_SIZE * scale).save(target)
+            written.add((SIDE_BAR_SIZE, scale))
+    return written
+
+
+def write_emblem_folders(theme_directory):
+    """Engraves every emblem into each size of the plain folder. Returns how many it wrote."""
+    artworks = sorted(EMBLEM_FOLDERS.glob("*.svg"))
+    if not artworks:
+        fail(f"{EMBLEM_FOLDERS} holds no emblems")
+    written = 0
+    for size in sorted(ENGRAVINGS):
+        # the 22 pixel folder is the side bar's glyph, not the folder
+        folder_file = theme_directory / folder_name(size, 1) / "places" / "folder.png"
+        if not folder_file.is_file():
+            continue
+        folder = Image.open(folder_file).convert("RGBA")
+        for artwork in artworks:
+            engrave(folder, emblem_mask(artwork, folder.width), folder.width).save(
+                folder_file.parent / f"{artwork.stem}.png")
+            written += 1
+    return written
 
 
 def folder_name(size, scale):
@@ -665,7 +855,7 @@ def index_text(contexts_by_size):
             directory = f"{folder_name(size, scale)}/{context}"
             directories.append(directory)
             context_name = {"apps": "Applications", "places": "Places", "devices": "Devices",
-                            "mimetypes": "MimeTypes", "status": "Status"}[context]
+                            "mimetypes": "MimeTypes", "status": "Status", "actions": "Actions"}[context]
             lines = [f"[{directory}]", f"Size={size}", f"Context={context_name}"]
             if scale != 1:
                 lines += [f"Scale={scale}"]
@@ -741,6 +931,12 @@ def main():
                 write_centred(picture, SIDE_BAR_SIZE * scale, target)
                 contexts_by_size.setdefault((SIDE_BAR_SIZE, scale), set()).add(context)
 
+    emblem_folders = write_emblem_folders(theme_directory)
+    for size_and_scale in write_action_icons(arguments.work, theme_directory, ACTION_TEMPLATES, ACTION_PICTURES):
+        contexts_by_size.setdefault(size_and_scale, set()).add("actions")
+    for size_and_scale in write_side_bar_emblems(theme_directory):
+        contexts_by_size.setdefault(size_and_scale, set()).add("places")
+
     if not MIME_DATABASE.is_dir():
         fail(f"{MIME_DATABASE} is missing; install shared-mime-info")
     program_icons = {picture.stem for picture in PROGRAM_ICONS.glob("*/mimetypes/*")}
@@ -748,7 +944,8 @@ def main():
 
     (theme_directory / "index.theme").write_text(index_text(contexts_by_size))
     print(f"wrote {len(ICONS) + len(BUNDLES) + len(SIDE_BAR_ICONS)} icons from {len(converted)} of the installer's "
-          f"icon files into {theme_directory}")
+          f"icon files, {emblem_folders} emblem folders and "
+          f"{len(ACTION_TEMPLATES) + len(ACTION_PICTURES)} toolbar icons into {theme_directory}")
 
 
 if __name__ == "__main__":
