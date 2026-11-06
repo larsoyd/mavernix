@@ -7,7 +7,7 @@
 - The menu bar can be on every display: Settings, Mission Control, Show the menu bar on every display. All of them show the same menus, or each display's own window with Give each display the menus of its own window, as on OS X, where the bars of the other displays fade.
 - Focus follows mouse can leave the menu bar alone until you click a window: Settings, Extensions, Focus follows mouse.
 - REAPER's menus are in the menu bar, and its audio status follows Help as on macOS, kept up to date by REAPER itself. Clicking it opens REAPER's audio device settings. Turning global menus off gives REAPER its own bar back at its next start.
-- REAPER opens files, media and folders in the desktop's file dialog, the one other programs use, with REAPER's own options such as Open read-only below the list. Save Project keeps REAPER's dialog, whose format and trim settings the desktop's dialog cannot show, and so does any dialog when the desktop's is missing or fails.
+- REAPER opens files, media and folders in the desktop's file dialog, the one other programs use, with REAPER's own options such as Open read-only below the list. Save Project opens the desktop's save dialog too, with all of REAPER's project options below the list as on macOS: ticking Convert media wakes Format and Trim at once, and Format opens REAPER's own settings. REAPER's own dialog comes back whenever the desktop's is missing or fails.
 - Steam's close, minimize and zoom buttons can take the theme's look at the left of its windows, in the Mac's order, with `[steam] window_buttons = true`. It patches one of Steam's stylesheets and patches it again after Steam updates, with no debugging port (see docs/configuration.md).
 
 ### Changed
