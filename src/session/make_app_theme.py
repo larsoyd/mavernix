@@ -37,7 +37,7 @@ from themes import usable_icon_theme
 from write_interface_settings import wanted_interface_values
 
 try:
-    from PIL import Image
+    from PIL import Image, ImageDraw
 except ImportError:
     sys.exit("make_app_theme: Python's Pillow is needed to cut and embed the theme's pictures. "
              "On Arch: sudo pacman -S --needed python-pillow")
@@ -381,13 +381,17 @@ def write_kvantum_theme(theme, theme_directory, output_directory):
     if tooltip is not None:
         colors["tooltip.base.color"] = tooltip["color"]
         colors["tooltip.text.color"] = tooltip["text_color"]
-        padding = tooltip.get("padding", 2)
-        side = 2 * padding + 1
+        border = tooltip.get("padding", 2) + (1 if "edge" in tooltip else 0)
+        side = 2 * border + 1
+        box = Image.new("RGBA", (side, side), color_tuple(tooltip["color"]))
+        if "edge" in tooltip:
+            ImageDraw.Draw(box).rectangle((0, 0, side - 1, side - 1), outline=color_tuple(tooltip["edge"]))
         picture.remove(r"tooltip-normal(-.*)?")
-        picture.add_nine_parts_of("tooltip-normal", Image.new("RGBA", (side, side), color_tuple(tooltip["color"])),
-                                  (side, side), [padding] * 4)
+        picture.add_nine_parts_of("tooltip-normal", box, (side, side), [border] * 4)
         for edge in ("top", "bottom", "left", "right"):
-            settings["ToolTip"][f"frame.{edge}"] = str(padding)
+            settings["ToolTip"][f"frame.{edge}"] = str(border)
+        # the stock shadow is drawn for the stock box
+        general["tooltip_shadow_depth"] = "0"
 
     # as with buttons, the pointer over an arrow changes nothing
     picture.copy_state(r"(flat-)?arrow-[a-z]+", "normal", "focused")

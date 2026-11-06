@@ -395,3 +395,9 @@ hold_menu_arrow = false
 color = "#ffffc7f2"
 text_color = "#000000"
 padding = 2
+
+[[update]]
+revision = 18
+
+[update.settings."controls.tooltip"]
+edge = "#00000040"

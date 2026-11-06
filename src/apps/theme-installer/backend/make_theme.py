@@ -297,6 +297,8 @@ text_color = "#000000"
 TOOLTIP_COLOR = "#ffffc7f2"
 TOOLTIP_TEXT_COLOR = "#000000"
 TOOLTIP_PADDING = 2
+# the window server's rim and soft shadow, as one faint line
+TOOLTIP_EDGE = "#00000040"
 
 TITLE_FONT_SIZE = 13
 
@@ -2043,6 +2045,7 @@ hold_menu_arrow = false
 color = "{TOOLTIP_COLOR}"
 text_color = "{TOOLTIP_TEXT_COLOR}"
 padding = {TOOLTIP_PADDING}
+edge = "{TOOLTIP_EDGE}"
 
 [controls.slider]
 track = "images/controls/slider-track.png"
