@@ -1,4 +1,5 @@
 #include <KFileCustomDialog>
+#include <KFilePlacesView>
 #include <KFileWidget>
 #include <KUrlComboBox>
 #include <QCheckBox>
@@ -9,6 +10,7 @@
 #include <QPushButton>
 #include <QScreen>
 #include <QTemporaryDir>
+#include <QWindow>
 #include <QtTest>
 
 #include "save-panel.h"
@@ -117,6 +119,7 @@ private Q_SLOTS:
         QVERIFY(!control<QPushButton>(panel, "1056")->isEnabled());
         QVERIFY(!control<QLineEdit>(panel, "1577")->isEnabled());
         QCOMPARE(control<QLineEdit>(panel, "1577")->text(), QString("500"));
+        QVERIFY2(control<QLineEdit>(panel, "1577")->width() < 2 * 66, "a field for a few digits took the row's spare width");
         QCOMPARE(control<QLabel>(panel, "1578")->text(), QString("ms"));
         QCOMPARE(control<QCheckBox>(panel, "1045")->text(),
             QString("Copy rather than move source media if not in old project media path"));
@@ -225,6 +228,57 @@ private Q_SLOTS:
         QVERIFY2(sent == QStringList({"shown"}), qPrintable(sent.join(" | ")));
     }
 
+    void noControlIsSqueezed()
+    {
+        SavePanel* panel = opened({"title\tT", "control\t1\tcheck\t8\t2\t277\t19\t1\t0\tCopy all media into project directory, using:",
+            "control\t2\tcheck\t291\t2\t112\t19\t1\t0\tConvert media", "control\t3\tedit\t410\t0\t66\t23\t1\t0\t500",
+            "control\t4\tlabel\t480\t4\t19\t15\t1\t0\tms"});
+        const int screen = QGuiApplication::primaryScreen()->availableGeometry().width();
+        QVERIFY2(panel->options()->sizeHint().width() <= screen * 9 / 10, "the row must fit for this case to mean anything");
+        panel->dialog()->resize(200, panel->dialog()->height());
+        QTest::qWait(100);
+        const int right = panel->options()->mapTo(panel->dialog(), QPoint(panel->options()->width(), 0)).x();
+        QVERIFY2(right <= panel->dialog()->width(),
+            qPrintable(QStringLiteral("panel ends at %1 in a window %2 wide").arg(right).arg(panel->dialog()->width())));
+        for (const char* id : {"1", "2", "3", "4"})
+        {
+            QWidget* widget = panel->options()->findChild<QWidget*>(id);
+            QVERIFY2(widget->width() >= std::min(widget->sizeHint().width(), widget->maximumWidth()),
+                qPrintable(QStringLiteral("%1 is %2 wide, needs %3").arg(id).arg(widget->width()).arg(widget->sizeHint().width())));
+        }
+    }
+
+    void rowsWrapOnAScreenTooSmallForThem()
+    {
+        QStringList lines{"title\tT"};
+        for (int at = 1; at <= 6; at++)
+            lines << QStringLiteral("control\t%1\tcheck\t%2\t2\t200\t19\t1\t0\tA rather long option label number %1").arg(at).arg(at * 210);
+        SavePanel* panel = opened(lines);
+        QStringList flat;
+        for (const QStringList& row : rows(panel))
+            flat << row;
+        QCOMPARE(flat, QStringList({"1", "2", "3", "4", "5", "6"}));
+        QVERIFY2(rows(panel).size() > 1, "a row wider than the screen stayed whole");
+        const int right = panel->options()->mapTo(panel->dialog(), QPoint(panel->options()->width(), 0)).x();
+        QVERIFY2(right <= panel->dialog()->width(), qPrintable(QStringLiteral("%1 > %2").arg(right).arg(panel->dialog()->width())));
+        QVERIFY(panel->dialog()->width() <= QGuiApplication::primaryScreen()->availableGeometry().width());
+        QApplication::processEvents();
+        for (int at = 1; at <= 6; at++)
+        {
+            QWidget* widget = panel->options()->findChild<QWidget*>(QString::number(at));
+            QVERIFY(widget->width() >= widget->sizeHint().width());
+        }
+    }
+
+    void placesKeepTheWidthTheUserGaveThem()
+    {
+        SavePanel* panel = opened(SAVE_PROJECT);
+        QTest::qWait(200);
+        auto places = panel->dialog()->fileWidget()->findChild<KFilePlacesView*>();
+        QVERIFY(places);
+        QVERIFY2(qAbs(places->width() - 195) <= 4, qPrintable(QString::number(places->width())));
+    }
+
     void longAndEmptyTextStayInBounds()
     {
         const QString endless(400, QChar('w'));
@@ -252,8 +306,22 @@ int main(int argc, char** argv)
     for (const char* name : {"HOME", "XDG_CONFIG_HOME", "XDG_DATA_HOME", "XDG_CACHE_HOME", "XDG_STATE_HOME"})
         qputenv(name, (home.path() + "/" + name).toUtf8());
     qputenv("XDG_RUNTIME_DIR", home.path().toUtf8());
+    QDir().mkpath(home.path() + "/XDG_CONFIG_HOME");
+    QFile settings(home.path() + "/XDG_CONFIG_HOME/kdeglobals");
+    if (!settings.open(QIODevice::WriteOnly) || settings.write("[KFileDialog Settings]\nSpeedbar Width=195\n") < 0)
+        qFatal("cannot write the dialog settings");
+    settings.close();
     qunsetenv("DBUS_SESSION_BUS_ADDRESS");
+    // the size of the headless session's screen, where kio's own minimum leaves the rows too little room
+    QFile screens(home.filePath("screens.json"));
+    if (!screens.open(QIODevice::WriteOnly) ||
+        screens.write(R"({"screens": [{"name": "s", "x": 0, "y": 0, "width": 1280, "height": 720, "logicalDpi": 96}]})") < 0)
+        qFatal("cannot write the screen setup");
+    screens.close();
+    qputenv("QT_QPA_PLATFORM", ("offscreen:configfile=" + screens.fileName()).toUtf8());
     QApplication app(argc, argv);
+    if (QGuiApplication::primaryScreen()->geometry().width() != 1280)
+        qFatal("offscreen screen is %d wide, not 1280", QGuiApplication::primaryScreen()->geometry().width());
     TestReaperSavePanel test;
     return QTest::qExec(&test, argc, argv);
 }

@@ -1,7 +1,11 @@
 #include "save-panel.h"
 
 #include <KFileCustomDialog>
+#include <KConfigGroup>
+#include <KFilePlacesView>
 #include <KFileWidget>
+#include <KSharedConfig>
+#include <KUrlComboBox>
 #include <QCheckBox>
 #include <QComboBox>
 #include <QDir>
@@ -11,6 +15,7 @@
 #include <QLineEdit>
 #include <QPushButton>
 #include <QScreen>
+#include <QStyle>
 #include <QVBoxLayout>
 
 #include <algorithm>
@@ -160,7 +165,7 @@ QWidget* SavePanel::build(const QString& id, Control& control)
     else if (control.kind == QLatin1String("edit"))
     {
         auto edit = new QLineEdit;
-        edit->setMinimumWidth(control.rect.width());
+        edit->setFixedWidth(std::max(control.rect.width(), edit->fontMetrics().horizontalAdvance(QStringLiteral("0000000"))));
         connect(edit, &QLineEdit::textEdited, this,
             [this, id](const QString& text) { Q_EMIT send(QStringLiteral("text\t%1\t%2").arg(id, escaped(text))); });
         widget = edit;
@@ -207,11 +212,8 @@ void SavePanel::apply(Control& control)
 }
 
 // rows as the template lays them out: a control whose middle falls inside a row's height joins it
-void SavePanel::show()
+QList<QList<QString>> SavePanel::templateRows() const
 {
-    panel = new QWidget;
-    auto rows = new QVBoxLayout(panel);
-    rows->setContentsMargins(0, 0, 0, 0);
     QList<QString> placed = order;
     std::stable_sort(placed.begin(), placed.end(),
         [this](const QString& a, const QString& b) { return controls[a].rect.top() < controls[b].rect.top(); });
@@ -229,15 +231,49 @@ void SavePanel::show()
         bottom = std::max(bottom, rect.bottom());
     }
     for (QList<QString>& line : lines)
-    {
         std::stable_sort(line.begin(), line.end(),
             [this](const QString& a, const QString& b) { return controls[a].rect.left() < controls[b].rect.left(); });
-        auto row = new QHBoxLayout;
+    return lines;
+}
+
+// a row that is wider than the room breaks before the control that would pass it
+void SavePanel::lay(int room)
+{
+    auto rows = static_cast<QVBoxLayout*>(panel->layout());
+    while (QLayoutItem* item = rows->takeAt(0))
+        delete item;
+    const int gap = panel->style()->pixelMetric(QStyle::PM_LayoutHorizontalSpacing);
+    for (const QList<QString>& line : templateRows())
+    {
+        QHBoxLayout* row = nullptr;
+        int used = 0;
         for (const QString& id : line)
-            row->addWidget(build(id, controls[id]));
-        row->addStretch();
-        rows->addLayout(row);
+        {
+            const int width = controls[id].widget->sizeHint().width();
+            if (!row || (used > 0 && used + gap + width > room))
+            {
+                if (row)
+                    row->addStretch();
+                row = new QHBoxLayout;
+                rows->addLayout(row);
+                used = 0;
+            }
+            row->addWidget(controls[id].widget);
+            used += (used ? gap : 0) + width;
+        }
+        if (row)
+            row->addStretch();
     }
+}
+
+void SavePanel::show()
+{
+    panel = new QWidget;
+    new QVBoxLayout(panel);
+    panel->layout()->setContentsMargins(0, 0, 0, 0);
+    for (const QString& id : order)
+        build(id, controls[id]);
+    lay(QWIDGETSIZE_MAX);
 
     window = new KFileCustomDialog(QUrl::fromLocalFile(folder));
     window->setWindowTitle(title);
@@ -252,8 +288,31 @@ void SavePanel::show()
     window->setCustomWidget(panel);
     connect(window, &QDialog::finished, this, &SavePanel::finished);
     window->show();
-    window->resize(std::max(window->width(), window->minimumSizeHint().width()), window->height());
+    fit();
     Q_EMIT send(QStringLiteral("shown"));
+}
+
+// the window makes room for the rows and the places list, or the rows wrap
+void SavePanel::fit()
+{
+    const QScreen* screen = window->screen();
+    const int widest = screen ? screen->availableGeometry().width() * 9 / 10 : window->width();
+    auto places = window->fileWidget()->findChild<KFilePlacesView*>();
+    QWidget* dock = places ? places->parentWidget() : nullptr;
+    const int wanted = KSharedConfig::openConfig()->group(QStringLiteral("KFileDialog Settings")).readEntry("Speedbar Width", 0);
+    const int squeezed = dock && dock->isVisible() ? std::max(0, wanted - dock->width()) : 0;
+    QWidget* field = window->fileWidget()->locationEdit();
+    const int fieldEnd = field->mapTo(window, QPoint(field->width(), 0)).x();
+    const int start = panel->mapTo(window, QPoint(0, 0)).x();
+    const int room = widest - window->width() - squeezed + fieldEnd - start;
+    if (panel->sizeHint().width() > room)
+        lay(room);
+    panel->setMinimumWidth(std::min(panel->sizeHint().width(), room));
+    const int needed = window->width() + start + panel->minimumWidth() - fieldEnd;
+    window->setMinimumWidth(std::max(window->minimumWidth(), std::min(needed, widest)));
+    const int width = std::min(std::max(needed, window->width()) + squeezed, widest);
+    if (width > window->width())
+        window->resize(width, window->height());
 }
 
 void SavePanel::finished(int result)

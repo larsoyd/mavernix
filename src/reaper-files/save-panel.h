@@ -43,6 +43,9 @@ private:
     };
 
     void show();
+    QList<QList<QString>> templateRows() const;
+    void lay(int room);
+    void fit();
     QWidget* build(const QString& id, Control& control);
     void apply(Control& control);
     void finished(int result);

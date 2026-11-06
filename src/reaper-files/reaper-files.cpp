@@ -755,6 +755,7 @@ private:
     // a disabled control takes no change, as in swell, and its state goes back so the panel undoes it
     void change(Control& control, const std::string& verb, const std::string& text, int value)
     {
+        const bool taken = control.enabled;
         if (control.enabled && verb == "click")
         {
             send("busy");
@@ -767,6 +768,8 @@ private:
         std::vector<const Control*> changed = extra.refresh();
         if (!control.enabled && std::find(changed.begin(), changed.end(), &control) == changed.end())
             changed.push_back(&control);
+        fprintf(stderr, "[reaper-files] panel action=%s id=%ld taken=%d changed=%zu\n", verb.c_str(), control.id, taken,
+            changed.size());
         for (const Control* each : changed)
             send("state\t" + std::to_string(each->id) + "\t" + std::to_string(each->enabled) + "\t" +
                  std::to_string(each->value) + "\t" + escaped(each->text));
