@@ -15,6 +15,8 @@ int main(int argc, char** argv)
     qunsetenv("QT_STYLE_OVERRIDE");
     QApplication app(argc, argv);
     QGuiApplication::setDesktopFileName(QStringLiteral("cockos-reaper"));
+    // shares the portal dialog's view settings, which are kept under this name
+    QCoreApplication::setApplicationName(QStringLiteral("xdg-desktop-portal-kde"));
     QApplication::setQuitOnLastWindowClosed(false);
 
     SavePanel panel;

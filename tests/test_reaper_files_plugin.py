@@ -388,6 +388,10 @@ def session(host, swell, plugin):
         check(commands == ["[host] template command id=1043 code=0", "[host] template command id=1057 code=0",
                            "[host] template command id=1577 code=768", "[host] template command id=1056 code=0"],
               f"changes did not reach the template: {commands}")
+        actions = [line for line in log[mark:] if line.startswith("[reaper-files] panel ")]
+        check(actions[:2] == ["[reaper-files] panel action=check id=1057 taken=0 changed=1",
+                              "[reaper-files] panel action=click id=1056 taken=0 changed=1"] and
+              "[reaper-files] panel action=check id=1057 taken=1 changed=4" in actions, f"panel actions: {actions}")
         after = told(mark)[told(mark).index("show") + 1:]
         check(after == ["state\t1057\t0\t0\tConvert media", "ready", "state\t1056\t0\t0\tFormat...", "ready",
                         "state\t1577\t0\t0\t500", "ready", "state\t1057\t1\t0\tConvert media", "ready",
