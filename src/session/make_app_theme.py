@@ -24,6 +24,7 @@ replaces only what the desktop theme describes.
 import argparse
 import base64
 import configparser
+import copy
 import io
 import re
 import shutil
@@ -126,6 +127,22 @@ class KvantumPicture:
             for child in list(parent):
                 if wanted.fullmatch(child.get("id", "")):
                     parent.remove(child)
+
+    def copy_state(self, name_pattern, source_state, target_state):
+        """Gives every element whose name matches the pattern its `source_state` look in `target_state` too."""
+        wanted = re.compile(f"({name_pattern})-{target_state}")
+        for parent in list(self.root.iter()):
+            for index, child in enumerate(list(parent)):
+                match = wanted.fullmatch(child.get("id", ""))
+                if match is None:
+                    continue
+                source = self.root.find(f".//*[@id='{match.group(1)}-{source_state}']")
+                if source is None:
+                    continue
+                twin = copy.deepcopy(source)
+                twin.set("id", child.get("id"))
+                parent.remove(child)
+                parent.insert(index, twin)
 
     def add(self, name, image, logical_width, logical_height):
         """Adds a picture under a name, shown at the given size."""
@@ -299,6 +316,8 @@ def write_kvantum_theme(theme, theme_directory, output_directory):
     general["translucent_windows"] = "false"
     general["blurring"] = "false"
     general["popup_blurring"] = "false"
+    # overlay scroll bars leave old view pieces in dolphin after a toolbar click on wayland
+    general["transient_scrollbar"] = "false"
 
     colors = settings["GeneralColors"]
     if "window_color" in controls:
@@ -358,8 +377,27 @@ def write_kvantum_theme(theme, theme_directory, output_directory):
         tool_button["frame"] = "false"
         tool_button["interior"] = "false"
 
+    tooltip = controls.get("tooltip")
+    if tooltip is not None:
+        colors["tooltip.base.color"] = tooltip["color"]
+        colors["tooltip.text.color"] = tooltip["text_color"]
+        padding = tooltip.get("padding", 2)
+        side = 2 * padding + 1
+        picture.remove(r"tooltip-normal(-.*)?")
+        picture.add_nine_parts_of("tooltip-normal", Image.new("RGBA", (side, side), color_tuple(tooltip["color"])),
+                                  (side, side), [padding] * 4)
+        for edge in ("top", "bottom", "left", "right"):
+            settings["ToolTip"][f"frame.{edge}"] = str(padding)
+
+    # as with buttons, the pointer over an arrow changes nothing
+    picture.copy_state(r"(flat-)?arrow-[a-z]+", "normal", "focused")
+
     tool_button_pictures = controls.get("tool_button")
-    if tool_button_pictures is not None:
+    if tool_button_pictures is not None and not tool_button_pictures.get("hold_menu_arrow", True):
+        # kvantum leaves room for the arrow of a press and hold menu by this size alone
+        for section_name in ("PanelButtonTool", "ToolbarButton"):
+            settings[section_name]["indicator.size"] = "0"
+    if tool_button_pictures is not None and "normal" in tool_button_pictures:
         for kvantum_state, our_state in KVANTUM_BUTTON_STATES.items():
             file_name = tool_button_pictures.get(our_state, tool_button_pictures["normal"])
             picture.add_nine_parts(f"{KVANTUM_TOOL_BUTTON_ELEMENT}-{kvantum_state}",
@@ -1128,7 +1166,8 @@ def write_kde_settings(theme, output_directory):
         ("View", controls.get("base_color"), text),
         ("Button", controls.get("window_color"), text),
         ("Header", controls.get("window_color"), text),
-        ("Tooltip", controls.get("window_color"), text),
+        ("Tooltip", controls.get("tooltip", {}).get("color", controls.get("window_color")),
+         controls.get("tooltip", {}).get("text_color", text)),
         ("Selection", controls.get("highlight_color"), controls.get("highlight_text_color")),
     ]
     for name, background, foreground in sets:

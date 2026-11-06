@@ -293,6 +293,11 @@ fill_inactive = { gradient = ["#f8f8f8", "#e2e2e2"] }
 line_color = "#7b7b7b"
 text_color = "#000000"
 """
+# mavericks' tooltip: pale yellow at 0.95 opacity, black text, 2 points round it
+TOOLTIP_COLOR = "#ffffc7f2"
+TOOLTIP_TEXT_COLOR = "#000000"
+TOOLTIP_PADDING = 2
+
 TITLE_FONT_SIZE = 13
 
 
@@ -2032,6 +2037,12 @@ slice = {CONTROL_TOOL_BUTTON_SLICE}
 normal = "images/controls/tool-button.png"
 pressed = "images/controls/tool-button-pressed.png"
 disabled = "images/controls/tool-button-disabled.png"
+hold_menu_arrow = false
+
+[controls.tooltip]
+color = "{TOOLTIP_COLOR}"
+text_color = "{TOOLTIP_TEXT_COLOR}"
+padding = {TOOLTIP_PADDING}
 
 [controls.slider]
 track = "images/controls/slider-track.png"

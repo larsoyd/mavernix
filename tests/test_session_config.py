@@ -1327,6 +1327,76 @@ selected_separator = "images/controls/tab-selected-separator.png"
         self.assertIn("text.margin.left=4", tab)
         self.assertIn("text.margin.right=4", tab)
 
+    def kvantum_output(self, theme):
+        from xml.etree import ElementTree
+
+        output = self.home / "app-theme"
+        self.run_script("make_app_theme.py", theme, output)
+        kvantum = output / "share/themes/DesktopTheme/Kvantum"
+        svg = ElementTree.parse(kvantum / "DesktopTheme.svg").getroot()
+        names = [element.get("id") for element in svg.iter() if element.get("id")]
+        # kvantum takes one picture per name, a second one beside it is a mistake
+        self.assertEqual(sorted(name for name in set(names) if names.count(name) > 1), [])
+        return {element.get("id"): element for element in svg.iter() if element.get("id")}, \
+            (kvantum / "DesktopTheme.kvconfig").read_text()
+
+    def test_arrows_keep_their_look_under_the_pointer(self):
+        elements, _ = self.kvantum_output(self.themed_with_tabs(True))
+        focused = [name for name in elements if re.fullmatch(r"(flat-)?arrow-[a-z]+-focused", name)]
+        self.assertTrue({"arrow-down-focused", "arrow-up-focused", "arrow-plus-focused"} <= set(focused))
+        for name in focused:
+            normal = elements[name.replace("-focused", "-normal")]
+            with self.subTest(name=name):
+                twin = dict(elements[name].attrib, id=normal.get("id"))
+                self.assertEqual(twin, dict(normal.attrib))
+                self.assertEqual(len(elements[name]), len(normal))
+
+    def test_tooltips_take_the_themes_box(self):
+        import base64
+        from io import BytesIO
+
+        from PIL import Image
+
+        theme = self.themed_with_tabs(True)
+        toml = theme / "theme.toml"
+        # mojave light brings a tooltip picture of its own, which must go
+        text = toml.read_text().replace('kvantum_base = "KvFlatLight"', 'kvantum_base = "KvMojaveLight"')
+        toml.write_text(text + '\n[controls.tooltip]\ncolor = "#ffffc7f2"\ntext_color = "#000000"\npadding = 2\n')
+        elements, settings = self.kvantum_output(theme)
+        colors = settings[settings.index("[GeneralColors]"):].split("\n[", 1)[0]
+        self.assertIn("tooltip.base.color=#ffffc7f2", colors)
+        self.assertIn("tooltip.text.color=#000000", colors)
+        tooltip = settings[settings.index("[ToolTip]"):].split("\n[", 1)[0]
+        for side in ("top", "bottom", "left", "right"):
+            self.assertIn(f"frame.{side}=2", tooltip)
+        for part in ("", "-top", "-left", "-bottomright"):
+            data = elements[f"tooltip-normal{part}"].get("{http://www.w3.org/1999/xlink}href").split(",", 1)[1]
+            picture = Image.open(BytesIO(base64.b64decode(data))).convert("RGBA")
+            self.assertEqual(set(picture.getdata()), {(255, 255, 199, 242)})
+        scheme = (self.home / "app-theme" / "xdg" / "kdeglobals").read_text()
+        block = scheme[scheme.index("[Colors:Tooltip]"):].split("\n\n", 1)[0]
+        self.assertIn("BackgroundNormal=255,255,199", block)
+        self.assertIn("ForegroundNormal=0,0,0", block)
+
+    def test_scroll_bars_stay_in_place(self):
+        _, settings = self.kvantum_output(self.themed_with_tabs(True))
+        general = settings[settings.index("[%General]"):].split("\n[", 1)[0]
+        self.assertIn("\ntransient_scrollbar=false\n", general + "\n")
+
+    def test_a_press_and_hold_menu_can_go_without_an_arrow(self):
+        theme = self.themed_with_tabs(True)
+        toml = theme / "theme.toml"
+        text = toml.read_text() + "\n[controls.tool_button]\nslice = [4, 6, 4, 6]\n"
+        toml.write_text(text)
+        _, plain = self.kvantum_output(theme)
+        toml.write_text(text + "hold_menu_arrow = false\n")
+        _, without = self.kvantum_output(theme)
+        for section in ("PanelButtonTool", "ToolbarButton"):
+            with self.subTest(section=section):
+                body = without[without.index(f"[{section}]"):].split("\n[", 1)[0]
+                self.assertIn("indicator.size=0", body)
+                self.assertNotIn("indicator.size=0", plain[plain.index(f"[{section}]"):].split("\n[", 1)[0])
+
     def test_tabs_that_are_not_joined_have_no_line(self):
         self.assertEqual(self.tab_separators(self.themed_with_tabs(False)), {})
 
