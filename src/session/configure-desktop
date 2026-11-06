@@ -336,17 +336,22 @@ link_mozilla_style() {
 }
 
 # REAPER's menus reach the menu bar through a plugin, and its own bar goes with it.
+# Its file dialogs reach the desktop's file chooser through another.
 link_reaper_menu() {
     local plugin="$library_dir/reaper/reaper_mavernix_menu.so"
+    local files="$library_dir/reaper/reaper_mavernix_files.so"
     if [[ -n "${DESKTOP_NESTED:-}" ]]; then
         return 0
     fi
     local arguments=()
+    if [[ -f $files ]]; then
+        arguments=(--files "$files")
+    fi
     if [[ ${MAVERNIX_GLOBAL_MENU:-1} != 0 && -f $plugin ]]; then
-        arguments=("$plugin")
+        arguments+=("$plugin")
     fi
     if ! python3 "$session_dir/link_reaper_menu.py" "${arguments[@]}"; then
-        echo "configure-desktop: could not set up REAPER's menus (message above); the desktop starts anyway." >&2
+        echo "configure-desktop: could not set up REAPER's plugins (message above); the desktop starts anyway." >&2
     fi
 }
 

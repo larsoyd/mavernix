@@ -1458,8 +1458,9 @@ wait $shell || true
         folder.mkdir(parents=True, exist_ok=True)
         library = self.home / "lib"
         (library / "reaper").mkdir(parents=True, exist_ok=True)
-        plugin = library / "reaper/reaper_mavernix_menu.so"
-        plugin.touch() if built else plugin.unlink(missing_ok=True)
+        for name in ("reaper_mavernix_menu.so", "reaper_mavernix_files.so"):
+            plugin = library / "reaper" / name
+            plugin.touch() if built else plugin.unlink(missing_ok=True)
         setup = (f"session_dir={shlex.quote(str(SESSION_SOURCE_DIR))}\n"
                  f"library_dir={shlex.quote(str(library))}\nlink_reaper_menu")
         self.session_functions("link_reaper_menu", setup=setup, **options)
@@ -1472,6 +1473,12 @@ wait $shell || true
         link = self.linked_reaper()
         self.linked_reaper(environment={"MAVERNIX_GLOBAL_MENU": "0"})
         self.assertFalse(link.is_symlink())
+
+    def test_reaper_gets_the_file_dialogs_without_the_menu(self):
+        files = self.linked_reaper(environment={"MAVERNIX_GLOBAL_MENU": "0"}).parent / "reaper_mavernix_files.so"
+        self.assertTrue(files.is_symlink())
+        self.linked_reaper(built=False)
+        self.assertFalse(files.is_symlink())
 
     def test_a_missing_plugin_gives_reaper_its_bar_back(self):
         link = self.linked_reaper()
@@ -2392,6 +2399,7 @@ class TestGimpTitlebar(SessionTestCase):
 
 class TestReaperMenu(SessionTestCase):
     PLUGIN = "/lib/mavernix/reaper/reaper_mavernix_menu.so"
+    FILES = "/lib/mavernix/reaper/reaper_mavernix_files.so"
     LINE = "menubar_height 0\n"
 
     def config(self, theme=None):
@@ -2452,6 +2460,28 @@ class TestReaperMenu(SessionTestCase):
         self.assertIn("reaper_mavernix_menu.so", result.stderr)
         self.assertEqual((folder / "UserPlugins/reaper_mavernix_menu.so").read_text(), "mine")
         self.assertFalse((folder / "libSwell-user.colortheme").exists())
+
+    def test_the_file_dialogs_link_on_their_own(self):
+        folder = self.config("default_font_face Inter\n")
+        self.link("--files", self.FILES)
+        self.assertEqual(os.readlink(folder / "UserPlugins/reaper_mavernix_files.so"), self.FILES)
+        self.assertFalse((folder / "UserPlugins/reaper_mavernix_menu.so").exists())
+        self.assertEqual((folder / "libSwell-user.colortheme").read_text(), "default_font_face Inter\n")
+        self.link("--files", self.FILES, self.PLUGIN)
+        self.assertTrue((folder / "UserPlugins/reaper_mavernix_menu.so").is_symlink())
+        self.link(self.PLUGIN)
+        self.assertFalse((folder / "UserPlugins/reaper_mavernix_files.so").is_symlink())
+        self.assertTrue((folder / "UserPlugins/reaper_mavernix_menu.so").is_symlink())
+
+    def test_a_file_dialog_plugin_of_the_users_own_is_kept(self):
+        folder = self.config()
+        (folder / "UserPlugins").mkdir()
+        (folder / "UserPlugins/reaper_mavernix_files.so").write_text("mine")
+        result = self.run_script("link_reaper_menu.py", "--files", self.FILES, may_fail=True)
+        self.assertEqual(result.returncode, 0)
+        self.assertIn("reaper_mavernix_files.so", result.stderr)
+        self.link()
+        self.assertEqual((folder / "UserPlugins/reaper_mavernix_files.so").read_text(), "mine")
 
     def test_reaper_never_started_is_fine(self):
         self.home.mkdir(parents=True)

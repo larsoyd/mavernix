@@ -234,6 +234,9 @@ reaper_plugin_host = executable('reaper-plugin-host', 'reaper-plugin-host.cpp',
 test('reaper-menu-plugin', python,
     args: [files('test_reaper_menu_plugin.py'), reaper_plugin_host, meson.current_build_dir(), reaper_menu_plugin],
     depends: fake_swell, timeout: 45)
+test('reaper-files-plugin', python,
+    args: [files('test_reaper_files_plugin.py'), reaper_plugin_host, meson.current_build_dir(), reaper_files_plugin],
+    depends: fake_swell, timeout: 45)
 
 test('menu-session', python, args: files('test_menu_session.py'))
 test('gtk-global-menu', python, args: [files('test_gtk_global_menu.py'), gtk_menu_module],

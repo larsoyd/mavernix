@@ -1,8 +1,9 @@
-// loads the menu plugin as reaper does over a scripted swell, one command per stdin line
+// loads a reaper plugin as reaper does over a scripted swell, one command per stdin line
 #include <dlfcn.h>
 #include <glib.h>
 
 #include <cstdio>
+#include <cstdlib>
 #include <cstring>
 #include <map>
 #include <memory>
@@ -55,8 +56,48 @@ struct PluginInfo
     void* (*function)(const char*);
 };
 
+typedef long (*DialogProc)(HWND, unsigned, unsigned long, long);
+
+struct Control
+{
+    std::string kind;
+    std::string text;
+    long id = 0;
+    unsigned long style = 0;
+    long parent = 0;
+    bool visible = true;
+    bool enabled = true;
+    int check = 0;
+    std::vector<std::string> items;
+    int selection = -1;
+    DialogProc proc = nullptr;
+};
+
+enum
+{
+    WM_DESTROY = 0x2,
+    WM_INITDIALOG = 0x110,
+    WM_COMMAND = 0x111,
+    BM_GETCHECK = 0xf0,
+    BM_SETCHECK = 0xf1,
+    CB_GETCOUNT = 0x146,
+    CB_GETCURSEL = 0x147,
+    CB_GETLBTEXT = 0x148,
+    CB_SETCURSEL = 0x14e,
+    GW_HWNDNEXT = 2,
+    GW_CHILD = 5,
+    GWL_ID = -12,
+    GWL_STYLE = -16,
+    OWN_VISIBLE = 0x02000000,
+};
+
 std::vector<std::unique_ptr<Menu>> menus;
 std::map<long, Window> windows;
+std::map<long, Control> controls;
+long nextControl = 1000;
+HWND foreground;
+int messageAnswer = 1;
+std::string nested;
 std::string swellFolder;
 std::string resourceFolder;
 void (*timer)();
@@ -83,6 +124,137 @@ Menu* newMenu(std::vector<Item> items)
 Item* statusItem()
 {
     return &windows[1].menu->items.back();
+}
+
+Control* controlOf(HWND window)
+{
+    const auto found = controls.find(reinterpret_cast<long>(window));
+    return found == controls.end() ? nullptr : &found->second;
+}
+
+long addControl(long parent, Control control)
+{
+    control.parent = parent;
+    controls[nextControl] = std::move(control);
+    return nextControl++;
+}
+
+// the address reaper would get from swell, which a plugin may have redirected
+void* swellFunction(const char* name)
+{
+    return dlsym(RTLD_DEFAULT, ("fake_" + std::string(name)).c_str());
+}
+
+std::string templateState(long window)
+{
+    std::string state;
+    for (const auto& [number, control] : controls)
+        if (control.parent == window && control.kind == "Button")
+            state += std::to_string(control.id) + ":" + std::to_string(control.check) + " ";
+        else if (control.parent == window && control.kind == "combobox")
+            state += std::to_string(control.id) + ":#" + std::to_string(control.selection) + " ";
+    return state;
+}
+
+// stands in for reaper's own dialog procedure behind a browse template
+long templateProc(HWND window, unsigned message, unsigned long command, long)
+{
+    if (message == WM_INITDIALOG)
+        printf("[host] template init window=%ld\n", reinterpret_cast<long>(window));
+    else if (message == WM_COMMAND)
+        printf("[host] template command id=%lu code=%lu\n", command & 0xffff, command >> 16);
+    else if (message == WM_DESTROY)
+        printf("[host] template destroy state=%s\n", templateState(reinterpret_cast<long>(window)).c_str());
+    return 0;
+}
+
+Control widget(const char* kind, const char* text, long id, unsigned long style)
+{
+    Control control;
+    control.kind = kind;
+    control.text = text;
+    control.id = id;
+    control.style = style;
+    return control;
+}
+
+void fillTemplate(long window, long kind)
+{
+    addControl(window, widget("Button", "Open in new &tab", 1042, 0x40010003));
+    controls[addControl(window, widget("Button", "Open read-only", 1043, 0x40010003))].check = 1;
+    controls[addControl(window, widget("Button", "Hidden option", 1044, 0x40010003))].visible = false;
+    controls[addControl(window, widget("Button", "Disabled option", 1045, 0x48010003))].enabled = false;
+    addControl(window, widget("Static", "Format:", 1049, 0x40000000));
+    Control& list = controls[addControl(window, widget("combobox", "", 1050, 0x40010003))];
+    list.items = {"WAV", "FLAC"};
+    list.selection = 1;
+    if (kind == 2)
+        controls[addControl(window, widget("Button", "Format...", 1056, 0x40000000))].enabled = false;
+    else if (kind == 3)
+        addControl(window, widget("combobox", "", 1051, 0x40010002));
+    else if (kind == 4)
+        addControl(window, widget("Edit", "500", 1577, 0x40002080));
+}
+
+std::string shown(const char* text, bool list)
+{
+    std::string out;
+    for (const char* part = text; part && (part == text || *part); part += strlen(part) + 1)
+    {
+        out += part;
+        if (!list)
+            break;
+        out += "|";
+    }
+    return out;
+}
+
+std::string extensions(const std::string& text)
+{
+    std::string list = text;
+    for (char& c : list)
+        if (c == '|')
+            c = '\0';
+    return list + '\0';
+}
+
+std::vector<std::string> fields(const std::string& line)
+{
+    std::vector<std::string> parts;
+    std::istringstream words(line);
+    for (std::string part; std::getline(words, part, '\t');)
+        parts.push_back(part);
+    parts.resize(5);
+    return parts;
+}
+
+void browse(const std::string& command, const std::vector<std::string>& part)
+{
+    if (command == "open")
+    {
+        auto function = reinterpret_cast<char* (*)(const char*, const char*, const char*, bool, const char*)>(
+            swellFunction("BrowseForFiles"));
+        const std::string list = extensions(part[3]);
+        char* value = function(part[1].c_str(), part[2].c_str(), "", part[0] == "1", list.c_str());
+        printf("[host] result kind=open value=%s\n", value ? shown(value, true).c_str() : "null");
+        free(value);
+    }
+    else if (command == "save")
+    {
+        auto function = reinterpret_cast<bool (*)(const char*, const char*, const char*, const char*, char*, int)>(
+            swellFunction("BrowseForSaveFile"));
+        const std::string list = extensions(part[3]);
+        char out[4096] = "";
+        const bool ok = function(part[0].c_str(), part[1].c_str(), part[2].c_str(), list.c_str(), out, sizeof(out));
+        printf("[host] result kind=save ok=%d value=%s\n", ok, out);
+    }
+    else
+    {
+        auto function = reinterpret_cast<bool (*)(const char*, const char*, char*, int)>(swellFunction("BrowseForDirectory"));
+        char out[4096] = "";
+        const bool ok = function(part[0].c_str(), part[1].c_str(), out, sizeof(out));
+        printf("[host] result kind=folder ok=%d value=%s\n", ok, out);
+    }
 }
 
 const char* swellPath()
@@ -159,6 +331,27 @@ void run(const std::string& line)
         for (long tick = 0; tick < number && timer; tick++)
             timer();
     }
+    else if (command == "open" || command == "save" || command == "folder")
+    {
+        std::string rest;
+        std::getline(words >> std::ws, rest);
+        browse(command, fields(rest));
+    }
+    else if (command == "template")
+    {
+        words >> number;
+        auto function = reinterpret_cast<void (*)(const char*, DialogProc, void*)>(swellFunction("BrowseFile_SetTemplate"));
+        function(reinterpret_cast<const char*>(number), number ? templateProc : nullptr, number ? &controls : nullptr);
+    }
+    else if (command == "foreground")
+    {
+        words >> number;
+        foreground = handle(number);
+    }
+    else if (command == "answer")
+        words >> messageAnswer;
+    else if (command == "nest")
+        std::getline(words >> std::ws, nested);
     else if (command == "unload")
         entry(nullptr, nullptr);
     else if (command == "quit")
@@ -223,10 +416,176 @@ __attribute__((visibility("default"))) int fake_GetMenuItemInfo(Menu* menu, int 
     return 1;
 }
 
-__attribute__((visibility("default"))) long fake_SendMessage(HWND window, unsigned message, unsigned long, long)
+__attribute__((visibility("default"))) long fake_SendMessage(HWND window, unsigned message, unsigned long value, long data)
 {
-    printf("[host] sent window=%ld message=0x%x\n", reinterpret_cast<long>(window), message);
+    Control* control = controlOf(window);
+    if (!control)
+    {
+        printf("[host] sent window=%ld message=0x%x\n", reinterpret_cast<long>(window), message);
+        return 0;
+    }
+    switch (message)
+    {
+    case BM_GETCHECK:
+        return control->check;
+    case BM_SETCHECK:
+        control->check = int(value);
+        return 0;
+    case CB_GETCOUNT:
+        return long(control->items.size());
+    case CB_GETCURSEL:
+        return control->selection;
+    case CB_GETLBTEXT:
+        if (value >= control->items.size())
+            return -1;
+        strcpy(reinterpret_cast<char*>(data), control->items[value].c_str());
+        return long(control->items[value].size());
+    case CB_SETCURSEL:
+        control->selection = int(value);
+        return control->selection;
+    case WM_COMMAND:
+        return control->proc ? control->proc(window, message, value, data) : 0;
+    }
     return 0;
+}
+
+__attribute__((visibility("default"))) char* fake_BrowseForFiles(const char* text, const char*, const char*, bool, const char*)
+{
+    printf("[host] swell browse kind=open caption=%s\n", text);
+    char* value = static_cast<char*>(calloc(16, 1));
+    strcpy(value, "/swell/open");
+    return value;
+}
+
+__attribute__((visibility("default"))) bool fake_BrowseForSaveFile(
+    const char* text, const char*, const char*, const char*, char* out, int size)
+{
+    printf("[host] swell browse kind=save caption=%s\n", text);
+    g_strlcpy(out, "/swell/save", size);
+    return true;
+}
+
+__attribute__((visibility("default"))) bool fake_BrowseForDirectory(const char* text, const char*, char* out, int size)
+{
+    printf("[host] swell browse kind=folder caption=%s\n", text);
+    g_strlcpy(out, "/swell/folder", size);
+    return true;
+}
+
+__attribute__((visibility("default"))) void fake_BrowseFile_SetTemplate(const char* id, DialogProc, void*)
+{
+    printf("[host] swell template id=%ld\n", reinterpret_cast<long>(id));
+}
+
+__attribute__((visibility("default"))) HWND fake_GetForegroundWindow()
+{
+    return foreground;
+}
+
+__attribute__((visibility("default"))) int fake_EnableWindow(HWND window, int enable)
+{
+    printf("[host] enable window=%ld on=%d\n", reinterpret_cast<long>(window), enable);
+    Window* found = windowOf(window);
+    const bool was = found && found->enabled;
+    if (found)
+        found->enabled = enable;
+    return !was;
+}
+
+__attribute__((visibility("default"))) void fake_SWELL_RunMessageLoop()
+{
+    if (nested.empty())
+        return;
+    const std::string line = nested;
+    nested.clear();
+    run(line);
+}
+
+__attribute__((visibility("default"))) int fake_MessageBox(HWND, const char* text, const char* caption, int)
+{
+    std::string flat = text;
+    for (char& c : flat)
+        if (c == '\r' || c == '\n')
+            c = ' ';
+    printf("[host] messagebox caption=%s text=%s answer=%d\n", caption, flat.c_str(), messageAnswer);
+    return messageAnswer;
+}
+
+__attribute__((visibility("default"))) HWND fake_SWELL_CreateDialog(void*, const char* resource, HWND parent, DialogProc proc, long data)
+{
+    const long kind = reinterpret_cast<long>(resource);
+    if (kind == 9)
+        return nullptr;
+    const long window = addControl(reinterpret_cast<long>(parent), widget(kind ? "dialog" : "container", "", 0, 0x40000000));
+    controls[window].proc = proc;
+    if (kind)
+        fillTemplate(window, kind);
+    printf("[host] dialog created window=%ld template=%ld parent=%ld\n", window, kind, reinterpret_cast<long>(parent));
+    if (proc)
+        proc(handle(window), WM_INITDIALOG, 0, data);
+    return handle(window);
+}
+
+__attribute__((visibility("default"))) int fake_DestroyWindow(HWND window)
+{
+    const long number = reinterpret_cast<long>(window);
+    Control* control = controlOf(window);
+    if (control && control->proc)
+        control->proc(window, WM_DESTROY, 0, 0);
+    std::vector<long> children;
+    for (const auto& [child, entry] : controls)
+        if (entry.parent == number)
+            children.push_back(child);
+    for (long child : children)
+        fake_DestroyWindow(handle(child));
+    printf("[host] destroyed window=%ld\n", number);
+    controls.erase(number);
+    return 1;
+}
+
+__attribute__((visibility("default"))) HWND fake_GetWindow(HWND window, int relation)
+{
+    const long number = reinterpret_cast<long>(window);
+    if (!window)
+        return nullptr;
+    if (relation == GW_CHILD)
+    {
+        for (const auto& [child, control] : controls)
+            if (control.parent == number)
+                return handle(child);
+        return nullptr;
+    }
+    Control* control = controlOf(window);
+    if (relation != GW_HWNDNEXT || !control)
+        return nullptr;
+    for (auto next = controls.upper_bound(number); next != controls.end(); ++next)
+        if (next->second.parent == control->parent)
+            return handle(next->first);
+    return nullptr;
+}
+
+__attribute__((visibility("default"))) int fake_GetClassName(HWND window, char* out, int size)
+{
+    Control* control = controlOf(window);
+    g_strlcpy(out, control ? control->kind.c_str() : "", size);
+    return control ? int(control->kind.size()) : 0;
+}
+
+__attribute__((visibility("default"))) bool fake_GetDlgItemText(HWND window, int item, char* out, int size)
+{
+    Control* control = item ? nullptr : controlOf(window);
+    g_strlcpy(out, control ? control->text.c_str() : "", size);
+    return control != nullptr;
+}
+
+__attribute__((visibility("default"))) long fake_GetWindowLong(HWND window, int index)
+{
+    Control* control = controlOf(window);
+    if (!control)
+        return 0;
+    if (index == GWL_STYLE)
+        return long(control->style | (control->visible ? OWN_VISIBLE : 0));
+    return index == GWL_ID ? control->id : 0;
 }
 
 __attribute__((visibility("default"))) int fake_PostMessage(HWND window, unsigned message, unsigned long command, long)
@@ -250,16 +609,23 @@ __attribute__((visibility("default"))) int fake_EnumWindows(int (*visit)(HWND, l
     return 1;
 }
 
+// as swell: visible only up a chain of visible parents, and a dialog nobody showed has none
 __attribute__((visibility("default"))) int fake_IsWindowVisible(HWND window)
 {
-    Window* found = windowOf(window);
-    return found && found->visible;
+    Control* control = controlOf(window);
+    if (!control)
+    {
+        Window* found = windowOf(window);
+        return found && found->visible;
+    }
+    return control->visible && control->parent && fake_IsWindowVisible(handle(control->parent));
 }
 
 __attribute__((visibility("default"))) int fake_IsWindowEnabled(HWND window)
 {
     Window* found = windowOf(window);
-    return found && found->enabled;
+    Control* control = controlOf(window);
+    return (found && found->enabled) || (control && control->enabled);
 }
 }
 
@@ -286,6 +652,7 @@ int main(int argc, char** argv)
         return 1;
     }
     run("main");
+    foreground = handle(1);
     PluginInfo info{0x20e, handle(1), addHook, apiFunction};
     printf("[host] loaded result=%d\n", entry(nullptr, &info));
     fflush(stdout);
