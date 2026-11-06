@@ -306,9 +306,8 @@ next_desktop = "<ctrl> <alt> KEY_RIGHT"
 
 [steam]
 # Steam's window buttons in the theme's look, at the left as on a Mac, from
-# the next login and Steam's next start. It turns on Steam's debugging port
-# on 127.0.0.1:8080, which any program on this computer can use to control
-# Steam, so it is off unless asked for.
+# the next login and Steam's next start. It patches one of Steam's own
+# stylesheets and patches it again after Steam updates.
 window_buttons = false
 
 [games]

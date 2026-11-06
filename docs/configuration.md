@@ -201,7 +201,9 @@ Steam draws its own close, minimize and zoom buttons at the right of its windows
 window_buttons = true
 ```
 
-It takes effect from the next login, once Steam starts again. Steam has no setting for its buttons, so the session turns on Steam's remote debugging and a small helper adds the style to each Steam window as it opens. Remote debugging listens on 127.0.0.1:8080, and any program running on this computer, under any user, can use it to control Steam. That's why it's off unless you ask for it. Setting it back to `false` takes the debugging flag away again at the next login, unless you had put it there yourself. The helper logs its work to the session's `login.log` as `[steam-buttons]` lines.
+It takes effect from the next login, once Steam starts again. Steam has no setting for its buttons, so the session puts a small stand-in for one of Steam's own stylesheets, `steamui/css/library.css`, that loads Steam's sheet and then the theme's buttons. It keeps the file's size, which is all Steam checks when it starts.
+
+A Steam update writes the file again, and the session patches it once more, so the buttons are back from Steam's next start. A theme change also shows from Steam's next start. Setting it back to `false` gives Steam its own file again at the next login. Nothing is opened for other programs to reach Steam through. The session logs its work to `login.log` as `[steam-buttons]` lines.
 
 ## The desktop's menus
 
