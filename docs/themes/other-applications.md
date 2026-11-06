@@ -116,9 +116,10 @@ hold_menu_arrow = false        # optional: whether a button whose menu opens on 
 # Without the pictures, tool bar buttons are drawn plain: no frame, just the icon or text.
 
 [controls.tooltip]             # optional: the box a pointer's help text shows in (Qt only so far)
-color = "#ffffc7f2"            # the fill, square, with no border of its own
+color = "#ffffc7f2"            # the fill of the square box
 text_color = "#000000"
 padding = 2                    # optional: room around the text (default 2)
+edge = "#00000040"             # optional: a one pixel line round the box, outside the padding
 
 [controls.slider]              # optional
 track = "images/controls/slider-track.png"                 # the groove; its height is the groove's

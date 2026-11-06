@@ -1468,18 +1468,28 @@ selected_separator = "images/controls/tab-selected-separator.png"
         toml = theme / "theme.toml"
         # mojave light brings a tooltip picture of its own, which must go
         text = toml.read_text().replace('kvantum_base = "KvFlatLight"', 'kvantum_base = "KvMojaveLight"')
-        toml.write_text(text + '\n[controls.tooltip]\ncolor = "#ffffc7f2"\ntext_color = "#000000"\npadding = 2\n')
+        toml.write_text(text + '\n[controls.tooltip]\ncolor = "#ffffc7f2"\ntext_color = "#000000"\npadding = 2\nedge = "#00000040"\n')
         elements, settings = self.kvantum_output(theme)
         colors = settings[settings.index("[GeneralColors]"):].split("\n[", 1)[0]
         self.assertIn("tooltip.base.color=#ffffc7f2", colors)
         self.assertIn("tooltip.text.color=#000000", colors)
         tooltip = settings[settings.index("[ToolTip]"):].split("\n[", 1)[0]
+        # the edge line sits outside the padding, and kvantum's own shadow belongs to its own box
         for side in ("top", "bottom", "left", "right"):
-            self.assertIn(f"frame.{side}=2", tooltip)
+            self.assertIn(f"frame.{side}=3", tooltip)
+        general = settings[settings.index("[%General]"):].split("\n[", 1)[0]
+        self.assertIn("\ntooltip_shadow_depth=0", general)
+        pictures = {}
         for part in ("", "-top", "-left", "-bottomright"):
             data = elements[f"tooltip-normal{part}"].get("{http://www.w3.org/1999/xlink}href").split(",", 1)[1]
-            picture = Image.open(BytesIO(base64.b64decode(data))).convert("RGBA")
-            self.assertEqual(set(picture.getdata()), {(255, 255, 199, 242)})
+            pictures[part] = Image.open(BytesIO(base64.b64decode(data))).convert("RGBA")
+        fill, edge = (255, 255, 199, 242), (0, 0, 0, 64)
+        self.assertEqual(set(pictures[""].getdata()), {fill})
+        self.assertEqual(pictures["-top"].size, (1, 3))
+        self.assertEqual([pictures["-top"].getpixel((0, y)) for y in range(3)], [edge, fill, fill])
+        self.assertEqual(pictures["-left"].getpixel((0, 0)), edge)
+        self.assertEqual(pictures["-bottomright"].getpixel((2, 2)), edge)
+        self.assertEqual(pictures["-bottomright"].getpixel((1, 1)), fill)
         scheme = (self.home / "app-theme" / "xdg" / "kdeglobals").read_text()
         block = scheme[scheme.index("[Colors:Tooltip]"):].split("\n\n", 1)[0]
         self.assertIn("BackgroundNormal=255,255,199", block)
