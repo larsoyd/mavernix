@@ -2039,7 +2039,6 @@ slice = {CONTROL_TOOL_BUTTON_SLICE}
 normal = "images/controls/tool-button.png"
 pressed = "images/controls/tool-button-pressed.png"
 disabled = "images/controls/tool-button-disabled.png"
-hold_menu_arrow = false
 
 [controls.tooltip]
 color = "{TOOLTIP_COLOR}"

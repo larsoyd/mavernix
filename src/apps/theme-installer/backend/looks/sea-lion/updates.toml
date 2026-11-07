@@ -384,12 +384,8 @@ import_brings = [
     "Every folder in a KDE side bar gets Finder's blue grey glyph, the public folder and emblem folders included.",
 ]
 
-# Finder's back and forward buttons show no arrow, their history opens on press and hold.
 [[update]]
 revision = 17
-
-[update.settings."controls.tool_button"]
-hold_menu_arrow = false
 
 [update.settings."controls.tooltip"]
 color = "#ffffc7f2"

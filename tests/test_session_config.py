@@ -1500,19 +1500,22 @@ selected_separator = "images/controls/tab-selected-separator.png"
         general = settings[settings.index("[%General]"):].split("\n[", 1)[0]
         self.assertIn("\ntransient_scrollbar=false\n", general + "\n")
 
-    def test_a_press_and_hold_menu_can_go_without_an_arrow(self):
+    def test_tool_buttons_keep_their_arrows(self):
+        # back and forward arrows and split button arrows all take this indicator size, older imports still hold the key
         theme = self.themed_with_tabs(True)
         toml = theme / "theme.toml"
-        text = toml.read_text() + "\n[controls.tool_button]\nslice = [4, 6, 4, 6]\n"
-        toml.write_text(text)
-        _, plain = self.kvantum_output(theme)
-        toml.write_text(text + "hold_menu_arrow = false\n")
-        _, without = self.kvantum_output(theme)
+        toml.write_text(toml.read_text() + "\n[controls.tool_button]\nslice = [4, 6, 4, 6]\nhold_menu_arrow = false\n")
+        _, settings = self.kvantum_output(theme)
+        parser = configparser.ConfigParser(interpolation=None, strict=False)
+        parser.optionxform = str
+        parser.read_string(settings)
         for section in ("PanelButtonTool", "ToolbarButton"):
             with self.subTest(section=section):
-                body = without[without.index(f"[{section}]"):].split("\n[", 1)[0]
-                self.assertIn("indicator.size=0", body)
-                self.assertNotIn("indicator.size=0", plain[plain.index(f"[{section}]"):].split("\n[", 1)[0])
+                name, size = section, None
+                while size is None and name in parser:
+                    size = parser[name].get("indicator.size")
+                    name = parser[name].get("inherits")
+                self.assertGreaterEqual(int(size or 0), 8, f"section={section} indicator.size={size}")
 
     def test_tabs_that_are_not_joined_have_no_line(self):
         self.assertEqual(self.tab_separators(self.themed_with_tabs(False)), {})
