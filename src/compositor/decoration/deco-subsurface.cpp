@@ -33,6 +33,7 @@
 // The corner clip's place among a window's transformers (lowest first).
 const int CORNER_CLIP_Z_ORDER = 0;
 const char *const CORNER_CLIP_NAME = "themed-decoration-corner-clip";
+const char *const FRAMELESS_CLIP_NAME = "themed-decoration-frameless-clip";
 
 static bool frame_hidden(const wf::toplevel_state_t& state)
 {
@@ -400,17 +401,20 @@ class simple_decoration_node_t : public wf::scene::node_t, public wf::pointer_in
 
     int current_thickness;
     int current_titlebar;
+    // only the shadow and rim, around a window that draws its own frame
+    const bool bare;
 
     // 0 is the inactive shadow, 1 the active one
     wf::animation::simple_animation_t shadow_fade;
 
-    simple_decoration_node_t(wayfire_toplevel_view view) :
+    simple_decoration_node_t(wayfire_toplevel_view view, bool bare = false) :
         node_t(false),
         theme{},
         layout{theme, [=] (wf::geometry_t box)
         {
             wf::scene::damage_node(shared_from_this(), box + get_offset());
         }},
+        bare(bare),
         shadow_fade{wf::create_option<int>(theme.values().shadow_fade_ms), fast_then_settling}
     {
         this->_view = view->weak_from_this();
@@ -432,6 +436,13 @@ class simple_decoration_node_t : public wf::scene::node_t, public wf::pointer_in
 
     wf::pointf_t get_offset()
     {
+        auto view = _view.lock();
+        if (bare && view)
+        {
+            // a program that draws its own shadow starts its surface outside the window
+            return view->get_surface_root_node()->to_local(wf::origin(view->get_geometry()));
+        }
+
         return {(double)-current_thickness, (double)-current_titlebar};
     }
 
@@ -447,9 +458,19 @@ class simple_decoration_node_t : public wf::scene::node_t, public wf::pointer_in
         }
 
         /* The shadow first: everything else lies on top of it. */
-        if ((current_titlebar > 0) && theme.has_shadow())
+        if (((current_titlebar > 0) || bare) && theme.has_shadow())
         {
             render_shadow(data, origin);
+        }
+
+        if (bare)
+        {
+            if (theme.has_rim(activated))
+            {
+                render_rim(data, origin, activated);
+            }
+
+            return;
         }
 
         if (current_titlebar > 0)
@@ -703,7 +724,7 @@ class simple_decoration_node_t : public wf::scene::node_t, public wf::pointer_in
             size = dims;
             layout.set_fixed_size(has_fixed_size(view));
             layout.resize(size.width, size.height);
-            if (!frame_hidden(view->toplevel()->current()))
+            if (!bare && !frame_hidden(view->toplevel()->current()))
             {
                 this->cached_region = layout.calculate_region();
             }
@@ -723,7 +744,7 @@ class simple_decoration_node_t : public wf::scene::node_t, public wf::pointer_in
 
     void update_decoration_size()
     {
-        if (frame_hidden(_view.lock()->toplevel()->current()))
+        if (bare || frame_hidden(_view.lock()->toplevel()->current()))
         {
             current_thickness = 0;
             current_titlebar  = 0;
@@ -748,7 +769,7 @@ wf::simple_decorator_t::simple_decorator_t(wayfire_toplevel_view view, bool tool
 
     if (deco->theme.get_bottom_corner_radius() > 0)
     {
-        corner_clip = std::make_shared<corner_clip_transformer_t>(view,
+        corner_clip = std::make_shared<corner_clip_transformer_t>(view, 0.0,
             deco->theme.get_bottom_corner_radius(), deco);
     }
 
@@ -836,4 +857,91 @@ wf::decoration_margins_t wf::simple_decorator_t::get_margins(const wf::toplevel_
         .bottom = (double)thickness,
         .top    = (double)titlebar,
     };
+}
+
+wf::frameless_decorator_t::frameless_decorator_t(wayfire_toplevel_view view) :
+    view(view), view_while_alive(view->weak_from_this())
+{
+    on_view_activated = [this] (auto)
+    {
+        if (shown)
+        {
+            deco->shadow_fade.animate(this->view->activated);
+            wf::scene::damage_node(deco, deco->get_bounding_box());
+        }
+    };
+    on_view_geometry_changed = [this] (auto)
+    {
+        if (shown)
+        {
+            deco->resize(wf::dimensions(this->view->get_geometry()));
+        }
+    };
+    on_view_fullscreen = [this] (auto) { update(); };
+    on_view_tiled = [this] (auto) { update(); };
+    view->connect(&on_view_activated);
+    view->connect(&on_view_geometry_changed);
+    view->connect(&on_view_fullscreen);
+    view->connect(&on_view_tiled);
+}
+
+wf::frameless_decorator_t::~frameless_decorator_t()
+{
+    if (shown && view_while_alive.lock())
+    {
+        hide();
+    }
+}
+
+void wf::frameless_decorator_t::set_allowed(bool allowed)
+{
+    this->allowed = allowed;
+    update();
+}
+
+void wf::frameless_decorator_t::update()
+{
+    const auto& state = view->toplevel()->current();
+    const bool wanted = allowed && !state.fullscreen && (state.tiled_edges == 0);
+    if (wanted && !shown)
+    {
+        show();
+    } else if (!wanted && shown)
+    {
+        hide();
+    }
+}
+
+void wf::frameless_decorator_t::show()
+{
+    deco = std::make_shared<simple_decoration_node_t>(view, true);
+    clip = std::make_shared<corner_clip_transformer_t>(view, deco->theme.get_corner_radius(),
+        deco->theme.get_bottom_corner_radius(), deco);
+    clip->cut_outside = true;
+    if (!clip->can_draw())
+    {
+        deco.reset();
+        clip.reset();
+        return;
+    }
+
+    deco->resize(wf::dimensions(view->get_geometry()));
+    wf::scene::add_back(view->get_surface_root_node(), deco);
+    view->get_transformed_node()->add_transformer(clip, CORNER_CLIP_Z_ORDER, FRAMELESS_CLIP_NAME);
+    shown = true;
+    view->damage();
+}
+
+void wf::frameless_decorator_t::hide()
+{
+    view->damage();
+    if (view->get_transformed_node()->get_transformer<corner_clip_transformer_t>(FRAMELESS_CLIP_NAME))
+    {
+        view->get_transformed_node()->rem_transformer(clip);
+    }
+
+    wf::scene::remove_child(deco);
+    deco.reset();
+    clip.reset();
+    shown = false;
 }

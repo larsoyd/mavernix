@@ -37,6 +37,30 @@ class simple_decorator_t : public wf::custom_data_t
     ~simple_decorator_t();
     wf::decoration_margins_t get_margins(const wf::toplevel_state_t& state);
 };
+
+// the theme's shadow, rim and round corners for a window that draws its own frame while it floats
+class frameless_decorator_t : public wf::custom_data_t
+{
+    wayfire_toplevel_view view;
+    std::weak_ptr<wf::toplevel_view_interface_t> view_while_alive;
+    std::shared_ptr<simple_decoration_node_t> deco;
+    std::shared_ptr<corner_clip_transformer_t> clip;
+    bool allowed = false;
+    bool shown   = false;
+    void show();
+    void hide();
+
+    wf::signal::connection_t<wf::view_activated_state_signal> on_view_activated;
+    wf::signal::connection_t<wf::view_geometry_changed_signal> on_view_geometry_changed;
+    wf::signal::connection_t<wf::view_fullscreen_signal> on_view_fullscreen;
+    wf::signal::connection_t<wf::view_tiled_signal> on_view_tiled;
+
+  public:
+    frameless_decorator_t(wayfire_toplevel_view view);
+    ~frameless_decorator_t();
+    void set_allowed(bool allowed);
+    void update();
+};
 }
 
 #endif /* end of include guard: DECO_SUBSURFACE_HPP */

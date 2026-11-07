@@ -20,6 +20,7 @@ extern "C"
 
 #include "deco-subsurface.hpp"
 #include "hide-maximized.hpp"
+#include "rounded-frameless.hpp"
 #include "wayfire/core.hpp"
 #include "wayfire/plugin.hpp"
 #include "wayfire/signal-provider.hpp"
@@ -56,6 +57,7 @@ class wayfire_decoration : public wf::plugin_interface_t
     wf::view_matcher_t ignore_views{"themed-decoration/ignore_views"};
     wf::view_matcher_t forced_views{"themed-decoration/forced_views"};
     wf::view_matcher_t joined_views{"themed-decoration/joined_views"};
+    wf::view_matcher_t square_views{"themed-decoration/square_views"};
     wf::option_wrapper_t<std::string> theme_directory{"themed-decoration/theme"};
     wf::option_wrapper_t<std::string> preferred_mode{"core/preferred_decoration_mode"};
     wf::option_wrapper_t<bool> force_preferred_mode{"workarounds/force_preferred_decoration_mode"};
@@ -71,6 +73,8 @@ class wayfire_decoration : public wf::plugin_interface_t
             theme_in_use = theme_directory;
             redecorate_all_views();
         }
+
+        update_all_frameless();
     };
 
     wf::signal::connection_t<wf::txn::new_transaction_signal> on_new_tx =
@@ -126,6 +130,25 @@ class wayfire_decoration : public wf::plugin_interface_t
         redecorate_all_views();
     };
 
+    wf::signal::connection_t<wf::round_frameless_changed_signal> on_round_frameless_changed =
+        [=] (wf::round_frameless_changed_signal*)
+    {
+        update_all_frameless();
+    };
+
+    wf::signal::connection_t<wf::view_mapped_signal> on_view_mapped = [=] (wf::view_mapped_signal *ev)
+    {
+        update_frameless(ev->view);
+    };
+
+    wf::signal::connection_t<wf::view_unmapped_signal> on_view_unmapped = [=] (wf::view_unmapped_signal *ev)
+    {
+        if (auto toplevel = wf::toplevel_cast(ev->view))
+        {
+            toplevel->toplevel()->erase_data<wf::frameless_decorator_t>();
+        }
+    };
+
   public:
     void init() override
     {
@@ -135,11 +158,48 @@ class wayfire_decoration : public wf::plugin_interface_t
         theme_in_use = theme_directory;
         wf::get_core().connect(&on_config_reloaded);
         wf::get_core().connect(&on_hide_maximized_changed);
+        wf::get_core().connect(&on_round_frameless_changed);
+        wf::get_core().connect(&on_view_mapped);
+        wf::get_core().connect(&on_view_unmapped);
 
         for (auto& view : wf::get_core().get_all_views())
         {
             update_view_decoration(view);
         }
+
+        update_all_frameless();
+    }
+
+    void update_all_frameless()
+    {
+        for (auto& view : wf::get_core().get_all_views())
+        {
+            update_frameless(view);
+        }
+    }
+
+    void update_frameless(wayfire_view view)
+    {
+        auto toplevel = wf::toplevel_cast(view);
+        if (!toplevel || !toplevel->is_mapped())
+        {
+            return;
+        }
+
+        auto& data = *toplevel->toplevel();
+        if (is_toplevel_decorated(toplevel->toplevel()))
+        {
+            data.erase_data<wf::frameless_decorator_t>();
+            return;
+        }
+
+        if (!data.has_data<wf::frameless_decorator_t>())
+        {
+            data.store_data(std::make_unique<wf::frameless_decorator_t>(toplevel));
+        }
+
+        data.get_data<wf::frameless_decorator_t>()->set_allowed(
+            wf::get_core().has_data<wf::round_frameless_windows_t>() && !square_views.matches(view));
     }
 
     /**
@@ -168,6 +228,7 @@ class wayfire_decoration : public wf::plugin_interface_t
         {
             if (auto toplevel = wf::toplevel_cast(view))
             {
+                toplevel->toplevel()->erase_data<wf::frameless_decorator_t>();
                 remove_decoration(toplevel);
                 wf::get_core().tx_manager->schedule_object(toplevel->toplevel());
             }
@@ -290,6 +351,8 @@ class wayfire_decoration : public wf::plugin_interface_t
 
                 wf::get_core().tx_manager->schedule_object(toplevel->toplevel());
             }
+
+            update_frameless(view);
         }
     }
 };

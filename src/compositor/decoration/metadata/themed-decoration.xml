@@ -39,6 +39,11 @@
 			<_long>Windows matching these criteria have a tool bar of their own directly under the title bar; the title bar then takes the theme's joined look, so that the two look like one piece.</_long>
 			<default>none</default>
 		</option>
+		<option name="square_views" type="string">
+			<_short>Windows kept square</_short>
+			<_long>Windows that draw their own frame and match these criteria keep square corners and get no shadow from the desktop, while rounded corners for such windows are on.</_long>
+			<default>none</default>
+		</option>
 		<option name="forced_views" type="string">
 			<_short>Force decorations for specified window types</_short>
 			<_long>Forces window decoration for windows matching the specified criteria, overriding client decoration preference.</_long>

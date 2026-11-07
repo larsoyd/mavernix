@@ -1,0 +1,4 @@
+title = "Rounded corners for windows with their own frame"
+description = "Programs that draw their own title bar, like Chrome and Steam, get the same rounded corners and shadow as other windows while they float."
+version = "0.1.0"
+compositor_plugin = "rounded-corners"

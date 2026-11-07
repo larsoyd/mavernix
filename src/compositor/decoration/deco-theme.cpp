@@ -213,6 +213,11 @@ bool decoration_theme_t::get_buttons_hover_together() const
     return theme->buttons_hover_together;
 }
 
+double decoration_theme_t::get_corner_radius() const
+{
+    return theme->corner_radius;
+}
+
 double decoration_theme_t::get_bottom_corner_radius() const
 {
     return theme->bottom_corner_radius;

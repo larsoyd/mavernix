@@ -1,0 +1,8 @@
+<?xml version="1.0"?>
+<wayfire>
+	<plugin name="rounded-corners">
+		<_short>Rounded corners for windows with their own frame</_short>
+		<_long>Windows that draw their own title bar get the theme's rounded corners and shadow while they float.</_long>
+		<category>Effects</category>
+	</plugin>
+</wayfire>
