@@ -99,6 +99,8 @@ An extension can't see the pointer over other programs' windows or move the keyb
 
 `borderless-maximized` ships the same way. A window maximized both ways loses its title bar and frame, and gets them back when it's restored. Half and quarter tiles keep theirs, and a program that draws its own title bar keeps it. GTK 3 programs with GTK's plain title bar lose that bar too, dialogs don't. Super+Down or a drag with Super held brings a maximized window back.
 
+`rounded-corners` ships the same way. Programs that draw their own title bar, like Chrome, Discord and Steam, get the same rounded corners, rim and shadow as framed windows while they float, and square corners when tiled, maximized or full screen. A shadow such a program draws itself is left out, so only the desktop's shows. GTK programs that draw their own frame take the theme's corner radius either way. To keep a program square, list it in `themed-decoration`'s `square_views`, for example `app_id is "steam"`.
+
 ## Trying one
 
 Switch it on in the desktop config (`[extensions] enabled = ["NAME"]`) or in the settings window. Then check the shell's log (`$XDG_RUNTIME_DIR/mavernix/login.log`) for "extensions:" and for QML errors. If an extension has an error in a file, it's left out with a message and the desktop carries on. `dev/run-in-container` is a safe place to try one.

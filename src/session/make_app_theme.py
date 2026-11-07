@@ -750,6 +750,27 @@ def copy_gtk_window_buttons(theme, theme_directory, assets_directory):
                 shutil.copyfile(picture, assets_directory / f"window-{name}-{state}{suffix}{source.suffix}")
 
 
+# a window that draws its own frame while it floats, not a menu
+FLOATING_CSD = ("window.csd:not(.popup):not(.maximized):not(.fullscreen):not(.tiled)"
+                ":not(.tiled-top):not(.tiled-right):not(.tiled-bottom):not(.tiled-left)")
+
+
+def csd_frame_lines(theme):
+    """Corners of programs that draw their own frame, as round as the desktop's frames."""
+    frame = theme.get("window", {}).get("frame", {})
+    top = frame.get("corner_radius", 0)
+    bottom = frame.get("bottom_corner_radius", 0)
+    return [
+        f"{FLOATING_CSD} decoration {{ border-radius: {top}px {top}px {bottom}px {bottom}px; }}",
+        "",
+        f"{FLOATING_CSD} headerbar, {FLOATING_CSD} .titlebar {{",
+        f"  border-top-left-radius: {top}px;",
+        f"  border-top-right-radius: {top}px;",
+        "}",
+        "",
+    ]
+
+
 def gtk_css(theme, theme_directory, version):
     """The CSS for one GTK version; returns (text, middles for cut_middles())."""
     controls = theme["controls"]
@@ -758,6 +779,7 @@ def gtk_css(theme, theme_directory, version):
         "/* Written by make_app_theme.py from the desktop theme. Do not edit. */",
         (GTK_DARK_BASE_IMPORT if controls.get("dark", False) else GTK_BASE_IMPORT)[version],
         "",
+        *csd_frame_lines(theme),
     ]
 
     if "window_color" in controls:

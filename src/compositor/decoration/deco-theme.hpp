@@ -73,6 +73,8 @@ class decoration_theme_t
     /** @return Whether the theme has a rim for windows in this state. */
     bool has_rim(bool active) const;
     int get_rim_corner_height() const;
+    // in logical pixels
+    double get_corner_radius() const;
     /** A tool bar right under the title bar takes the theme's "joined" look. */
     void set_tool_bar_joined(bool joined);
 

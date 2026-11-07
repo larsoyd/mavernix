@@ -161,7 +161,7 @@ class TestWrittenSettings(SessionTestCase):
         written = self.home / "plain.json"
         self.run_script("make_shell_config.py", CONFIG_DIR / "plain.toml", written)
         self.assertEqual(sorted(json.loads(written.read_text())["extensions"]),
-                         ["borderless-maximized", "echo", "focus-follows-mouse"])
+                         ["borderless-maximized", "echo", "focus-follows-mouse", "rounded-corners"])
 
 
 class TestRefreshedExtensions(SessionTestCase):
@@ -1770,6 +1770,30 @@ wait $shell || true
         self.assertEqual(written[:2], ["[Icons][$i]", "Theme=Papirus"])
         self.assertIn("gtk-icon-theme-name=Papirus",
                       (output / "xdg" / "gtk-3.0" / "settings.ini").read_text().splitlines())
+
+
+class TestCsdFrames(SessionTestCase):
+    FLOATING = ("window.csd:not(.popup):not(.maximized):not(.fullscreen):not(.tiled)"
+                ":not(.tiled-top):not(.tiled-right):not(.tiled-bottom):not(.tiled-left)")
+
+    def written(self):
+        output = self.home / "app-theme"
+        self.run_script("make_app_theme.py", THEMES_DIR / "plain", output)
+        return output / "share" / "themes" / "DesktopTheme"
+
+    def rule(self, text, selector):
+        found = re.search(re.escape(selector) + r" \{([^}]*)\}", text)
+        self.assertIsNotNone(found, f"no rule for {selector} in {text[-800:]}")
+        return found.group(1)
+
+    def test_floating_csd_windows_take_the_frames_corner_radii(self):
+        theme = self.written()
+        for version in ("gtk-3.0", "gtk-4.0"):
+            css = (theme / version / "gtk.css").read_text()
+            self.assertIn("border-radius: 5px 5px 0px 0px;", self.rule(css, f"{self.FLOATING} decoration"))
+            title = self.rule(css, f"{self.FLOATING} headerbar, {self.FLOATING} .titlebar")
+            self.assertIn("border-top-left-radius: 5px;", title)
+            self.assertIn("border-top-right-radius: 5px;", title)
 
 
 class TestLogGuard(unittest.TestCase):

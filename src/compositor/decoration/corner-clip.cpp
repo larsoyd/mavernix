@@ -57,8 +57,7 @@ void main()
 }
 )";
 
-const int BOTTOM_LEFT  = 0;
-const int BOTTOM_RIGHT = 1;
+using corner_t = corner_clip_transformer_t::corner_t;
 
 class corner_clip_render_instance_t :
     public wf::scene::transformer_render_instance_t<corner_clip_transformer_t>
@@ -88,9 +87,9 @@ class corner_clip_render_instance_t :
         const wf::render_target_t& target, wf::regionf_t& damage) override
     {
         wf::regionf_t corners;
-        for (const wf::geometry_t& square : self->corner_squares())
+        for (const auto& square : self->corner_squares())
         {
-            corners |= square;
+            corners |= square.box;
         }
 
         wf::regionf_t corner_damage = damage & corners;
@@ -104,22 +103,41 @@ class corner_clip_render_instance_t :
         }
 
         // (For regions, ^ is "without".)
+        wf::regionf_t outside;
         wf::regionf_t elsewhere = damage ^ corners;
+        if (self->cut_outside)
+        {
+            const wf::regionf_t window{self->window_box()};
+            outside   = damage ^ window;
+            elsewhere = elsewhere & window;
+        }
+
         for (auto& child : children)
         {
             child->schedule_instructions(instructions, target, elsewhere);
         }
 
-        damage = elsewhere | corner_damage;
+        if (!outside.empty())
+        {
+            // the frame's instances bypass the surface root, so they take its coordinates
+            const wf::pointf_t origin = frame_origin();
+            const wf::render_target_t frame_target = target.translated(origin);
+            wf::regionf_t frame_damage = outside;
+            frame_damage += origin;
+            for (auto& instance : frame_instances)
+            {
+                instance->schedule_instructions(instructions, frame_target, frame_damage);
+            }
+        }
+
+        damage = elsewhere | corner_damage | outside;
     }
 
     void render(const wf::scene::render_instruction_t& data) override
     {
-        const std::vector<wf::geometry_t> squares = self->corner_squares();
-        for (int corner : {BOTTOM_LEFT, BOTTOM_RIGHT})
+        for (const auto& [corner, square] : self->corner_squares())
         {
-            const wf::geometry_t& square = squares[corner];
-            const wf::regionf_t to_draw  = data.damage & square;
+            const wf::regionf_t to_draw = data.damage & square;
             if (to_draw.empty())
             {
                 continue;
@@ -170,34 +188,35 @@ class corner_clip_render_instance_t :
     }
 
     /** Draws `buffer` onto the screen at `square`, cut round at its corner if `cut`. */
-    void draw_square(wf::auxilliary_buffer_t& buffer, wf::geometry_t square, int corner, bool cut,
+    void draw_square(wf::auxilliary_buffer_t& buffer, wf::geometry_t square, corner_t corner, bool cut,
         const wf::scene::render_instruction_t& data, const wf::regionf_t& to_draw)
     {
-        // The circle's middle is the square's inner corner: its top right
-        // for the left corner, its top left for the right one.
-        const double middle_x = (corner == BOTTOM_LEFT) ? square.x + square.width : square.x;
-        const double middle_y = square.y;
+        // the circle's middle is the square's inner corner
+        const bool left = (corner == corner_t::TOP_LEFT) || (corner == corner_t::BOTTOM_LEFT);
+        const bool top  = (corner == corner_t::TOP_LEFT) || (corner == corner_t::TOP_RIGHT);
+        const double middle_x = left ? square.x + square.width : square.x;
+        const double middle_y = top ? square.y + square.height : square.y;
 
-        const double left   = square.x;
-        const double top    = square.y;
-        const double right  = square.x + square.width;
-        const double bottom = square.y + square.height;
+        const double x0 = square.x;
+        const double y0 = square.y;
+        const double x1 = square.x + square.width;
+        const double y1 = square.y + square.height;
 
         // A triangle strip: top left, top right, bottom left, bottom right.
         // In a texture, height 1 is the top edge.
         const float positions[] = {
-            (float)left, (float)top, (float)right, (float)top,
-            (float)left, (float)bottom, (float)right, (float)bottom,
+            (float)x0, (float)y0, (float)x1, (float)y0,
+            (float)x0, (float)y1, (float)x1, (float)y1,
         };
         const float picture_positions[] = {
             0.0f, 1.0f, 1.0f, 1.0f,
             0.0f, 0.0f, 1.0f, 0.0f,
         };
         const float from_middle[] = {
-            (float)(left - middle_x), (float)(top - middle_y),
-            (float)(right - middle_x), (float)(top - middle_y),
-            (float)(left - middle_x), (float)(bottom - middle_y),
-            (float)(right - middle_x), (float)(bottom - middle_y),
+            (float)(x0 - middle_x), (float)(y0 - middle_y),
+            (float)(x1 - middle_x), (float)(y0 - middle_y),
+            (float)(x0 - middle_x), (float)(y1 - middle_y),
+            (float)(x1 - middle_x), (float)(y1 - middle_y),
         };
 
         auto picture = wf::gles_texture_t{wf::texture_t::from_aux(buffer)};
@@ -206,7 +225,7 @@ class corner_clip_render_instance_t :
             self->program.use(wf::TEXTURE_TYPE_RGBA);
             self->program.uniformMatrix4f("matrix",
                 wf::gles::render_target_orthographic_projection(data.target));
-            self->program.uniform1f("radius", self->radius);
+            self->program.uniform1f("radius", self->radius_of(corner));
             self->program.uniform1f("device_pixels_per_point", data.target.scale);
             self->program.uniform1f("cut", cut ? 1.0f : 0.0f);
             self->program.attrib_pointer("position", 2, 0, positions);
@@ -226,9 +245,10 @@ class corner_clip_render_instance_t :
 };
 }
 
-corner_clip_transformer_t::corner_clip_transformer_t(wayfire_toplevel_view view, double radius,
-    std::shared_ptr<wf::scene::node_t> frame) :
-    wf::scene::transformer_base_node_t(false), radius(radius), frame(frame), _view(view->weak_from_this())
+corner_clip_transformer_t::corner_clip_transformer_t(wayfire_toplevel_view view, double top_radius,
+    double bottom_radius, std::shared_ptr<wf::scene::node_t> frame) :
+    wf::scene::transformer_base_node_t(false), top_radius(top_radius), bottom_radius(bottom_radius),
+    frame(frame), _view(view->weak_from_this())
 {
     // Only possible with the GLES renderer; otherwise windows keep square
     // corners (see can_draw).
@@ -252,21 +272,43 @@ bool corner_clip_transformer_t::can_draw() const
     return program_ready;
 }
 
-std::vector<wf::geometry_t> corner_clip_transformer_t::corner_squares() const
+double corner_clip_transformer_t::radius_of(corner_t corner) const
+{
+    const bool top = (corner == TOP_LEFT) || (corner == TOP_RIGHT);
+    return top ? top_radius : bottom_radius;
+}
+
+wf::geometry_t corner_clip_transformer_t::window_box() const
+{
+    auto view = _view.lock();
+    return view ? view->get_geometry() : wf::geometry_t{0, 0, 0, 0};
+}
+
+std::vector<corner_clip_transformer_t::square_t> corner_clip_transformer_t::corner_squares() const
 {
     auto view = _view.lock();
     if (!view)
     {
-        return {{0, 0, 0, 0}, {0, 0, 0, 0}};
+        return {};
     }
 
-    // The frame has no border at the bottom, so its bottom edge is the contents'.
-    const wf::geometry_t frame = view->get_geometry();
-    const double size = std::ceil(radius);
-    return {
-        {frame.x, frame.y + frame.height - size, size, size},
-        {frame.x + frame.width - size, frame.y + frame.height - size, size, size},
-    };
+    const wf::geometry_t window = view->get_geometry();
+    std::vector<square_t> squares;
+    for (corner_t corner : {TOP_LEFT, TOP_RIGHT, BOTTOM_LEFT, BOTTOM_RIGHT})
+    {
+        const double size = std::ceil(radius_of(corner));
+        if (size <= 0)
+        {
+            continue;
+        }
+
+        const bool left = (corner == TOP_LEFT) || (corner == BOTTOM_LEFT);
+        const bool top  = (corner == TOP_LEFT) || (corner == TOP_RIGHT);
+        squares.push_back({corner, {left ? window.x : window.x + window.width - size,
+            top ? window.y : window.y + window.height - size, size, size}});
+    }
+
+    return squares;
 }
 
 void corner_clip_transformer_t::gen_render_instances(
