@@ -397,10 +397,6 @@ def write_kvantum_theme(theme, theme_directory, output_directory):
     picture.copy_state(r"(flat-)?arrow-[a-z]+", "normal", "focused")
 
     tool_button_pictures = controls.get("tool_button")
-    if tool_button_pictures is not None and not tool_button_pictures.get("hold_menu_arrow", True):
-        # kvantum leaves room for the arrow of a press and hold menu by this size alone
-        for section_name in ("PanelButtonTool", "ToolbarButton"):
-            settings[section_name]["indicator.size"] = "0"
     if tool_button_pictures is not None and "normal" in tool_button_pictures:
         for kvantum_state, our_state in KVANTUM_BUTTON_STATES.items():
             file_name = tool_button_pictures.get(our_state, tool_button_pictures["normal"])

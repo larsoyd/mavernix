@@ -112,7 +112,6 @@ slice = [4, 6, 4, 6]
 normal = "images/controls/tool-button.png"
 pressed = "images/controls/tool-button-pressed.png"        # optional, like the next one
 disabled = "images/controls/tool-button-disabled.png"
-hold_menu_arrow = false        # optional: whether a button whose menu opens on press and hold shows an arrow (default true)
 # Without the pictures, tool bar buttons are drawn plain: no frame, just the icon or text.
 
 [controls.tooltip]             # optional: the box a pointer's help text shows in (Qt only so far)
