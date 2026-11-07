@@ -10,8 +10,8 @@
 			<default>true</default>
 		</option>
 		<option name="dpi" type="bool">
-			<_short>Xft.dpi from the main screen's scale</_short>
-			<_long>For X11 programs drawn at the screen's own pixels (workarounds/force_xwayland_scaling): 96 times the main screen's scale.</_long>
+			<_short>Xft.dpi from the largest screen scale</_short>
+			<_long>For X11 programs drawn at the largest screen scale (workarounds/force_xwayland_scaling): 96 times that scale.</_long>
 			<default>false</default>
 		</option>
 	</plugin>

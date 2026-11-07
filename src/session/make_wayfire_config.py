@@ -741,7 +741,7 @@ def display_flag(config, key, default):
 def x11_settings_section(config):
     """The x11-settings plugin makes the main screen Xwayland's primary one,
     unless [display] x11_primary is false, and with [display] sharp_x11 sets
-    Xft.dpi from its scale. It is told when Xwayland is ready (the [core]
+    Xft.dpi from the largest screen scale. It is told when Xwayland is ready (the [core]
     line xwayland_ready_line())."""
     return ["[x11-settings]", f"primary_screen = {yes_or_no(display_flag(config, 'x11_primary', True))}",
             f"dpi = {yes_or_no(display_flag(config, 'sharp_x11', False))}"]
@@ -754,7 +754,7 @@ def xwayland_ready_line():
 def workarounds_section(config):
     """[input] middle_click_paste: false takes the primary selection away,
     which Wayfire reads only when it starts. [display] sharp_x11: X11
-    programs are drawn at the screen's own pixels instead of stretched,
+    programs are drawn at the largest screen scale instead of stretched,
     sizing themselves by Xft.dpi (x11_settings_section)."""
     paste = config.get("input", {}).get("middle_click_paste", True)
     if not isinstance(paste, bool):
