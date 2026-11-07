@@ -5,10 +5,6 @@
 // X11 programs then take the first screen it lists for their own: games
 // (SDL, Wine and Proton) open there and offer only that screen's resolutions.
 //
-// "dpi": X11's Xft.dpi is 96 times its scale, for X11 programs drawn at the
-// screen's own pixels (workarounds/force_xwayland_scaling) to size
-// themselves. Qt, GTK's text, Chromium and Electron read it as they start.
-//
 // The plugin talks to Xwayland as an X11 client, as KWin does. It connects
 // only once Xwayland says it is ready (core/xwayland_startup_script calls
 // x11-settings/xwayland-ready), since connecting earlier would wait on a server
@@ -23,6 +19,7 @@
 // IPC: x11-settings/xwayland-ready; x11-settings/main-screen { "name" };
 // x11-settings/window-id { "id" } -> { "window" }, an X11 window's own ID.
 
+#include <algorithm>
 #include <cmath>
 #include <sstream>
 #include <string>
@@ -294,8 +291,13 @@ class plugin_t : public wf::plugin_interface_t
         {
             return;
         }
-        wf::output_t* screen = main_screen.empty() ? nullptr : wf::get_core().output_layout->find_output(main_screen);
-        const int wanted = (dpi && screen) ? int(std::lround(96 * screen->handle->scale)) : 0;
+        // x11 is drawn at the largest screen scale and scaled down on the others
+        float scale = 0;
+        for (wf::output_t* screen : wf::get_core().output_layout->get_outputs())
+        {
+            scale = std::max(scale, screen->handle->scale);
+        }
+        const int wanted = (dpi && scale > 0) ? int(std::lround(96 * scale)) : 0;
         if ((wanted == written_dpi) && !dpi_asked)
         {
             return;
