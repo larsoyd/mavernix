@@ -1872,7 +1872,7 @@ wait $shell || true
         output = self.home / "app-theme"
         self.run_script("make_app_theme.py", THEMES_DIR / "plain", output, "--icon-theme", "Papirus")
         written = (output / "xdg" / "kdeglobals").read_text().splitlines()
-        self.assertEqual(written[:2], ["[Icons][$i]", "Theme=Papirus"])
+        self.assertEqual(written[:2], ["[Icons]", "Theme[$i]=Papirus"])
         self.assertIn("gtk-icon-theme-name=Papirus",
                       (output / "xdg" / "gtk-3.0" / "settings.ini").read_text().splitlines())
 
