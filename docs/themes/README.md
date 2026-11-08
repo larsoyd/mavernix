@@ -157,7 +157,12 @@ search_heading = { family = "Lucida Grande", size = 12 }
 search_label = { family = "Lucida Grande", size = 13 }
 theme_installer_heading = { family = "Lucida Grande", size = 15, bold = true }
 theme_installer_text    = { family = "Lucida Grande", size = 13 }
+tooltip      = { family = "Lucida Grande", size = 11 }   # programs' tooltips (GTK)
+document     = { family = "Helvetica", size = 12 }       # programs' document text (GTK)
+monospace    = { family = "Menlo", size = 11 }           # programs' fixed pitch text (GTK and Qt)
 ```
+
+Programs take `interface` as their own font as well. `tooltip`, `document` and `monospace` reach only programs, and a program keeps its toolkit's default for any of them you leave out. Qt draws tooltips in `interface`, because its style has no size of its own for them.
 
 Sizes are in **logical pixels**, like every other length in a theme, not in points. To Linux toolkits a "point" is 1/72 inch, but to some other systems it's one screen pixel. So "13 pt" could mean two different sizes depending on who reads it. Pixels only mean one thing. (For reference, 13 pixels is what Linux toolkits call 9.75 pt at the usual 96 dots per inch.)
 

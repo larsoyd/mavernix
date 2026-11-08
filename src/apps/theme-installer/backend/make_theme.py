@@ -365,7 +365,7 @@ PANEL_LOGO_HIGHLIGHTED_ENTRY = 12
 # --- Menus ---------------------------------------------------------------------
 # Shared art: the strip behind the selected item.
 MENU_HIGHLIGHT_ENTRY = 107
-# The menu font is nominally 13, but item text on screen has the height of 14.
+# menu items are 14 in the system theme fonts, a point above the system font
 MENU_FONT_SIZE = 14
 MENU_PADDING = 4
 MENU_ITEM_HEIGHT = 19
@@ -376,6 +376,48 @@ MENU_SEPARATOR_LINE_ROW = 7
 MENU_CORNER_RADIUS = 5
 MENU_SHORTCUT_END_INSET = 11
 
+
+# --- Fonts ---------------------------------------------------------------------
+FONTS_TABLE = f"""[fonts]
+interface    = {{ family = "{TITLE_FONT_FAMILY}", size = {TITLE_FONT_SIZE} }}
+window_title = {{ family = "{TITLE_FONT_FAMILY}", size = {TITLE_FONT_SIZE} }}
+panel        = {{ family = "{TITLE_FONT_FAMILY}", size = {PANEL_FONT_SIZE} }}
+dock_label   = {{ family = "{TITLE_FONT_FAMILY}", size = 14, bold = true }}
+notification_list = {{ family = "Helvetica", size = 13 }}
+notification_list_heading = {{ family = "Helvetica", size = 14, bold = true }}
+notification_list_time = {{ family = "Helvetica", size = 11, bold = true }}
+lock_name    = {{ family = "{TITLE_FONT_FAMILY}", size = 13 }}
+dock_folder  = {{ family = "{TITLE_FONT_FAMILY}", size = 12, bold = true }}
+window_overview_label = {{ family = "{TITLE_FONT_FAMILY}", size = 12, bold = true }}
+menu         = {{ family = "{TITLE_FONT_FAMILY}", size = {MENU_FONT_SIZE} }}
+search         = {{ family = "{TITLE_FONT_FAMILY}", size = 12 }}
+search_heading = {{ family = "{TITLE_FONT_FAMILY}", size = 11 }}
+search_label   = {{ family = "{TITLE_FONT_FAMILY}", size = 12, bold = true }}
+dialog_title = {{ family = "{TITLE_FONT_FAMILY}", size = 13, bold = true }}
+dialog_text  = {{ family = "{TITLE_FONT_FAMILY}", size = 11 }}
+theme_installer_heading = {{ family = "{TITLE_FONT_FAMILY}", size = 15, bold = true }}
+theme_installer_text    = {{ family = "{TITLE_FONT_FAMILY}", size = 13 }}
+about_version = {{ family = "{TITLE_FONT_FAMILY}", size = 12 }}
+about_label   = {{ family = "{TITLE_FONT_FAMILY}", size = 11, bold = true }}
+about_value   = {{ family = "{TITLE_FONT_FAMILY}", size = 11 }}
+about_button  = {{ family = "{TITLE_FONT_FAMILY}", size = 11 }}
+about_footer  = {{ family = "{TITLE_FONT_FAMILY}", size = 10 }}
+app_store_tab     = {{ family = "{TITLE_FONT_FAMILY}", size = 11 }}
+app_store_heading = {{ family = "{TITLE_FONT_FAMILY}", size = 14 }}
+app_store_title   = {{ family = "{TITLE_FONT_FAMILY}", size = 22 }}
+app_store_name    = {{ family = "{TITLE_FONT_FAMILY}", size = 12 }}
+app_store_text    = {{ family = "{TITLE_FONT_FAMILY}", size = 12 }}
+app_store_small   = {{ family = "{TITLE_FONT_FAMILY}", size = 10 }}
+app_store_button  = {{ family = "{TITLE_FONT_FAMILY}", size = 9, bold = true }}
+program_switcher = {{ family = "{TITLE_FONT_FAMILY}", size = 14, bold = true }}
+desktop_icon = {{ family = "{TITLE_FONT_FAMILY}", size = 12, bold = true }}
+banner_title = {{ family = "{TITLE_FONT_FAMILY}", size = 13, bold = true }}
+banner_text  = {{ family = "{TITLE_FONT_FAMILY}", size = 11 }}
+app_grid_label = {{ family = "{TITLE_FONT_FAMILY}", size = 12, bold = true }}
+tooltip      = {{ family = "{TITLE_FONT_FAMILY}", size = 11 }}
+document     = {{ family = "Helvetica", size = 12 }}
+monospace    = {{ family = "Menlo", size = 11 }}
+"""
 
 # --- Dock ----------------------------------------------------------------------
 # The shelf is a slab drawn by the shell, not a picture.
@@ -655,11 +697,12 @@ THEME_DESKTOP_PICTURES = "wallpapers"
 
 
 # --- Typeface ------------------------------------------------------------------
-# The theme carries the fonts its [fonts] table names; a user's font folder
-# links to them. Helvetica is the notification list's face.
+# the theme carries every face its fonts table names
 SYSTEM_FONT_FILE = "System/Library/Fonts/LucidaGrande.ttc"
 THEME_FONTS = "fonts"
 HELVETICA_FILE = "System/Library/Fonts/Helvetica.dfont"
+MENLO_FILE = "System/Library/Fonts/Menlo.ttc"
+TYPEFACE_FILES = (SYSTEM_FONT_FILE, HELVETICA_FILE, MENLO_FILE)
 
 
 def font_table(data, face, tag):
@@ -689,7 +732,7 @@ def mend_average_widths(font_file):
 def copy_typeface(root_dir, fonts_dir):
     """Copies the system's font files into the theme, mending the collection's widths."""
     fonts_dir.mkdir(parents=True, exist_ok=True)
-    for name in (SYSTEM_FONT_FILE, HELVETICA_FILE):
+    for name in TYPEFACE_FILES:
         font_file = root_dir / name
         if not font_file.is_file():
             fail(f"{font_file} is missing")
@@ -1237,43 +1280,7 @@ name = "Sea Lion"
 description = "The look of OS X 10.9 Mavericks."
 format = 0
 
-[fonts]
-interface    = {{ family = "{TITLE_FONT_FAMILY}", size = {TITLE_FONT_SIZE} }}
-window_title = {{ family = "{TITLE_FONT_FAMILY}", size = {TITLE_FONT_SIZE} }}
-panel        = {{ family = "{TITLE_FONT_FAMILY}", size = {PANEL_FONT_SIZE} }}
-dock_label   = {{ family = "{TITLE_FONT_FAMILY}", size = 14, bold = true }}
-notification_list = {{ family = "Helvetica", size = 13 }}
-notification_list_heading = {{ family = "Helvetica", size = 14, bold = true }}
-notification_list_time = {{ family = "Helvetica", size = 11, bold = true }}
-lock_name    = {{ family = "{TITLE_FONT_FAMILY}", size = 13, bold = true }}
-dock_folder  = {{ family = "{TITLE_FONT_FAMILY}", size = 12, bold = true }}
-window_overview_label = {{ family = "{TITLE_FONT_FAMILY}", size = 13, bold = true }}
-menu         = {{ family = "{TITLE_FONT_FAMILY}", size = {MENU_FONT_SIZE} }}
-search         = {{ family = "{TITLE_FONT_FAMILY}", size = 12 }}
-search_heading = {{ family = "{TITLE_FONT_FAMILY}", size = 11 }}
-search_label   = {{ family = "{TITLE_FONT_FAMILY}", size = 12, bold = true }}
-dialog_title = {{ family = "{TITLE_FONT_FAMILY}", size = 13, bold = true }}
-dialog_text  = {{ family = "{TITLE_FONT_FAMILY}", size = 11 }}
-theme_installer_heading = {{ family = "{TITLE_FONT_FAMILY}", size = 15, bold = true }}
-theme_installer_text    = {{ family = "{TITLE_FONT_FAMILY}", size = 13 }}
-about_version = {{ family = "{TITLE_FONT_FAMILY}", size = 12 }}
-about_label   = {{ family = "{TITLE_FONT_FAMILY}", size = 11, bold = true }}
-about_value   = {{ family = "{TITLE_FONT_FAMILY}", size = 11 }}
-about_button  = {{ family = "{TITLE_FONT_FAMILY}", size = 11 }}
-about_footer  = {{ family = "{TITLE_FONT_FAMILY}", size = 10 }}
-app_store_tab     = {{ family = "{TITLE_FONT_FAMILY}", size = 11 }}
-app_store_heading = {{ family = "{TITLE_FONT_FAMILY}", size = 14 }}
-app_store_title   = {{ family = "{TITLE_FONT_FAMILY}", size = 22 }}
-app_store_name    = {{ family = "{TITLE_FONT_FAMILY}", size = 12 }}
-app_store_text    = {{ family = "{TITLE_FONT_FAMILY}", size = 12 }}
-app_store_small   = {{ family = "{TITLE_FONT_FAMILY}", size = 10 }}
-app_store_button  = {{ family = "{TITLE_FONT_FAMILY}", size = 9, bold = true }}
-program_switcher = {{ family = "{TITLE_FONT_FAMILY}", size = 12, bold = true }}
-desktop_icon = {{ family = "{TITLE_FONT_FAMILY}", size = 12, bold = true }}
-banner_title = {{ family = "{TITLE_FONT_FAMILY}", size = 13, bold = true }}
-banner_text  = {{ family = "{TITLE_FONT_FAMILY}", size = 11 }}
-app_grid_label = {{ family = "{TITLE_FONT_FAMILY}", size = 13, bold = true }}
-
+{FONTS_TABLE}
 [window.titlebar]
 height = {TITLEBAR_HEIGHT}
 

@@ -78,10 +78,12 @@ def wanted_interface_values(theme, config):
         values["cursor-theme"] = cursors["theme"]
     if cursors.get("size"):
         values["cursor-size"] = str(cursors["size"])
-    font = theme.get("fonts", {}).get("interface")
-    if font and font.get("family") and font.get("size"):
-        points = round(font["size"] * POINTS_PER_PIXEL, 2)
-        values["font-name"] = f"{font['family']} {points:g}"
+    for role, key in (("interface", "font-name"), ("document", "document-font-name"),
+                      ("monospace", "monospace-font-name")):
+        font = theme.get("fonts", {}).get(role)
+        if font and font.get("family") and font.get("size"):
+            points = round(font["size"] * POINTS_PER_PIXEL, 2)
+            values[key] = f"{font['family']} {points:g}"
     return values
 
 

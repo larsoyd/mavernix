@@ -397,3 +397,38 @@ revision = 18
 
 [update.settings."controls.tooltip"]
 edge = "#00000040"
+
+# Text sizes as Mavericks' own Dock and login screen set them.
+[[update]]
+revision = 19
+import_brings = [
+    "Programs get Menlo, Mavericks' fixed pitch typeface, for terminals and code.",
+]
+
+[[update.corrections]]
+table = "fonts"
+key = "lock_name"
+was = { family = ".Lucida Grande UI", size = 13, bold = true }
+now = { family = ".Lucida Grande UI", size = 13 }
+
+[[update.corrections]]
+table = "fonts"
+key = "app_grid_label"
+was = { family = ".Lucida Grande UI", size = 13, bold = true }
+now = { family = ".Lucida Grande UI", size = 12, bold = true }
+
+[[update.corrections]]
+table = "fonts"
+key = "window_overview_label"
+was = { family = ".Lucida Grande UI", size = 13, bold = true }
+now = { family = ".Lucida Grande UI", size = 12, bold = true }
+
+[[update.corrections]]
+table = "fonts"
+key = "program_switcher"
+was = { family = ".Lucida Grande UI", size = 12, bold = true }
+now = { family = ".Lucida Grande UI", size = 14, bold = true }
+
+[update.settings.fonts]
+tooltip  = { family = ".Lucida Grande UI", size = 11 }
+document = { family = "Helvetica", size = 12 }

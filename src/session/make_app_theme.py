@@ -782,6 +782,10 @@ def gtk_css(theme, theme_directory, version):
         *csd_frame_lines(theme),
     ]
 
+    tooltip = theme.get("fonts", {}).get("tooltip", {})
+    if tooltip.get("size"):
+        lines += [f"tooltip {{ font-size: {tooltip['size']}px; }}", ""]
+
     if "window_color" in controls:
         lines += [
             f"window, dialog, .background {{ background-color: {controls['window_color']}; }}",
@@ -1150,6 +1154,11 @@ def mixed(first, second):
     return "#" + "".join(f"{(one[part] + two[part]) // 2:02x}" for part in range(3))
 
 
+def qt_font(font):
+    points = round(font["size"] * POINTS_PER_PIXEL, 2)
+    return f'"{font["family"]},{points:g},-1,5,400,0,0,0,0,0,0,0,0,0,0,1"'
+
+
 def write_qt6ct_settings(theme, output_directory):
     """Writes the theme's font for Qt, which reads none of its own without a platform theme.
 
@@ -1159,12 +1168,15 @@ def write_qt6ct_settings(theme, output_directory):
     font = theme.get("fonts", {}).get("interface", {})
     if not font.get("family") or not font.get("size"):
         return
-    points = round(font["size"] * POINTS_PER_PIXEL, 2)
     lines = ["[Appearance]", "custom_palette=false", "standard_dialogs=xdgdesktopportal"]
     icon_theme = theme.get("icons", {}).get("theme")
     if icon_theme is not None:
         lines.append(f"icon_theme={icon_theme}")
-    lines += ["", "[Fonts]", f'general="{font["family"]},{points:g},-1,5,400,0,0,0,0,0,0,0,0,0,0,1"', ""]
+    lines += ["", "[Fonts]", f"general={qt_font(font)}"]
+    fixed = theme["fonts"].get("monospace", {})
+    if fixed.get("family") and fixed.get("size"):
+        lines.append(f"fixed={qt_font(fixed)}")
+    lines.append("")
     settings_directory = output_directory / "xdg" / "qt6ct"
     settings_directory.mkdir(parents=True, exist_ok=True)
     (settings_directory / "qt6ct.conf").write_text("\n".join(lines))

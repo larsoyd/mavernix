@@ -694,6 +694,63 @@ class TestSeaLionUpdates(unittest.TestCase):
         self.assertEqual(correction["now"], [self.make_theme.PANEL_EDGE])
 
 
+class TestSeaLionFonts(unittest.TestCase):
+    """Sizes Mavericks 10.9.5 itself uses, as its Dock, Finder and AppKit set them."""
+
+    def setUp(self):
+        sys.path.insert(0, str(LOOKS_DIR.parent))
+        self.addCleanup(sys.path.remove, str(LOOKS_DIR.parent))
+        import installer_image
+        import make_theme
+        self.installer_image = installer_image
+        self.make_theme = make_theme
+        self.fonts = tomllib.loads(make_theme.FONTS_TABLE)["fonts"]
+        with open(LOOKS_DIR / "sea-lion" / "updates.toml", "rb") as file:
+            self.updates = {update["revision"]: update for update in tomllib.load(file)["update"]}
+
+    def face(self, name):
+        self.assertIn(name, self.fonts)
+        font = self.fonts[name]
+        return font["family"], font["size"], font.get("bold", False)
+
+    def test_overlay_labels_have_the_docks_sizes(self):
+        ui = self.make_theme.TITLE_FONT_FAMILY
+        self.assertEqual(self.face("lock_name"), (ui, 13, False))
+        self.assertEqual(self.face("app_grid_label"), (ui, 12, True))
+        self.assertEqual(self.face("window_overview_label"), (ui, 12, True))
+        self.assertEqual(self.face("program_switcher"), (ui, 14, True))
+        self.assertEqual(self.face("dock_label"), (ui, 14, True))
+
+    def test_programs_get_the_tooltip_document_and_fixed_pitch_faces(self):
+        self.assertEqual(self.face("tooltip"), (self.make_theme.TITLE_FONT_FAMILY, 11, False))
+        self.assertEqual(self.face("document"), ("Helvetica", 12, False))
+        self.assertEqual(self.face("monospace"), ("Menlo", 11, False))
+
+    def test_every_named_face_comes_with_the_theme(self):
+        taken = self.installer_image.needed_files(LOOKS_DIR / "sea-lion")["Essentials"]
+        self.assertTrue(hasattr(self.make_theme, "TYPEFACE_FILES"))
+        for path in self.make_theme.TYPEFACE_FILES:
+            with self.subTest(path=path):
+                self.assertIn(path, taken)
+        self.assertIn("System/Library/Fonts/Menlo.ttc", self.make_theme.TYPEFACE_FILES)
+
+    def test_older_themes_get_the_new_sizes(self):
+        self.assertIn(19, self.updates)
+        update = self.updates[19]
+        corrected = {}
+        for correction in update["corrections"]:
+            self.assertEqual(correction["table"], "fonts")
+            corrected[correction["key"]] = correction
+        self.assertEqual(set(corrected), {"lock_name", "app_grid_label", "window_overview_label", "program_switcher"})
+        for key, correction in corrected.items():
+            with self.subTest(key=key):
+                self.assertEqual(correction["now"], self.fonts[key])
+                self.assertNotEqual(correction["was"], self.fonts[key])
+        self.assertEqual(update["settings"]["fonts"], {key: self.fonts[key] for key in ("tooltip", "document")})
+        # menlo is only in themes imported after it, so only an import can name it
+        self.assertTrue(any("Menlo" in line for line in update["import_brings"]))
+
+
 class TestSeaLionMusic(unittest.TestCase):
     """Bandstand's [music] table names pictures make_music_pictures cuts from
     iTunes' resource files, which the import must take from the installer;
@@ -932,8 +989,10 @@ class TestTypefaceWidths(unittest.TestCase):
         fonts.mkdir(parents=True)
         self.collection((-1003, [1000, 2000])).rename(fonts / "LucidaGrande.ttc")
         (fonts / "Helvetica.dfont").write_bytes(b"resources")
+        (fonts / "Menlo.ttc").write_bytes(b"menlo")
         self.make_theme.copy_typeface(self.folder / "root", self.folder / "theme")
         self.assertEqual(self.averages(self.folder / "theme" / "LucidaGrande.ttc"), [1500])
+        self.assertEqual((self.folder / "theme" / "Menlo.ttc").read_bytes(), b"menlo")
 
 
 class TestThemeUpdates(unittest.TestCase):
@@ -1057,6 +1116,52 @@ class TestGtkSettingsFile(SessionTestCase):
         self.assertIn("gtk-font-name=Lucida Grande 9.75", written)
         self.assertIn("gtk-cursor-theme-name=Aqua", written)
         self.assertIn("gtk-cursor-theme-size=32", written)
+
+
+class TestProgramFaces(SessionTestCase):
+    FONTS = {"interface": {"family": "Lucida Grande", "size": 13},
+             "tooltip": {"family": "Lucida Grande", "size": 11},
+             "document": {"family": "Helvetica", "size": 12},
+             "monospace": {"family": "Menlo", "size": 11}}
+
+    def setUp(self):
+        super().setUp()
+        sys.path[:0] = [self.folder.name, str(SESSION_SOURCE_DIR)]
+        try:
+            import make_app_theme
+            import write_interface_settings
+        finally:
+            del sys.path[:2]
+        self.make = make_app_theme
+        self.interface = write_interface_settings
+
+    def test_gtk_gets_the_document_and_fixed_pitch_faces(self):
+        values = self.interface.wanted_interface_values({"fonts": self.FONTS}, {})
+        self.assertEqual(values.get("document-font-name"), "Helvetica 9")
+        self.assertEqual(values.get("monospace-font-name"), "Menlo 8.25")
+        bare = self.interface.wanted_interface_values({"fonts": {"interface": self.FONTS["interface"]}}, {})
+        self.assertNotIn("document-font-name", bare)
+        self.assertNotIn("monospace-font-name", bare)
+        sizeless = self.interface.wanted_interface_values({"fonts": {"monospace": {"family": "Menlo"}}}, {})
+        self.assertNotIn("monospace-font-name", sizeless)
+
+    def test_qt_gets_the_fixed_pitch_face(self):
+        self.make.write_qt6ct_settings({"fonts": self.FONTS}, self.home)
+        settings = configparser.ConfigParser(interpolation=None)
+        settings.read(self.home / "xdg" / "qt6ct" / "qt6ct.conf")
+        self.assertEqual(settings.get("Fonts", "fixed", fallback=None), '"Menlo,8.25,-1,5,400,0,0,0,0,0,0,0,0,0,0,1"')
+        self.make.write_qt6ct_settings({"fonts": {"interface": self.FONTS["interface"]}}, self.home)
+        settings = configparser.ConfigParser(interpolation=None)
+        settings.read(self.home / "xdg" / "qt6ct" / "qt6ct.conf")
+        self.assertIsNone(settings.get("Fonts", "fixed", fallback=None))
+
+    def test_gtk_tooltips_take_the_tooltip_size(self):
+        for version in ("gtk-3.0", "gtk-4.0"):
+            with self.subTest(version=version):
+                css, _ = self.make.gtk_css({"controls": {}, "fonts": self.FONTS}, self.home, version)
+                self.assertIn("tooltip { font-size: 11px; }", css)
+                css, _ = self.make.gtk_css({"controls": {}, "fonts": {}}, self.home, version)
+                self.assertNotIn("tooltip { font-size", css)
 
 
 class TestGameSettings(SessionTestCase):
