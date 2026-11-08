@@ -432,3 +432,14 @@ now = { family = ".Lucida Grande UI", size = 14, bold = true }
 [update.settings.fonts]
 tooltip  = { family = ".Lucida Grande UI", size = 11 }
 document = { family = "Helvetica", size = 12 }
+
+# The menu bar's last row is half black, softer than the solid line.
+[[update]]
+revision = 20
+themes = ["sea-lion"]
+
+[[update.corrections]]
+table = "panel"
+key = "separator"
+was = ["#000000"]
+now = ["#00000080"]

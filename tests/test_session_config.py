@@ -688,10 +688,21 @@ class TestSeaLionUpdates(unittest.TestCase):
         self.assertEqual(self.updates[5]["settings"]["animation.menu_close"], made["animation"]["menu_close"])
 
     def test_older_light_themes_get_the_imports_panel_edge(self):
-        self.assertEqual(self.updates[8]["themes"], ["sea-lion"])
-        [correction] = self.updates[8]["corrections"]
-        self.assertEqual((correction["table"], correction["key"]), ("panel", "separator"))
-        self.assertEqual(correction["now"], [self.make_theme.PANEL_EDGE])
+        for start in (["#00000000"], ["#000000"]):
+            edge = start
+            for revision in sorted(self.updates):
+                update = self.updates[revision]
+                if update.get("themes", ["sea-lion"]) != ["sea-lion"]:
+                    continue
+                for correction in update.get("corrections", []):
+                    if (correction["table"], correction["key"]) == ("panel", "separator") and correction["was"] == edge:
+                        edge = correction["now"]
+            with self.subTest(start=start):
+                self.assertEqual(edge, [self.make_theme.PANEL_EDGE])
+
+    def test_the_panel_edge_lets_a_little_through(self):
+        alpha = int(self.make_theme.PANEL_EDGE[7:9] or "ff", 16)
+        self.assertTrue(0x60 <= alpha <= 0xa0, self.make_theme.PANEL_EDGE)
 
 
 class TestSeaLionFonts(unittest.TestCase):

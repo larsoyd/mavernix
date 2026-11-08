@@ -353,9 +353,8 @@ PANEL_BACKGROUND_ENTRY = 48
 PANEL_LOGO_ENTRY = 11
 # The strip is 21 rows and covers all but one row of the bar.
 PANEL_HEIGHT = 22
-# The bar's last row, under the strip: black, as 10.9.5 draws it (and as
-# ProKit's menubarEdgeColor gives Sea Lion Dark).
-PANEL_EDGE = "#000000"
+# the bar's last row under the strip, half black so it reads softer than 10.9.5's solid line
+PANEL_EDGE = "#00000080"
 PANEL_FONT_SIZE = 14
 # Shared art: the strip behind an open menu's title, and the logo in white.
 PANEL_TITLE_HIGHLIGHT_ENTRY = 49
