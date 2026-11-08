@@ -14,10 +14,12 @@ position (DECODED_BY_POSITION) must be the one they were made for; any other
 file may differ, and the theme is then made from what the installer has.
 """
 
+import functools
 import hashlib
 import os
 import re
 import shutil
+import struct
 import subprocess
 import threading
 from dataclasses import dataclass
@@ -74,6 +76,12 @@ SEVEN_ZIP_PROGRESS = re.compile(rb"^\s*(\d+)%( Open)?")
 OPEN_SHARE = 0.55
 
 
+# a restored installer volume is its own base system, it has no BaseSystem.dmg
+WHOLE_IMAGE = ""
+RESTORED_PACKAGES = "System/Installation/Packages/"
+RESTORED_SYSTEM = "System/Library/CoreServices/SystemVersion.plist"
+
+
 class InstallerProblem(Exception):
     """Something the user has to be told, in words they can act on."""
 
@@ -86,13 +94,41 @@ class Member:
     size: int
 
 
+@functools.cache
+def only_free_space_cut(archive):
+    """Whether the image's Apple partition map claims nothing but free space past its end."""
+    size = archive.stat().st_size
+    with open(archive, "rb") as file:
+        signature, block = struct.unpack(">2sH", file.read(4))
+        if signature != b"ER" or block == 0:
+            return False
+        entries = None
+        index = 1
+        while entries is None or index <= entries:
+            file.seek(block * index)
+            entry = file.read(80)
+            if len(entry) < 80 or entry[:2] != b"PM":
+                return False
+            entries, start, count = struct.unpack(">4xIII", entry[:16])
+            kind = entry[48:80].split(b"\0")[0]
+            if (start + count) * block > size and kind != b"Apple_Free":
+                return False
+            index += 1
+    return True
+
+
+def seven_zip_failed(archive, status):
+    """7-Zip calls a short partition map fatal even when every volume in it is whole."""
+    return status != 0 and not (status == 2 and only_free_space_cut(Path(archive)))
+
+
 def list_archive(archive, archive_type=None):
     """Every file in an archive, with its size."""
     command = ["7z", "l", "-ba", "-slt", str(archive)]
     if archive_type:
         command.insert(2, f"-t{archive_type}")
     result = subprocess.run(command, capture_output=True, text=True, errors="surrogateescape")
-    if result.returncode != 0:
+    if seven_zip_failed(archive, result.returncode):
         raise InstallerProblem(f"7-Zip cannot read {archive.name}: {result.stderr.strip() or 'unknown format'}")
     members, path, size = [], None, 0
     for line in result.stdout.split("\n") + [""]:
@@ -154,7 +190,7 @@ def find_installer(source, work, report, known_listing=None):
     members = known_listing(source) if known_listing else None
     if members is None:
         members = list_archive(source)
-    parts = match_parts(members)
+    parts = match_parts(members) or restored_parts(members)
     if parts:
         return source, parts
 
@@ -183,6 +219,26 @@ def match_parts(members):
     return found if len(found) == len(PARTS) else {}
 
 
+def restored_parts(members):
+    """{part name: Member} of a restored installer volume, the base system
+    being the image itself, or {} if it is not one."""
+    paths = {member.path: member for member in members}
+    essentials = next((path for path in paths if path.endswith("/" + RESTORED_PACKAGES + "Essentials.pkg")), None)
+    if essentials is None:
+        return {}
+    volume = essentials[:-len(RESTORED_PACKAGES + "Essentials.pkg")]
+    if volume + RESTORED_SYSTEM not in paths:
+        return {}
+    parts = {"BaseSystem": Member(WHOLE_IMAGE, 0)}
+    for name, suffix in PARTS.items():
+        if name != "BaseSystem":
+            path = volume + RESTORED_PACKAGES + suffix.removeprefix("Packages/")
+            if path not in paths:
+                return {}
+            parts[name] = paths[path]
+    return parts
+
+
 def copy_member(archive, member, destination, report):
     """Copies one file out of an archive, reporting how far it has come."""
     destination.parent.mkdir(parents=True, exist_ok=True)
@@ -195,7 +251,7 @@ def copy_member(archive, member, destination, report):
             copied += len(chunk)
             report.fraction(copied / max(member.size, 1))
         errors = reader.stderr.read().decode(errors="replace")
-        if reader.wait() != 0:
+        if seven_zip_failed(archive, reader.wait()) or copied != member.size:
             raise InstallerProblem(f"{archive.name} is damaged or incomplete: 7-Zip could not copy {member.path} "
                                f"out of it ({errors.strip()}). Download the installer again.")
     return destination
@@ -225,7 +281,7 @@ def copy_members(archive, members, destination, report):
             report.fraction(fraction * OPEN_SHARE if found.group(2) else OPEN_SHARE + fraction * (1 - OPEN_SHARE))
     reading_errors.join()
     message = b"".join(errors).decode(errors="replace").strip()
-    if reader.wait() != 0:
+    if seven_zip_failed(archive, reader.wait()):
         raise InstallerProblem(f"{archive.name} is damaged or incomplete: 7-Zip could not copy the installer's "
                                f"parts out of it ({message or 'no reason given'}). Download the installer again.")
 
@@ -256,7 +312,7 @@ def take_files_from_base_system(image, paths, root, report):
     list_file.write_text("\n".join(by_installed_path[path] for path in paths) + "\n")
     result = subprocess.run(["7z", "x", "-y", WITHOUT_STREAMS, f"-o{extract_to}", str(image), f"@{list_file}"],
                             capture_output=True, text=True)
-    if result.returncode != 0:
+    if seven_zip_failed(image, result.returncode):
         raise InstallerProblem(f"BaseSystem.dmg is damaged or incomplete: 7-Zip could not take files out of it "
                                f"({result.stderr.strip()}). Download the installer again.")
     for number, path in enumerate(paths, start=1):

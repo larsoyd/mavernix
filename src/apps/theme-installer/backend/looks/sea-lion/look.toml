@@ -19,5 +19,7 @@ desktops = ["sea-lion", "sea-lion-dark"]
 # inside `wrapped_in` within it (an image of the installer program), or in
 # `inside_program` when a program folder is dropped.
 recognise = ["BaseSystem.dmg", "Packages/Essentials.pkg"]
+# or as an installer volume restored to a disk, the base system itself
+recognise_restored = ["System/Installation/Packages/Essentials.pkg", "System/Library/CoreServices/SystemVersion.plist"]
 wrapped_in = "InstallESD.dmg"
 inside_program = "Contents/SharedSupport/InstallESD.dmg"

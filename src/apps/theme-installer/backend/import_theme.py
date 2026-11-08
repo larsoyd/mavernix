@@ -236,7 +236,9 @@ def identify(source, list_image=installer_image.list_archive):
             except InstallerProblem:
                 listed[image] = []
         paths = listed[image]
-        if all(holds(paths, suffix) for suffix in look["recognise"]) or holds(paths, look["wrapped_in"]):
+        restored = look.get("recognise_restored")
+        if (all(holds(paths, suffix) for suffix in look["recognise"]) or holds(paths, look["wrapped_in"])
+                or restored and all(holds(paths, suffix) for suffix in restored)):
             return look_id
     raise InstallerProblem(f"{source.name} is not an installer the Theme Installer knows. "
                            "The looks it can make, and what each is made from, are on its first page.")
@@ -329,8 +331,10 @@ def unpack(archive, parts, work, look_dir, report, check):
 
     report.detail(f"Copying the installer's parts out of {archive.name}")
     report.within(0, COPY_SHARE)
-    copies = installer_image.copy_members(archive, [parts[name] for name in installer_image.PART_ORDER],
-                                          work / "parts", report)
+    copies = installer_image.copy_members(
+        archive, [parts[name] for name in installer_image.PART_ORDER if parts[name].path != installer_image.WHOLE_IMAGE],
+        work / "parts", report)
+    copies[installer_image.WHOLE_IMAGE] = archive
     # An image taken out of another is no longer needed.
     nested = work / "InstallESD.dmg"
     if nested.exists():
@@ -347,7 +351,8 @@ def unpack(archive, parts, work, look_dir, report, check):
             installer_image.take_files_from_base_system(part_file, list(files[name]), root, report)
         else:
             installer_image.take_files_from_package(part_file, list(files[name]), root, report)
-        part_file.unlink()
+        if part_file != archive:
+            part_file.unlink()
         if check:
             differing += installer_image.differing_files(files[name], root)
         done += sizes[name]

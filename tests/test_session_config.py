@@ -909,6 +909,139 @@ class TestSeaLionIcons(unittest.TestCase):
         self.assertFalse(os.path.lexists(theme / "32x32" / "mimetypes" / "text-x-python.png"))
 
 
+class TestRestoredInstaller(unittest.TestCase):
+    """A disk image of a restored installer volume: the base system itself, its
+    packages in System/Installation/Packages, and a partition map that may
+    claim free space past the end of the file."""
+
+    VOLUME = "OS X Base System/"
+    PACKAGES = ["BaseSystemBinaries", "Essentials", "AdditionalEssentials", "MediaFiles"]
+
+    def setUp(self):
+        self.folder = Path(tempfile.mkdtemp())
+        self.addCleanup(shutil.rmtree, self.folder)
+        sys.path.insert(0, str(LOOKS_DIR.parent))
+        self.addCleanup(sys.path.remove, str(LOOKS_DIR.parent))
+        import import_theme
+        import installer_image
+        self.import_theme = import_theme
+        self.installer_image = installer_image
+        bin_dir = self.folder / "bin"
+        bin_dir.mkdir()
+        seven_zip = bin_dir / "7z"
+        seven_zip.write_text('#!/bin/sh\ncat "$FAKE_LISTING"\nexit "$FAKE_STATUS"\n')
+        seven_zip.chmod(0o755)
+        patcher = unittest.mock.patch.dict(os.environ, {"PATH": f"{bin_dir}:{os.environ['PATH']}",
+                                                        "FAKE_LISTING": str(self.folder / "listing"),
+                                                        "FAKE_STATUS": "0"})
+        patcher.start()
+        self.addCleanup(patcher.stop)
+
+    def image(self, partitions, size):
+        """An Apple partition map of (type, start, end) in bytes, padded to size."""
+        block = 512
+        data = bytearray(size)
+        struct.pack_into(">2sH", data, 0, b"ER", block)
+        for number, (kind, start, end) in enumerate(partitions, start=1):
+            struct.pack_into(">2s2xIII", data, block * number, b"PM", len(partitions), start // block,
+                             (end - start) // block)
+            data[block * number + 48:block * number + 48 + len(kind)] = kind.encode()
+        path = self.folder / "installer.iso"
+        path.write_bytes(data)
+        return path
+
+    def listing(self, paths, status):
+        (self.folder / "listing").write_text("".join(f"Path = {path}\nSize = 7\n\n" for path in paths))
+        os.environ["FAKE_STATUS"] = str(status)
+
+    def restored_paths(self):
+        return [self.VOLUME + "System/Library/CoreServices/SystemVersion.plist"] + [
+            f"{self.VOLUME}System/Installation/Packages/{name}.pkg" for name in self.PACKAGES]
+
+    def test_a_cut_off_end_of_free_space_is_read(self):
+        image = self.image([("Apple_partition_map", 512, 4096), ("Apple_HFS", 4096, 16384),
+                            ("Apple_Free", 16384, 18432)], 16384)
+        self.listing(self.restored_paths(), 2)
+        self.assertEqual(len(self.installer_image.list_archive(image)), 5)
+
+    def test_a_cut_off_volume_is_refused(self):
+        image = self.image([("Apple_partition_map", 512, 4096), ("Apple_HFS", 4096, 18432)], 16384)
+        self.listing(self.restored_paths(), 2)
+        with self.assertRaises(self.installer_image.InstallerProblem):
+            self.installer_image.list_archive(image)
+
+    def test_other_failures_are_refused(self):
+        not_apm = self.folder / "other.iso"
+        not_apm.write_bytes(bytes(16384))
+        self.listing(self.restored_paths(), 2)
+        with self.assertRaises(self.installer_image.InstallerProblem):
+            self.installer_image.list_archive(not_apm)
+        unsigned = self.image([("Apple_partition_map", 512, 4096), ("Apple_HFS", 4096, 16384),
+                               ("Apple_Free", 16384, 18432)], 16384)
+        unsigned.write_bytes(b"XX" + unsigned.read_bytes()[2:])
+        with self.assertRaises(self.installer_image.InstallerProblem):
+            self.installer_image.list_archive(unsigned)
+        image = self.image([("Apple_partition_map", 512, 4096), ("Apple_HFS", 4096, 16384),
+                            ("Apple_Free", 16384, 18432)], 16384)
+        self.listing(self.restored_paths(), 1)
+        with self.assertRaises(self.installer_image.InstallerProblem):
+            self.installer_image.list_archive(image)
+
+    def test_a_restored_volume_is_its_own_base_system(self):
+        members = [self.installer_image.Member(path, 7) for path in self.restored_paths()]
+        image = self.folder / "installer.iso"
+        image.write_bytes(b"image")
+        archive, parts = self.installer_image.find_installer(image, self.folder, unittest.mock.Mock(),
+                                                             lambda path: members)
+        self.assertEqual(archive, image)
+        self.assertEqual(parts["BaseSystem"].path, self.installer_image.WHOLE_IMAGE)
+        self.assertEqual(parts["Essentials"].path, f"{self.VOLUME}System/Installation/Packages/Essentials.pkg")
+        without_system = members[1:]
+        with self.assertRaises(self.installer_image.InstallerProblem):
+            self.installer_image.find_installer(image, self.folder, unittest.mock.Mock(),
+                                                lambda path: without_system)
+
+    def test_the_theme_installer_knows_a_restored_volume(self):
+        image = self.folder / "installer.iso"
+        image.write_bytes(b"image")
+        listed = [self.installer_image.Member(path, 7) for path in self.restored_paths()]
+        self.assertEqual(self.import_theme.identify(image, lambda path: listed), "sea-lion")
+        looks = {"other": {"recognise": ["Other.dmg"], "wrapped_in": "Other.dmg"}}
+        with unittest.mock.patch.object(self.import_theme, "read_looks", lambda: looks):
+            with self.assertRaises(self.installer_image.InstallerProblem):
+                self.import_theme.identify(image, lambda path: listed)
+
+    def test_unpacking_a_restored_volume_keeps_the_image(self):
+        image = self.folder / "installer.iso"
+        image.write_bytes(b"image")
+        members = [self.installer_image.Member(path, 7) for path in self.restored_paths()]
+        _, parts = self.installer_image.find_installer(image, self.folder, unittest.mock.Mock(), lambda path: members)
+        copied_names = []
+
+        def copy_members(archive, wanted, destination, report):
+            copied_names.extend(member.path for member in wanted)
+            destination.mkdir(parents=True, exist_ok=True)
+            copies = {}
+            for member in wanted:
+                copies[member.path] = destination / Path(member.path).name
+                copies[member.path].write_bytes(b"part")
+            return copies
+
+        base_system_from = []
+        with unittest.mock.patch.object(self.installer_image, "copy_members", copy_members), \
+                unittest.mock.patch.object(self.installer_image, "take_files_from_base_system",
+                                           lambda part, paths, root, report: base_system_from.append(part)), \
+                unittest.mock.patch.object(self.installer_image, "take_files_from_package",
+                                           lambda part, paths, root, report: None), \
+                unittest.mock.patch.object(self.import_theme, "check_space", lambda *arguments: None):
+            self.import_theme.unpack(image, parts, self.folder / "work", LOOKS_DIR / "sea-lion",
+                                     unittest.mock.Mock(), check=False)
+        self.assertTrue(image.is_file())
+        self.assertEqual(image.read_bytes(), b"image")
+        self.assertEqual(base_system_from, [image])
+        self.assertNotIn(self.installer_image.WHOLE_IMAGE, copied_names)
+
+
 class TestTypefaceWidths(unittest.TestCase):
     """Apple's Lucida Grande has a negative average width, which leaves
     Chrome's find box with no room to type in."""
