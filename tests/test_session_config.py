@@ -2241,6 +2241,65 @@ class TestAutostartWaitsForTray(unittest.TestCase):
         self.assertIn("'portals' / 'plasma-xdg-desktop-portal-kde.conf'", build)
 
 
+class TestPointerSize(SessionTestCase):
+    """[pointer] size is the user's own, so a new import of the theme keeps it."""
+
+    def choose(self, size):
+        choices = self.home / ".config" / "mavernix" / "plain.json"
+        choices.parent.mkdir(parents=True, exist_ok=True)
+        choices.write_text(json.dumps({"pointer": {"size": size}}))
+
+    def fake_gsettings(self):
+        fake_bin = self.home / "bin"
+        fake_bin.mkdir(parents=True)
+        log = self.home / "gsettings.log"
+        gsettings = fake_bin / "gsettings"
+        gsettings.write_text('#!/bin/sh\nprintf "%s\\n" "$*" >> "$SETTINGS_LOG"\n')
+        gsettings.chmod(0o755)
+        self.environment.update(PATH=f"{fake_bin}:{os.environ['PATH']}", SETTINGS_LOG=str(log))
+        return log
+
+    def test_the_shell_and_x11_take_the_chosen_size(self):
+        self.choose(48)
+        written = self.home / "shell.json"
+        self.run_script("make_shell_config.py", CONFIG_DIR / "plain.toml", written)
+        settings = json.loads(written.read_text())
+        self.assertEqual(settings["theme"]["cursors"], {"theme": "Adwaita", "size": 48})
+
+    def test_without_a_choice_the_theme_decides(self):
+        written = self.home / "shell.json"
+        self.run_script("make_shell_config.py", CONFIG_DIR / "plain.toml", written)
+        self.assertEqual(json.loads(written.read_text())["theme"]["cursors"]["size"], 24)
+
+    def test_the_compositor_takes_the_chosen_size(self):
+        self.choose(60)
+        written = self.home / "session.ini"
+        self.run_script("make_wayfire_config.py", CONFIG_DIR / "plain.toml", written)
+        self.assertIn("cursor_size = 60", written.read_text().splitlines())
+
+    def test_a_size_that_is_not_one_is_refused(self):
+        for wrong in ("big", True, 0, 1000):
+            with self.subTest(size=wrong):
+                self.choose(wrong)
+                result = self.run_script("make_shell_config.py", CONFIG_DIR / "plain.toml", self.home / "shell.json",
+                                         may_fail=True)
+                self.assertNotEqual(result.returncode, 0)
+                self.assertIn("pointer", result.stderr)
+
+    def test_gtk_settings_take_the_chosen_size(self):
+        output = self.home / "app-theme"
+        self.run_script("make_app_theme.py", THEMES_DIR / "plain", output, "--cursor-size", "72")
+        written = (output / "xdg" / "gtk-3.0" / "settings.ini").read_text().splitlines()
+        self.assertIn("gtk-cursor-theme-size=72", written)
+
+    def test_a_change_in_settings_reaches_gtk_at_once(self):
+        log = self.fake_gsettings()
+        settings = self.home / "shell.json"
+        settings.write_text(json.dumps({"theme": {"cursors": {"theme": "Adwaita", "size": 36}}, "config": {}}))
+        self.run_script("write_interface_settings.py", settings, "--window-buttons-only")
+        self.assertIn("set org.gnome.desktop.interface cursor-size 36", log.read_text().splitlines())
+
+
 class TestGtkWindowButtons(SessionTestCase):
     def test_session_theme_name_is_published_to_x11_and_wayland(self):
         settings = self.home / "shell.json"

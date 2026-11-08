@@ -10,7 +10,7 @@ choices do not show here and Plasma's store is not touched.
 The button layout must be written: left out, GTK header bars get the
 schema's default of a close button only. It comes from [gtk] button_side and
 button_order, falling back to [window]. `--window-buttons-only` writes it
-alone, for mavernix-reconfigure.
+and the pointer alone, for mavernix-reconfigure.
 
 Without `gsettings`, only the optional X11 settings file is written.
 """
@@ -90,6 +90,7 @@ def wanted_interface_values(theme, config):
 # Keys a theme may leave out that must not keep the last desktop's value:
 # the session's database outlives a switch.
 RESET_WHEN_UNSET = ["cursor-theme", "cursor-size", "gtk-theme"]
+POINTER_KEYS = ["cursor-theme", "cursor-size"]
 
 
 def write_xsettings(settings, path):
@@ -152,6 +153,10 @@ def main():
         if not write_values(INTERFACE_SCHEMA, wanted):
             return
         reset_values(INTERFACE_SCHEMA, [key for key in RESET_WHEN_UNSET if key not in wanted])
+    else:
+        pointer = wanted_interface_values(settings["theme"], settings["config"])
+        if not write_values(INTERFACE_SCHEMA, {key: pointer[key] for key in POINTER_KEYS if key in pointer}):
+            return
     write_values(WINDOW_BUTTONS_SCHEMA, wanted_window_button_values(settings["config"]))
 
 

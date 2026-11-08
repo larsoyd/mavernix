@@ -28,6 +28,8 @@ static const int slider_width_px = 200;
 // Each write rewrites the compositor's config, so holding an arrow key on
 // a slider writes once it is let go.
 static const int write_delay_ms = 500;
+// the sizes the pointer themes draw, so none is scaled
+static const QList<double> pointer_sizes = {24, 30, 36, 48, 60, 72, 96};
 
 static int nearest_scroll_stop(double factor)
 {
@@ -98,6 +100,18 @@ MousePane::MousePane(Choices& choices, QWidget* parent) : QWidget(parent), choic
     shake_row->setEnabled(shake->isChecked());
     connect(shake, &QCheckBox::toggled, shake_row, &QWidget::setEnabled);
 
+    // kept with the user's choices, so a new import of the theme does not undo it
+    const QVariant chosen_pointer = choices.value(QStringLiteral("pointer"), QStringLiteral("size"));
+    const QVariant theme_pointer = choices.themeTable(QStringLiteral("cursors")).value(QStringLiteral("size"));
+    auto* pointer_size = stops_slider(pointer_sizes,
+        chosen_pointer.isValid() ? chosen_pointer.toDouble() : theme_pointer.isValid() ? theme_pointer.toDouble() : 24,
+        [this](double size) {
+            this->choices.set(QStringLiteral("pointer"), QStringLiteral("size"), qRound(size));
+            QProcess::startDetached(reconfigure_command, {});
+        });
+    auto* pointer_row = with_end_words(
+        pointer_size, word("mouse_pointer_normal", "Normal"), word("mouse_pointer_large", "Large"));
+
     auto* left = new QRadioButton(word("mouse_primary_left", "Left"));
     auto* right = new QRadioButton(word("mouse_primary_right", "Right"));
     auto* buttons = new QButtonGroup(this);
@@ -129,6 +143,10 @@ MousePane::MousePane(Choices& choices, QWidget* parent) : QWidget(parent), choic
     form->addCheck(with_note(shake, word("mouse_shake_to_find_note",
                                         "Shaking the mouse quickly makes the pointer grow for a moment, so you can spot it.")));
     form->addRow(word("mouse_shake_needed", "Shake needed:"), shake_row);
+    form->addDivider();
+    form->addRow(word("mouse_pointer_size", "Pointer size:"),
+        with_note_under(pointer_row,
+            word("mouse_pointer_size_note", "Programs opened before keep the old size until they start again."), 0));
 }
 
 QWidget* MousePane::speedSlider(QSlider*& slider, int stops, int at)

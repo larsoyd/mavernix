@@ -49,7 +49,7 @@ from pathlib import Path
 
 from make_wayfire_config import load_toml, system_keyboard
 from extensions import found_extensions
-from themes import find_theme, usable_icon_theme
+from themes import find_theme, usable_icon_theme, with_pointer_size
 from user_choices import (choices_path, default_desktop_path, desktop_names, desktops_sharing_choices, load_desktop_config,
                           with_user_choices)
 
@@ -82,7 +82,7 @@ def main():
     if "theme" not in config:
         sys.exit(f"make_shell_config: {arguments.config} does not name a theme")
     theme_dir = find_theme(config["theme"])
-    theme = load_toml(theme_dir / "theme.toml")
+    theme = with_pointer_size(load_toml(theme_dir / "theme.toml"), config.get("pointer", {}).get("size"))
     # The icon themes picked in Settings, App Style, each in the theme's place.
     picked_icons = config.get("icons", {})
     shell_theme = usable_icon_theme(theme, theme_dir, picked_icons.get("dock_and_menu_bar"))

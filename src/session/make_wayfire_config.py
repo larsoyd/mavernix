@@ -26,7 +26,7 @@ from pathlib import Path
 
 from extensions import found_extensions
 from paths import SESSION_DIR, SHELL_DIR
-from themes import find_theme
+from themes import find_theme, with_pointer_size
 from user_choices import load_desktop_config, settings_home, with_user_choices
 
 # Plugins every session loads; the order has no meaning to Wayfire.
@@ -1272,7 +1272,7 @@ def main():
     if "theme" not in config:
         fail(f"{arguments.config} does not name a theme")
     theme_dir = find_theme(config["theme"])
-    theme = load_toml(theme_dir / "theme.toml")
+    theme = with_pointer_size(load_toml(theme_dir / "theme.toml"), config.get("pointer", {}).get("size"))
 
     plugins = list(BASE_PLUGINS)
     sections = [decoration_section(config, theme_dir)]

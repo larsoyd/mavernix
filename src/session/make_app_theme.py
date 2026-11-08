@@ -35,7 +35,7 @@ import tomllib
 import xml.etree.ElementTree as ElementTree
 from pathlib import Path
 
-from themes import usable_icon_theme
+from themes import usable_icon_theme, with_pointer_size
 from write_interface_settings import wanted_interface_values
 
 try:
@@ -1291,6 +1291,7 @@ def main():
     parser.add_argument("theme", type=Path, help="desktop theme directory, holding theme.toml")
     parser.add_argument("output", type=Path, help="directory to write the toolkit themes into")
     parser.add_argument("--icon-theme", default="", help="the icon theme the user picked, if any")
+    parser.add_argument("--cursor-size", default="", help="the pointer size the user picked, if any")
     arguments = parser.parse_args()
 
     theme_file = arguments.theme / "theme.toml"
@@ -1298,6 +1299,7 @@ def main():
         fail(f"{theme_file} does not exist")
     with open(theme_file, "rb") as file:
         theme = usable_icon_theme(tomllib.load(file), arguments.theme, arguments.icon_theme)
+    theme = with_pointer_size(theme, arguments.cursor_size)
 
     if "controls" not in theme:
         print(f"{theme_file} has no [controls] table; applications keep their own look")

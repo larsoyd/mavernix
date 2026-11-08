@@ -104,6 +104,15 @@ As on El Capitan, shaking the pointer quickly back and forth can make it big for
 
 How hard you have to shake is up to you: Settings, Mouse, **Shake needed**, from Little to Lots, or `[input] shake_sensitivity` from 1 to 5. The default is 3: five quick turns, each after about 90 pixels. At 1 it reacts to four short turns of 40 pixels, which ordinary quick pointing can set off.
 
+## Pointer size
+
+The pointer's size is yours, not the theme's: Settings, Mouse, **Pointer size**, from Normal to Large, or `[pointer] size` in pixels. Left out, the theme's own size applies. A new import of a theme keeps yours. The slider stops at the sizes Sea Lion's pointers are drawn at, 24, 30, 36, 48, 60, 72 and 96, so none is scaled. The desktop and GTK programs follow at once, programs that were already open when they start again.
+
+```toml
+[pointer]
+size = 48
+```
+
 ## Wayfire's own settings
 
 The session writes Wayfire's settings file anew at every login and on every change, so editing it by hand doesn't last. Put your own Wayfire settings in `~/.config/mavernix/wayfire.ini` instead. It's added after everything the session writes, and Wayfire takes the last value it reads, so yours win. For example:

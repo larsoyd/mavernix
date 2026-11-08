@@ -32,8 +32,24 @@ FORMAT_KEYS_FILE = DATA_DIR / "theme-keys.json"
 FALLBACK_ICON_THEMES = ["Adwaita", "breeze", "Papirus", "hicolor"]
 
 
+# pointer sizes the toolkits handle, in pixels
+POINTER_SIZES = range(8, 257)
+
+
 def fail(message):
     sys.exit(f"themes: {message}")
+
+
+def with_pointer_size(theme, size):
+    """`theme` with the pointer size the user chose ([pointer] size), if any."""
+    if size is None or size == "":
+        return theme
+    if isinstance(size, str) and size.isdigit():
+        size = int(size)
+    if isinstance(size, bool) or not isinstance(size, int) or not POINTER_SIZES.start <= size < POINTER_SIZES.stop:
+        fail(f"[pointer] size must be a whole number of pixels from {POINTER_SIZES.start} to "
+             f"{POINTER_SIZES.stop - 1}, not {size!r}")
+    return dict(theme, cursors=dict(theme.get("cursors", {}), size=size))
 
 
 def user_themes_dir():
