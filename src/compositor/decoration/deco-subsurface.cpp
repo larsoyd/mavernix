@@ -33,6 +33,8 @@
 // The corner clip's place among a window's transformers (lowest first).
 const int CORNER_CLIP_Z_ORDER = 0;
 const char *const CORNER_CLIP_NAME = "themed-decoration-corner-clip";
+// apps that draw their own frame round it near 8 px
+const double SELF_FRAMED_CORNER_RADIUS = 8.0;
 const char *const FRAMELESS_CLIP_NAME = "themed-decoration-frameless-clip";
 
 static bool frame_hidden(const wf::toplevel_state_t& state)
@@ -417,6 +419,11 @@ class simple_decoration_node_t : public wf::scene::node_t, public wf::pointer_in
         bare(bare),
         shadow_fade{wf::create_option<int>(theme.values().shadow_fade_ms), fast_then_settling}
     {
+        if (bare)
+        {
+            theme.set_least_corner_radius(SELF_FRAMED_CORNER_RADIUS);
+        }
+
         this->_view = view->weak_from_this();
         shadow_fade.set(view->activated, view->activated);
         view->connect(&title_set);

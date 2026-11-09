@@ -75,6 +75,8 @@ class decoration_theme_t
     int get_rim_corner_height() const;
     // in logical pixels
     double get_corner_radius() const;
+    // rounds every corner at least this much, logical pixels
+    void set_least_corner_radius(double radius);
     /** A tool bar right under the title bar takes the theme's "joined" look. */
     void set_tool_bar_joined(bool joined);
 
@@ -109,6 +111,7 @@ class decoration_theme_t
     wf::option_wrapper_t<std::string> theme_directory{"themed-decoration/theme"};
     wf::option_wrapper_t<int> resize_grip_wish{"themed-decoration/resize_grip"};
     std::shared_ptr<const themed::window_theme_t> theme;
+    double least_corner_radius = 0.0;
 };
 }
 }

@@ -205,7 +205,7 @@ bool decoration_theme_t::has_rim(bool active) const
 
 int decoration_theme_t::get_rim_corner_height() const
 {
-    return (int)std::ceil(theme->corner_radius);
+    return (int)std::ceil(get_corner_radius());
 }
 
 bool decoration_theme_t::get_buttons_hover_together() const
@@ -215,17 +215,22 @@ bool decoration_theme_t::get_buttons_hover_together() const
 
 double decoration_theme_t::get_corner_radius() const
 {
-    return theme->corner_radius;
+    return std::max(theme->corner_radius, least_corner_radius);
+}
+
+void decoration_theme_t::set_least_corner_radius(double radius)
+{
+    least_corner_radius = radius;
 }
 
 double decoration_theme_t::get_bottom_corner_radius() const
 {
-    return theme->bottom_corner_radius;
+    return std::max(theme->bottom_corner_radius, least_corner_radius);
 }
 
 int decoration_theme_t::get_rim_bottom_corner_height() const
 {
-    return (int)std::ceil(theme->bottom_corner_radius);
+    return (int)std::ceil(get_bottom_corner_radius());
 }
 
 wf::color_t decoration_theme_t::get_rim_color(rim_part_t part, bool active) const
@@ -253,7 +258,7 @@ cairo_surface_t*decoration_theme_t::render_rim_top(int width, int height, double
     // only its top and its corners fall inside.
     const double line   = scale;
     const double middle = line / 2.0;
-    const double radius = theme->corner_radius * scale + middle;
+    const double radius = get_corner_radius() * scale + middle;
     themed::rounded_rectangle_path(cr, middle, middle, width - line, height * 4.0,
         {radius, radius, 0.0, 0.0});
 
@@ -281,7 +286,7 @@ cairo_surface_t*decoration_theme_t::render_rim_bottom(int width, int height, dou
     // As in render_rim_top, with the outline reaching far up instead.
     const double line   = scale;
     const double middle = line / 2.0;
-    const double radius = (theme->bottom_corner_radius > 0) ? theme->bottom_corner_radius * scale + middle : 0.0;
+    const double radius = (get_bottom_corner_radius() > 0) ? get_bottom_corner_radius() * scale + middle : 0.0;
     const double outline_height = height * 4.0;
     themed::rounded_rectangle_path(cr, middle, height - middle - outline_height, width - line,
         outline_height, {0.0, 0.0, radius, radius});
@@ -323,7 +328,7 @@ cairo_surface_t*decoration_theme_t::render_titlebar(int width, int height, doubl
     auto cr = cairo_create(surface);
     cairo_set_antialias(cr, CAIRO_ANTIALIAS_BEST);
 
-    const double radius = theme->corner_radius * scale;
+    const double radius = get_corner_radius() * scale;
     const themed::corner_radii_t top_corners = {radius, radius, 0.0, 0.0};
 
     cairo_save(cr);
