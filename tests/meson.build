@@ -185,6 +185,14 @@ clipboard_stack_size_test = executable(
 )
 test('clipboard-stack-size', clipboard_stack_size_test, env: {'QT_QPA_PLATFORM': 'offscreen'})
 
+app_grid_layout_test = executable(
+    'test-app-grid-layout',
+    ['test-app-grid-layout.cpp', qt.compile_moc(sources: 'test-app-grid-layout.cpp', dependencies: qt_test)],
+    dependencies: [qt_test, dependency('qt6', modules: ['Core', 'Qml'])],
+    cpp_args: ['-DSHELL_DIR="' + (meson.project_source_root() / 'src' / 'shell') + '"'],
+)
+test('app-grid-layout', app_grid_layout_test, env: {'QT_QPA_PLATFORM': 'offscreen'})
+
 dock_screen_test = executable(
     'test-dock-screen',
     ['test-dock-screen.cpp', qt.compile_moc(sources: 'test-dock-screen.cpp', dependencies: qt_test)],

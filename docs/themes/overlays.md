@@ -183,6 +183,8 @@ color = "#ffffff8c"
 
 A grid of all installed applications that covers the screen. The names use `[fonts].app_grid_label` and the search field's text uses `[fonts].interface`. `[animation.app_grid]` sets how the grid comes and goes: `kind` "fade", "zoom" (it fades too, while the icons settle into place from a little larger, and grow again as they go) or "none", `duration_ms`, and optionally `close_duration_ms` if closing should take a different time than opening.
 
+The icons and the spaces between them follow the screen: they are sized as Launchpad sizes them, from 32 pixels on a small screen up to `largest_icon_size` on a large one, in steps of 8. A wide screen draws the columns towards its middle, and the grid keeps clear of the dock when it stands on the same screen.
+
 The pages sit side by side in a strip that follows a swipe on a touchpad or a drag. `[animation.app_grid_page]` sets how the strip settles on a page after a swipe, or after you turn the page with a key, the wheel or a dot (`kind` "slide" or "none", `duration_ms`, `curve`).
 
 ```toml
@@ -190,13 +192,9 @@ The pages sit side by side in a strip that follows a swipe on a touchpad or a dr
 background_blur = 16           # behind the grid is the desktop's background, blurred by about this many pixels (0: not at all)
 background_veil = "#00000060"  # optional: a colour laid over that
 columns = 6
-rows = 4
-column_pitch = 180             # from one icon's middle to the next
-row_pitch = 140
-columns_shift = 0              # optional: moves all columns sideways from an even spread about the screen's middle
-first_row_top = 110            # the first row's icons' tops
-icon_size = 64
-label_baseline = 84            # how far below an icon's top its name's baseline sits
+rows = 4                       # a screen too low for them shows fewer
+largest_icon_size = 128        # optional: icons grow with the screen up to this size
+label_gap = 20                 # optional: from an icon's bottom down to its name's baseline
 label_color = "#ffffff"
 label_shadow_color = "#000000a0"   # optional: a dark edge under the names
 
@@ -213,7 +211,6 @@ text_color = "#ffffff"
 [app_grid.page_dots]           # one dot per page
 size = 8
 pitch = 18
-center_above_bottom = 100
 color = "#ffffff"              # the current page's dot
 other_color = "#ffffff50"
 ```

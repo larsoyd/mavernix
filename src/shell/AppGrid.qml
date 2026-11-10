@@ -8,6 +8,7 @@ import QtQuick
 import QtQuick.Effects
 import Quickshell
 import Quickshell.Wayland
+import "AppGridLayout.js" as AppGridLayout
 import "ApplicationMatch.js" as ApplicationMatch
 import "ApplicationName.js" as ApplicationName
 import "StartProgram.js" as StartProgram
@@ -174,8 +175,22 @@ PanelWindow {
         return list.map(found => found.entry)
     }
 
+    // icons and the spaces between them follow the screen's size
+    // and keep clear of the dock when it stands on this screen
+    FontMetrics {
+        id: labelMetrics
+        font.family: grid.theme.fonts.app_grid_label.family
+        font.pixelSize: grid.theme.fonts.app_grid_label.size
+        font.bold: grid.theme.fonts.app_grid_label.bold ?? false
+    }
+    readonly property real dockRoom: dock !== null && dock.screen === grid.screen ? dock.restingHeight : 0
+    readonly property var fit: AppGridLayout.fitted(screen?.width ?? 0, screen?.height ?? 0, dockRoom,
+                                                    Math.ceil(labelMetrics.height), columns, looks.rows ?? 4,
+                                                    looks.largest_icon_size ?? 128)
+    readonly property real labelGap: looks.label_gap ?? 18
+
     readonly property int columns: looks.columns ?? 6
-    readonly property int rows: looks.rows ?? 4
+    readonly property int rows: fit.rows
     readonly property int perPage: columns * rows
     readonly property int pageCount: Math.max(1, Math.ceil(applications.length / perPage))
     onPageCountChanged: jumpToPage(Math.min(page, pageCount - 1))
@@ -421,14 +436,14 @@ PanelWindow {
 
                                     readonly property int column: index % grid.columns
                                     readonly property int row: Math.floor(index / grid.columns)
-                                    readonly property real iconSize: grid.looks.icon_size ?? 64
+                                    readonly property real iconSize: grid.fit.iconSize
+                                    // from the icon's top to its name's baseline
+                                    readonly property real labelBaseline: iconSize + grid.labelGap
 
-                                    // Columns are spread evenly about the page's middle.
-                                    width: grid.looks.column_pitch ?? 160
-                                    height: grid.looks.row_pitch ?? 120
-                                    x: Math.round(content.width / 2 + (column - grid.columns / 2) * width)
-                                       + (grid.looks.columns_shift ?? 0)
-                                    y: (grid.looks.first_row_top ?? 80) + row * height
+                                    width: grid.fit.columnPitch
+                                    height: grid.fit.rowPitch
+                                    x: grid.fit.side + column * width
+                                    y: grid.fit.firstIconTop + row * height
 
                                     Image {
                                         id: icon
@@ -463,7 +478,7 @@ PanelWindow {
                                         horizontalAlignment: Text.AlignHCenter
                                         elide: Text.ElideRight
                                         // Placed by its baseline.
-                                        y: (grid.looks.label_baseline ?? (cell.iconSize + 18)) - baselineOffset
+                                        y: cell.labelBaseline - baselineOffset
                                         text: ApplicationName.of(cell.modelData, grid.choices)
                                         color: ThemeValues.color(grid.looks.label_color ?? "#ffffff")
                                         font.family: grid.theme.fonts.app_grid_label.family
@@ -480,7 +495,7 @@ PanelWindow {
                                         acceptedButtons: Qt.LeftButton | Qt.RightButton
                                         anchors.horizontalCenter: parent.horizontalCenter
                                         width: cell.iconSize + 24
-                                        height: (grid.looks.label_baseline ?? (cell.iconSize + 18)) + 6
+                                        height: cell.labelBaseline + 6
 
                                         readonly property real dragStartDistance: 8
                                         property real pressedX: 0
@@ -618,7 +633,7 @@ PanelWindow {
                 readonly property real dotSize: grid.dotLooks.size ?? 8
                 spacing: (grid.dotLooks.pitch ?? 16) - dotSize
                 x: Math.round((content.width - width) / 2)
-                y: content.height - (grid.dotLooks.center_above_bottom ?? 40) - dotSize / 2
+                y: content.height - grid.fit.dotsAboveBottom - dotSize / 2
 
                 Repeater {
                     model: grid.pageCount

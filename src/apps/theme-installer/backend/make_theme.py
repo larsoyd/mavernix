@@ -1617,12 +1617,8 @@ background_blur = 14
 background_veil = "#00000010"
 columns = 7
 rows = 5
-column_pitch = 170
-row_pitch = 122
-first_row_top = 77
-columns_shift = -3
-icon_size = 64
-label_baseline = 82
+largest_icon_size = 128
+label_gap = 18
 label_color = "#ffffff"
 label_shadow_color = "#000000a0"
 
@@ -1639,7 +1635,6 @@ text_color = "#ffffff"
 [app_grid.page_dots]
 size = 8
 pitch = 15
-center_above_bottom = 111
 color = "#ffffff"
 other_color = "#ffffff30"
 

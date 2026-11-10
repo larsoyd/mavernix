@@ -486,11 +486,8 @@ background_blur = 16
 background_veil = "#00000060"
 columns = 6
 rows = 4
-column_pitch = 180
-row_pitch = 140
-first_row_top = 110
-icon_size = 64
-label_baseline = 84
+largest_icon_size = 128
+label_gap = 20
 label_color = "#ffffff"
 
 [app_grid.search]
@@ -504,7 +501,6 @@ text_color = "#ffffff"
 [app_grid.page_dots]
 size = 8
 pitch = 18
-center_above_bottom = 100
 color = "#ffffff"
 other_color = "#ffffff50"
 
