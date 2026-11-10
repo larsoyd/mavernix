@@ -15,6 +15,11 @@ tests = {
         'include': test_sources / 'compositor/shared-edges',
         'dependencies': [],
     },
+    'hide-pointer': {
+        'sources': [test_sources / 'compositor/hide-pointer/typing-key.cpp'],
+        'include': test_sources / 'compositor/hide-pointer',
+        'dependencies': [dependency('xkbcommon')],
+    },
     'shake-to-find': {
         'sources': [test_sources / 'compositor/shake-to-find/shake-detect.cpp'],
         'include': test_sources / 'compositor/shake-to-find',

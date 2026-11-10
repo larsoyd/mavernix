@@ -4,6 +4,7 @@
 
 ### Added
 
+- The pointer can hide while you type and after the mouse has rested, by the rules of KWin's Hide Cursor effect: Settings, Mouse, Hide the pointer while typing and Hide the pointer after, or `[input] hide_pointer_when_typing` and `hide_pointer_after_seconds`. It comes back when the mouse is used.
 - An emoji menu: Super+. opens it at the pointer, with a search field, groups, the ones used last and skin tones, and puts the chosen emoji into the window you were typing in. Settings, Keyboard changes the key, `[emoji]` in the config the rest (see docs/configuration.md). It needs a colour emoji font.
 - The menu bar can be on every display: Settings, Mission Control, Show the menu bar on every display. All of them show the same menus, or each display's own window with Give each display the menus of its own window, as on OS X, where the bars of the other displays fade.
 - Focus follows mouse can leave the menu bar alone until you click a window: Settings, Extensions, Focus follows mouse.

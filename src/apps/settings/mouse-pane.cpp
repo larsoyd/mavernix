@@ -2,6 +2,7 @@
 
 #include <QButtonGroup>
 #include <QCheckBox>
+#include <QComboBox>
 #include <QProcess>
 #include <QRadioButton>
 #include <QSlider>
@@ -28,6 +29,8 @@ static const int slider_width_px = 200;
 // Each write rewrites the compositor's config, so holding an arrow key on
 // a slider writes once it is let go.
 static const int write_delay_ms = 500;
+// the rests KWin offers before the pointer hides, in seconds, 0 for never
+static const QList<int> pointer_rests = {0, 1, 5, 10, 15, 30, 60};
 // the sizes the pointer themes draw, so none is scaled
 static const QList<double> pointer_sizes = {24, 30, 36, 48, 60, 72, 96};
 
@@ -100,6 +103,25 @@ MousePane::MousePane(Choices& choices, QWidget* parent) : QWidget(parent), choic
     shake_row->setEnabled(shake->isChecked());
     connect(shake, &QCheckBox::toggled, shake_row, &QWidget::setEnabled);
 
+    // as KWin's Hide Cursor effect has them, both off unless asked for
+    auto* hide_typing = new QCheckBox(word("mouse_hide_pointer_typing", "Hide the pointer while typing"));
+    hide_typing->setChecked(choices.value(table, QStringLiteral("hide_pointer_when_typing")).toBool());
+    connect(hide_typing, &QCheckBox::toggled, this,
+        [this](bool on) { change(QStringLiteral("hide_pointer_when_typing"), on); });
+    const int chosen_rest = qMax(0, choices.value(table, QStringLiteral("hide_pointer_after_seconds")).toInt());
+    auto* hide_after = new QComboBox;
+    for (int seconds : pointer_rests.contains(chosen_rest) ? pointer_rests : pointer_rests + QList<int>{chosen_rest})
+    {
+        hide_after->addItem(seconds == 0   ? word("mouse_hide_pointer_never", "Never")
+                            : seconds == 1 ? word("mouse_hide_pointer_second", "1 second")
+                                           : word("mouse_hide_pointer_seconds", "%1 seconds").arg(seconds),
+            seconds);
+    }
+    hide_after->setCurrentIndex(hide_after->findData(chosen_rest));
+    connect(hide_after, &QComboBox::activated, this, [this, hide_after](int index) {
+        change(QStringLiteral("hide_pointer_after_seconds"), hide_after->itemData(index));
+    });
+
     // kept with the user's choices, so a new import of the theme does not undo it
     const QVariant chosen_pointer = choices.value(QStringLiteral("pointer"), QStringLiteral("size"));
     const QVariant theme_pointer = choices.themeTable(QStringLiteral("cursors")).value(QStringLiteral("size"));
@@ -143,6 +165,9 @@ MousePane::MousePane(Choices& choices, QWidget* parent) : QWidget(parent), choic
     form->addCheck(with_note(shake, word("mouse_shake_to_find_note",
                                         "Shaking the mouse quickly makes the pointer grow for a moment, so you can spot it.")));
     form->addRow(word("mouse_shake_needed", "Shake needed:"), shake_row);
+    form->addCheck(with_note(hide_typing, word("mouse_hide_pointer_typing_note",
+                                              "It comes back when you move the mouse.")));
+    form->addRow(word("mouse_hide_pointer_after", "Hide the pointer after:"), hide_after);
     form->addDivider();
     form->addRow(word("mouse_pointer_size", "Pointer size:"),
         with_note_under(pointer_row,

@@ -1411,6 +1411,25 @@ class TestGameSettings(SessionTestCase):
         with self.assertRaises(SystemExit):
             self.make.workarounds_section({"input": {"middle_click_paste": "no"}})
 
+    def test_hide_pointer_loads_its_plugin_only_when_asked(self):
+        self.assertEqual(self.make.hide_pointer_plugins({}), [])
+        self.assertEqual(self.make.hide_pointer_plugins({"input": {"hide_pointer_after_seconds": 0}}), [])
+        self.assertEqual(self.make.hide_pointer_plugins({"input": {"hide_pointer_when_typing": True}}),
+                         ["hide-pointer"])
+        self.assertEqual(self.make.hide_pointer_plugins({"input": {"hide_pointer_after_seconds": 5}}),
+                         ["hide-pointer"])
+
+    def test_hide_pointer_section(self):
+        self.assertEqual(self.make.hide_pointer_section({}),
+                         ["[hide-pointer]", "when_typing = false", "after_seconds = 0"])
+        both = {"input": {"hide_pointer_when_typing": True, "hide_pointer_after_seconds": 30}}
+        self.assertEqual(self.make.hide_pointer_section(both),
+                         ["[hide-pointer]", "when_typing = true", "after_seconds = 30"])
+        for wrong in ({"hide_pointer_when_typing": "yes"}, {"hide_pointer_after_seconds": -1},
+                      {"hide_pointer_after_seconds": True}, {"hide_pointer_after_seconds": 2.5}):
+            with self.assertRaises(SystemExit):
+                self.make.hide_pointer_section({"input": wrong})
+
     def test_shake_to_find_loads_its_plugin_only_when_asked(self):
         self.assertEqual(self.make.shake_to_find_plugins({}), [])
         self.assertEqual(self.make.shake_to_find_plugins({"input": {"shake_to_find": True}}), ["shake-to-find"])

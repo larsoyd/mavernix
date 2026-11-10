@@ -113,6 +113,12 @@ As on El Capitan, shaking the pointer quickly back and forth can make it big for
 
 How hard you have to shake is up to you: Settings, Mouse, **Shake needed**, from Little to Lots, or `[input] shake_sensitivity` from 1 to 5. The default is 3: five quick turns, each after about 90 pixels. At 1 it reacts to four short turns of 40 pixels, which ordinary quick pointing can set off.
 
+## Hiding the pointer
+
+The pointer can get out of the way while you type, as KWin's Hide Cursor effect does on Plasma. It's off at first: tick **Hide the pointer while typing** in Settings, Mouse, or set `[input] hide_pointer_when_typing = true`. A key that types a character hides it, with or without Shift. Shortcuts with Ctrl, Alt or Super, the number pad, and keys such as Return, Backspace, Tab, Escape, the arrows and the function keys leave it alone, since they tend to go with the mouse. Moving the mouse, pressing a button, turning the wheel or using a pen brings it back, as the pointer the program under it asks for. Programs get every pointer event meanwhile.
+
+It can also hide once the mouse has rested: Settings, Mouse, **Hide the pointer after**, or `[input] hide_pointer_after_seconds`, where 0 is never. Keys don't count as using the mouse, so typing never puts that off.
+
 ## Pointer size
 
 The pointer's size is yours, not the theme's: Settings, Mouse, **Pointer size**, from Normal to Large, or `[pointer] size` in pixels. Left out, the theme's own size applies. A new import of a theme keeps yours. The slider stops at the sizes Sea Lion's pointers are drawn at, 24, 30, 36, 48, 60, 72 and 96, so none is scaled. The desktop and GTK programs follow at once, programs that were already open when they start again.

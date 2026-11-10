@@ -731,6 +731,30 @@ def shake_to_find_section(config):
     return ["[shake-to-find]", f"sensitivity = {level}"]
 
 
+def hide_pointer_choices(config):
+    """[input] hide_pointer_when_typing and hide_pointer_after_seconds, as
+    KWin's Hide Cursor effect has them. Left out: false, and 0 for never."""
+    chosen = config.get("input", {})
+    typing = chosen.get("hide_pointer_when_typing", False)
+    if not isinstance(typing, bool):
+        fail("[input] hide_pointer_when_typing must be true or false")
+    seconds = chosen.get("hide_pointer_after_seconds", 0)
+    if isinstance(seconds, bool) or not isinstance(seconds, int) or seconds < 0:
+        fail("[input] hide_pointer_after_seconds must be a whole number, 0 for never")
+    return typing, seconds
+
+
+def hide_pointer_plugins(config):
+    """The plugin loads only when one of the two is asked for."""
+    typing, seconds = hide_pointer_choices(config)
+    return ["hide-pointer"] if typing or seconds else []
+
+
+def hide_pointer_section(config):
+    typing, seconds = hide_pointer_choices(config)
+    return ["[hide-pointer]", f"when_typing = {yes_or_no(typing)}", f"after_seconds = {seconds}"]
+
+
 def display_flag(config, key, default):
     value = config.get("display", {}).get(key, default)
     if not isinstance(value, bool):
@@ -1296,6 +1320,8 @@ def main():
     sections.append(input_section(config, theme))
     plugins += shake_to_find_plugins(config)
     sections.append(shake_to_find_section(config))
+    plugins += hide_pointer_plugins(config)
+    sections.append(hide_pointer_section(config))
     sections.append(idle_section(config))
     sections += display_sections(config)
     vrr, vrr_plugins = game_vrr_section(config)

@@ -837,6 +837,12 @@ mouse_shake_to_find_note = "Shaking the mouse quickly makes the pointer grow for
 mouse_shake_needed = "Shake needed:"
 mouse_shake_little = "Little"
 mouse_shake_lots = "Lots"
+mouse_hide_pointer_typing = "Hide the pointer while typing"
+mouse_hide_pointer_typing_note = "It comes back when you move the mouse."
+mouse_hide_pointer_after = "Hide the pointer after:"
+mouse_hide_pointer_never = "Never"
+mouse_hide_pointer_second = "1 second"
+mouse_hide_pointer_seconds = "%1 seconds"
 mouse_pointer_size = "Pointer size:"
 mouse_pointer_normal = "Normal"
 mouse_pointer_large = "Large"
@@ -962,6 +968,11 @@ natural_scroll = false
 # from 1 (a little) to 5 (a lot). Left out: off, and 3.
 # shake_to_find = false
 # shake_sensitivity = 3
+# The pointer goes away when a key that types a character is pressed, and
+# after the mouse has rested this many seconds, until the mouse is used
+# again. Left out: false, and 0 for never.
+# hide_pointer_when_typing = false
+# hide_pointer_after_seconds = 0
 # Shaking the pointer quickly back and forth makes it big for a moment, so
 # it's easy to find, as on El Capitan. Left out: false.
 # shake_to_find = false

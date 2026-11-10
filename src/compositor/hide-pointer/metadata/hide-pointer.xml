@@ -1,0 +1,19 @@
+<?xml version="1.0"?>
+<wayfire>
+	<plugin name="hide-pointer">
+		<_short>Hide Pointer</_short>
+		<_long>Hides the pointer while you type or once it has rested, until the mouse is used again. Loaded only when [input] hide_pointer_when_typing or hide_pointer_after_seconds is set.</_long>
+		<category>Input</category>
+		<option name="when_typing" type="bool">
+			<_short>When typing</_short>
+			<_long>Hides the pointer when a key that types a character is pressed.</_long>
+			<default>true</default>
+		</option>
+		<option name="after_seconds" type="int">
+			<_short>After seconds</_short>
+			<_long>Hides the pointer once the mouse has rested this many seconds; 0 never does.</_long>
+			<default>0</default>
+			<min>0</min>
+		</option>
+	</plugin>
+</wayfire>
