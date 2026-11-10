@@ -1,0 +1,8 @@
+<?xml version="1.0"?>
+<wayfire>
+	<plugin name="dock-dig">
+		<_short>Dock Dig</_short>
+		<_long>Tells programs that ask through the control socket (method "dock-dig/watch") when the pointer digs at the bottom edge of a screen other than the dock's (named with "dock-dig/configure"), so the dock can move to that screen.</_long>
+		<category>Utility</category>
+	</plugin>
+</wayfire>

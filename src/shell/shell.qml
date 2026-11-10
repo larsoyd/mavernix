@@ -10,6 +10,7 @@ import Quickshell
 import Quickshell.Io
 import Quickshell.Wayland
 import Shell.Native
+import "DockScreen.js" as DockScreen
 
 ShellRoot {
     id: shell
@@ -37,6 +38,29 @@ ShellRoot {
         const screens = Quickshell.screens
         const leftmost = Array.from(screens).sort((a, b) => a.x - b.x || a.y - b.y)[0]
         return screens.find(screen => screen.name === wanted) ?? leftmost ?? null
+    }
+
+    // the dock's screen is its own: the lowest one under the main screen
+    // until a dig at another's bottom edge brings it there
+
+    readonly property var screenBoxes: Array.from(Quickshell.screens).map(screen =>
+        ({ name: screen.name, x: screen.x, y: screen.y, width: screen.width, height: screen.height }))
+    readonly property string dockHome: DockScreen.home(screenBoxes, mainScreen?.name ?? "")
+    readonly property string screenLayout: JSON.stringify(screenBoxes) + dockHome
+    // the screen dug at last, forgotten when the screens change
+    property string dugScreen: ""
+    onScreenLayoutChanged: dugScreen = ""
+    readonly property var dockScreen: Quickshell.screens.find(screen => screen.name === dugScreen)
+        ?? Quickshell.screens.find(screen => screen.name === dockHome) ?? mainScreen
+
+    DockDig {
+        output: dock.screen?.name ?? ""
+        onDug: (output, kind) => {
+            const moves = userChoices.value("dock", "follows_dig") ?? true
+            if (kind === "move" && moves && !dock.busy && !appGrid.open) {
+                shell.dugScreen = output
+            }
+        }
     }
 
     // X11 programs, games above all, take the main screen for their own.
@@ -376,7 +400,7 @@ ShellRoot {
 
     Dock {
         id: dock
-        screen: shell.mainScreen
+        wantedScreen: shell.dockScreen
         settings: shell.settings
         shell: shell
         choices: userChoices

@@ -20,6 +20,14 @@ tests = {
         'include': test_sources / 'compositor/hide-pointer',
         'dependencies': [dependency('xkbcommon')],
     },
+    'dock-dig': {
+        'sources': [
+            test_sources / 'compositor/dock-dig/dig-detect.cpp',
+            test_sources / 'compositor/dock-dig/dig-edges.cpp',
+        ],
+        'include': test_sources / 'compositor/dock-dig',
+        'dependencies': [],
+    },
     'shake-to-find': {
         'sources': [test_sources / 'compositor/shake-to-find/shake-detect.cpp'],
         'include': test_sources / 'compositor/shake-to-find',
@@ -176,6 +184,14 @@ clipboard_stack_size_test = executable(
     cpp_args: ['-DSHELL_DIR="' + (meson.project_source_root() / 'src' / 'shell') + '"'],
 )
 test('clipboard-stack-size', clipboard_stack_size_test, env: {'QT_QPA_PLATFORM': 'offscreen'})
+
+dock_screen_test = executable(
+    'test-dock-screen',
+    ['test-dock-screen.cpp', qt.compile_moc(sources: 'test-dock-screen.cpp', dependencies: qt_test)],
+    dependencies: [qt_test, dependency('qt6', modules: ['Core', 'Qml'])],
+    cpp_args: ['-DSHELL_DIR="' + (meson.project_source_root() / 'src' / 'shell') + '"'],
+)
+test('dock-screen', dock_screen_test, env: {'QT_QPA_PLATFORM': 'offscreen'})
 
 folder_grid_scroll_test = executable(
     'test-folder-grid-scroll',

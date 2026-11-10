@@ -515,8 +515,9 @@ class TestWindowAnimations(SessionTestCase):
         self.assertIn('enabled_for = type equals "toplevel"', sections[0])
         self.assertIn(["[themed-open-close]", "pop_duration = 200ms circle"], sections)
 
-        # the login cover is drawn whole at once, other overlays keep their fade
-        self.assertIn('fade_enabled_for = type equals "overlay" & !(app_id equals "mavernix-entry")', sections[0])
+        # the login cover and the dock leave the fade to other overlays
+        self.assertIn('fade_enabled_for = type equals "overlay" & !(app_id equals "mavernix-entry")'
+                      ' & !(app_id contains "mavernix-dock")', sections[0])
 
         # A desktop's [window] quick_open_close_ms keeps the curve.
         make_wayfire_config.shorten_open_and_close(sections, 120)
@@ -1429,6 +1430,9 @@ class TestGameSettings(SessionTestCase):
                       {"hide_pointer_after_seconds": True}, {"hide_pointer_after_seconds": 2.5}):
             with self.assertRaises(SystemExit):
                 self.make.hide_pointer_section({"input": wrong})
+
+    def test_the_dock_hears_of_digs_at_other_screens(self):
+        self.assertIn("dock-dig", self.make.BASE_PLUGINS)
 
     def test_shake_to_find_loads_its_plugin_only_when_asked(self):
         self.assertEqual(self.make.shake_to_find_plugins({}), [])

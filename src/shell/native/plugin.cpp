@@ -15,12 +15,14 @@
 #include "clipboard-history.hpp"
 #include "desktop-aside.hpp"
 #include "desktops.hpp"
+#include "dock-dig.hpp"
 #include "emoji-set.hpp"
 #include "file-kind.hpp"
 #include "folder-contents.hpp"
 #include "folder-watch.hpp"
 #include "held-keys.hpp"
 #include "icon-files.hpp"
+#include "item-picture.hpp"
 #include "lid-watch.hpp"
 #include "main-screen.hpp"
 #include "menu-registrar.hpp"
@@ -68,12 +70,14 @@ void ShellNativePlugin::registerTypes(const char* uri)
     qmlRegisterType<ClipboardSearch>(uri, major_version, minor_version, "ClipboardSearch");
     qmlRegisterType<DesktopAside>(uri, major_version, minor_version, "DesktopAside");
     qmlRegisterType<Desktops>(uri, major_version, minor_version, "Desktops");
+    qmlRegisterType<DockDig>(uri, major_version, minor_version, "DockDig");
     qmlRegisterType<EmojiSet>(uri, major_version, minor_version, "EmojiSet");
     qmlRegisterType<FileKind>(uri, major_version, minor_version, "FileKind");
     qmlRegisterType<FolderContents>(uri, major_version, minor_version, "FolderContents");
     qmlRegisterType<FolderWatch>(uri, major_version, minor_version, "FolderWatch");
     qmlRegisterType<HeldKeys>(uri, major_version, minor_version, "HeldKeys");
     qmlRegisterType<IconFiles>(uri, major_version, minor_version, "IconFiles");
+    qmlRegisterType<ItemPicture>(uri, major_version, minor_version, "ItemPicture");
     qmlRegisterType<LidWatch>(uri, major_version, minor_version, "LidWatch");
     qmlRegisterType<MainScreen>(uri, major_version, minor_version, "MainScreen");
     qmlRegisterType<MenuRegistrar>(uri, major_version, minor_version, "MenuRegistrar");

@@ -436,6 +436,9 @@ soon_text = "Click to change it now. Open windows keep their look until reopened
 groups = [[{ name = "Applications", icon = "view-app-grid", shell = "app_grid" }, { name = "Home", icon = "user-home", folder = "~", view = "list", order = "name" }, "foot", "mavernix-settings"], [{ name = "Programs", icon = "folder-applications", programs = true, view = "grid", subfolders = [{ name = "System Tools", icon = "folder", categories = ["System"] }] }, { name = "Downloads", icon = "folder-download", folder = "~/Downloads", view = "list", order = "added" }]]
 magnification = false
 autohide = false
+# The dock is on one screen. A push kept up against another screen's bottom
+# edge for a quarter second brings it there. false keeps it where it starts.
+follows_dig = true
 settings_command = ["mavernix-settings", "dock"]
 trash = true
 trash_label = "Wastebasket"

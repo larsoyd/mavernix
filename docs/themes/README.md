@@ -234,6 +234,18 @@ hide_delay_ms = 300       # how long the pointer is off the dock before it goes 
 
 Whether the dock hides itself is up to the user (`[dock] autohide`). Without the table, the dock goes and comes instantly.
 
+### A dock that changes screens
+
+With several screens the dock is on one of them. When it moves to another, a picture of it slides out of the old screen while the dock rises on the new one.
+
+```toml
+[animation.dock_switch]
+duration_ms = 240                # both slides
+curve = "ease-in-out-sine"
+```
+
+Without the table the slide takes 60 ms for each whole step of `ln(height / 2 + 1) + 1`, with the dock's resting height in pixels, which is 240 ms for a dock 39 to 107 pixels high, and eases in and out along a sine. That is how the Dock of OS X 10.9 does it. `duration_ms = 0` moves the dock at once. `curve` also takes the four curves above.
+
 ### Several desktops
 
 ```toml

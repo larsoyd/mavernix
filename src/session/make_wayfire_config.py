@@ -53,6 +53,7 @@ BASE_PLUGINS = [
     "desktop-focus",
     "desktop-aside",
     "window-attention",
+    "dock-dig",
     "game-keys",
     "x11-settings",
     "x11-windows",
@@ -168,8 +169,11 @@ def animation_sections(theme):
     # Windows only. Wayfire's default also takes X11 menus ("x-or"), which
     # then pop in and out like windows while Wayland menus simply appear.
     # the login cover must hide the desktop from its first frame, not fade in over it
+
+    # the dock slides between screens, a fade would leave it standing where it was
     animate = ["[animate]", 'enabled_for = type equals "toplevel"',
-               'fade_enabled_for = type equals "overlay" & !(app_id equals "mavernix-entry")']
+               'fade_enabled_for = type equals "overlay" & !(app_id equals "mavernix-entry")'
+               ' & !(app_id contains "mavernix-dock")']
     sections = [animate]
     plugins = []
 

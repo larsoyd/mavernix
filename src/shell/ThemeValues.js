@@ -44,5 +44,8 @@ function easing(curve) {
     if (curve === "ease-out") {
         return QtQuick.Easing.OutQuad
     }
+    if (curve === "ease-in-out-sine") {
+        return QtQuick.Easing.InOutSine
+    }
     return QtQuick.Easing.InOutQuad
 }

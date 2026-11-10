@@ -11,6 +11,7 @@ import Quickshell.Wayland
 import Quickshell.Io
 import Shell.Native
 import "DockLayout.js" as DockLayout
+import "DockScreen.js" as DockScreen
 import "DroppedFiles.js" as DroppedFiles
 import "StackSize.js" as StackSize
 import "ThemeValues.js" as ThemeValues
@@ -52,6 +53,138 @@ PanelWindow {
         target: dock
     }
 
+    // one dock on one screen: to change it a picture slides out of the old
+    // screen while the dock rises on the new one, as on OS X 10.9
+
+    property var wantedScreen: null
+    // a binding only until the dock is made, then set by hand
+    property var shownScreen: wantedScreen
+    screen: shownScreen
+    onWantedScreenChanged: changeScreen()
+
+    readonly property var switchMotion: (settings.theme.animation ?? ({})).dock_switch ?? ({})
+    readonly property int switchMs: switchMotion.duration_ms ?? DockScreen.slideMs(restingHeight)
+    // from the wish for another screen until the dock stands on it
+    property bool changingScreen: false
+    // 1 while the dock waits below its new screen's edge, 0 once it is up
+    property real switchSunk: 0
+
+    // nothing of the dock's may be open or held when it leaves
+    readonly property bool busy: menuIndex >= 0 || folderIndex >= 0 || dragged !== null
+        || draggedIconSize > 0 || changingScreen
+
+    function changeScreen() {
+        const from = shownScreen
+        const to = wantedScreen
+        if ((from?.name ?? "") === (to?.name ?? "")) {
+            // back where it is, or was about to leave
+            if (changingScreen && !slide.running) {
+                arriveAtOnce()
+            }
+            return
+        }
+        closeMenu()
+        closeFolder()
+        const fromIsThere = from !== null && Quickshell.screens.some(screen => screen.name === from.name)
+        if (changingScreen || !fromIsThere || to === null || !visible || sunk >= 1 || switchMs <= 0) {
+            arriveAtOnce()
+            return
+        }
+        changingScreen = true
+        const glass = windowReflections && glassWindow.visible ? glassWindow.contentItem : null
+        if (!leaving.take(glass, dock.contentItem, from.devicePixelRatio)) {
+            arriveAtOnce()
+            return
+        }
+        leavingFrom = from
+        leavingDeadline.restart()
+    }
+
+    property var leavingFrom: null
+    function showLeaving() {
+        // given up meanwhile, or the old screen went away
+        if (!changingScreen || slide.running || leaving.visible
+            || !Quickshell.screens.some(screen => screen.name === leavingFrom?.name)) {
+            return
+        }
+        leaving.screen = leavingFrom
+        leaving.slid = 0
+        leaving.visible = true
+    }
+
+    // the picture covers the dock now, so the dock can go
+    function crossOver() {
+        if (!changingScreen || slide.running) {
+            return
+        }
+        leavingDeadline.stop()
+        switchSunk = 1
+        shownScreen = wantedScreen
+        slide.restart()
+    }
+
+    function arriveAtOnce() {
+        leavingDeadline.stop()
+        slide.stop()
+        settle()
+        shownScreen = wantedScreen
+    }
+
+    function settle() {
+        leaving.visible = false
+        leaving.clear()
+        leavingFrom = null
+        switchSunk = 0
+        changingScreen = false
+    }
+
+    // a picture that never comes must not hold the dock back
+    Timer {
+        id: leavingDeadline
+        interval: 300
+        onTriggered: {
+            console.warn("[dock] screen_switch picture=late ms=" + interval)
+            dock.arriveAtOnce()
+        }
+    }
+
+    DockLeaving {
+        id: leaving
+        implicitHeight: dock.height
+        travel: dock.restingHeight
+        WlrLayershell.layer: dock.inOverlay ? WlrLayer.Overlay : WlrLayer.Top
+        onTaken: dock.showLeaving()
+        onDrawn: dock.crossOver()
+    }
+
+    ParallelAnimation {
+        id: slide
+        NumberAnimation {
+            target: leaving
+            property: "slid"
+            from: 0
+            to: 1
+            duration: dock.switchMs
+            easing.type: ThemeValues.easing(dock.switchMotion.curve ?? "ease-in-out-sine")
+        }
+        NumberAnimation {
+            target: dock
+            property: "switchSunk"
+            from: 1
+            to: 0
+            duration: dock.switchMs
+            easing.type: ThemeValues.easing(dock.switchMotion.curve ?? "ease-in-out-sine")
+        }
+        onFinished: dock.settle()
+    }
+
+    // the minimise effect aims at this surface, which is new on a new screen
+    onBackingWindowVisibleChanged: {
+        if (backingWindowVisible) {
+            Qt.callLater(dock.tellWindowPlaces)
+        }
+    }
+
     required property var choices
     property var confirmDialog: null
     property var sounds: null
@@ -66,7 +199,7 @@ PanelWindow {
     readonly property string reflectedShelf: JSON.stringify({
         output: dock.screen?.name ?? "",
         x: Math.round(dock.shelfEdges.left),
-        y: Math.round(dock.screen.height - dock.shelfHeight + dock.sunk * dock.restingHeight),
+        y: Math.round((dock.screen?.height ?? 0) - dock.shelfHeight + dock.sunk * dock.restingHeight),
         width: dock.visible && dock.shelfIsSlab ? Math.round(dock.shelfEdges.right - dock.shelfEdges.left) : 0,
         height: dock.visible && dock.sunk < 1 ? Math.round(dock.shelfHeight) : 0,
         opacity: dock.choices.value("dock", "window_reflection_opacity") ?? 0.35,
@@ -415,6 +548,7 @@ PanelWindow {
     }
     onMinimizedWindowsChanged: keepMinimizeOrder()
     Component.onCompleted: {
+        shownScreen = wantedScreen
         readInstalled()
         keepMinimizeOrder()
     }
@@ -838,7 +972,7 @@ PanelWindow {
     }
 
     readonly property real wantedTileSize:
-        DockLayout.iconSize(looks, sizeWishes, screen.height) + 2 * tileMargin
+        DockLayout.iconSize(looks, sizeWishes, screen?.height ?? 0) + 2 * tileMargin
     readonly property real tileSize:
         DockLayout.fittingTileSize(looks, wantedTileSize, rowUnits, width)
 
@@ -1004,8 +1138,9 @@ PanelWindow {
         onTriggered: dock.inView = dock.keptInView
     }
     // 0 in view, 1 out of sight.
-    property real sunk: inView ? 0 : 1
-    Behavior on sunk {
+    property real hidSunk: inView ? 0 : 1
+    readonly property real sunk: Math.max(hidSunk, switchSunk)
+    Behavior on hidSunk {
         NumberAnimation {
             duration: dock.hideMotion.duration_ms ?? 0
             easing.type: ThemeValues.easing(dock.hideMotion.curve ?? "ease-in-out")
