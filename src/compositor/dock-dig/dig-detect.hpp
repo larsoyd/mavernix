@@ -41,4 +41,27 @@ class dig_detect_t
     double run_x = 0;
     double run_y = 0;
 };
+// a touch of the edge that holds still, which stands in for a dig in some states
+class rest_detect_t
+{
+  public:
+    void enter(double x, double y, int64_t now_ms);
+    // the pointer is at x, y now
+    void move(double x, double y, int64_t now_ms);
+    void leave();
+
+    bool resting() const;
+    int64_t due_ms() const;
+    bool fire();
+
+    static constexpr int64_t REST_MS = 150;
+    // how far from where it entered still counts as still
+    static constexpr double SLACK = 2;
+
+  private:
+    bool on_edge = false;
+    int64_t due = -1;
+    double entered_x = 0;
+    double entered_y = 0;
+};
 } // namespace dock_dig

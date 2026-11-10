@@ -1,7 +1,8 @@
-// tells watchers when the pointer digs at the bottom edge of a screen
-// the dock is not on, so the dock can come there as on OS X 10.9
+// tells watchers when the pointer digs at a screen's bottom edge: move for a screen
+// the dock is not on, reveal for its own under a full screen window, as on OS X 10.9
 
 #include <algorithm>
+#include <ctime>
 #include <string>
 #include <vector>
 
@@ -14,7 +15,10 @@
 #include <wayfire/plugins/ipc/ipc-helpers.hpp>
 #include <wayfire/plugins/ipc/ipc-method-repository.hpp>
 #include <wayfire/signal-definitions.hpp>
+#include <wayfire/toplevel-view.hpp>
 #include <wayfire/util.hpp>
+#include <wayfire/view.hpp>
+#include <wayfire/workspace-set.hpp>
 
 #include "dig-detect.hpp"
 #include "dig-edges.hpp"
@@ -31,14 +35,35 @@ class plugin_t : public wf::plugin_interface_t
     std::vector<wf::ipc::client_interface_t*> watchers;
     std::string dock_output;
 
+    struct edge_t
+    {
+        std::string output;
+        std::string kind;
+        // a touch that holds still does it, no dig needed
+        bool by_rest = false;
+
+        bool operator==(const edge_t& other) const
+        {
+            return output == other.output && kind == other.kind && by_rest == other.by_rest;
+        }
+    };
+
     dig_detect_t detect;
-    // the screen whose edge the pointer is on, kept until it leaves the row
-    std::string at_edge;
+    rest_detect_t rest;
+    // the edge the pointer is on, kept until it leaves the row
+    edge_t at_edge;
     wf::wl_timer<false> timer;
     int buttons_down = 0;
 
-    // the screen with an edge to dig at under the pointer, if any
-    std::string edge_under_pointer()
+    // whether a full screen window lies on top of the screen
+    static bool covered(wf::output_t* output)
+    {
+        const auto views = output->wset()->get_views(wf::WSET_CURRENT_WORKSPACE | wf::WSET_MAPPED_ONLY |
+            wf::WSET_EXCLUDE_MINIMIZED | wf::WSET_SORT_STACKING);
+        return !views.empty() && views.front()->pending_fullscreen();
+    }
+
+    edge_t edge_under_pointer()
     {
         const auto outputs = wf::get_core().output_layout->get_outputs();
         const wf::pointf_t at = wf::get_core().get_cursor_position();
@@ -55,37 +80,61 @@ class plugin_t : public wf::plugin_interface_t
         }
         if (dock == outputs.size())
         {
-            return "";
+            return {};
+        }
+        const bool dock_covered = covered(outputs[dock]);
+        if (on_bottom_row(screens[dock], at.x, at.y))
+        {
+            return dock_covered ? edge_t{dock_output, "reveal", false} : edge_t{};
         }
         const std::vector<bool> edges = edges_to_dig(screens, dock);
         for (size_t i = 0; i < outputs.size(); i++)
         {
             if (edges[i] && on_bottom_row(screens[i], at.x, at.y))
             {
-                return outputs[i]->to_string();
+                // from under a full screen window an open screen is reached by a rest
+                return {outputs[i]->to_string(), "move", dock_covered && !covered(outputs[i])};
             }
         }
-        return "";
+        return {};
+    }
+
+    // a surface under a full screen window may wait for a frame event that never comes
+    static void wake_dock(const std::string& output)
+    {
+        for (auto view : wf::get_core().get_all_views())
+        {
+            wlr_surface* surface = view->get_wlr_surface();
+            if (surface && view->get_app_id() == "mavernix-dock" && view->get_output() &&
+                view->get_output()->to_string() == output)
+            {
+                timespec now;
+                clock_gettime(CLOCK_MONOTONIC, &now);
+                wlr_surface_send_frame_done(surface, &now);
+            }
+        }
     }
 
     void leave()
     {
-        at_edge.clear();
+        at_edge = {};
         detect.leave();
+        rest.leave();
     }
 
     void keep_time()
     {
-        if (detect.due_ms() >= 0)
+        const int64_t due = at_edge.by_rest ? rest.due_ms() : detect.due_ms();
+        if (due >= 0)
         {
-            const int64_t wait = std::max<int64_t>(detect.due_ms() - wf::get_current_time(), 0);
+            const int64_t wait = std::max<int64_t>(due - wf::get_current_time(), 0);
             timer.set_timeout(uint32_t(wait), [this] { fire(); });
         }
     }
 
     void fire()
     {
-        const bool through = detect.fire(wf::get_current_time());
+        const bool through = at_edge.by_rest ? rest.fire() : detect.fire(wf::get_current_time());
         keep_time();
         // a held button is a drag or a press, not a dig
         if (!through || buttons_down > 0)
@@ -94,30 +143,39 @@ class plugin_t : public wf::plugin_interface_t
         }
         wf::json_t event;
         event["event"] = EVENT;
-        event["output"] = at_edge;
-        event["kind"] = "move";
+        event["output"] = at_edge.output;
+        event["kind"] = at_edge.kind;
         for (auto client : watchers)
         {
             client->send_json(event);
+        }
+        if (at_edge.kind == "reveal")
+        {
+            wake_dock(at_edge.output);
         }
     }
 
     wf::signal::connection_t<wf::post_input_event_signal<wlr_pointer_motion_event>> on_motion =
         [this](wf::post_input_event_signal<wlr_pointer_motion_event>* signal) {
-        const std::string edge = edge_under_pointer();
+        const edge_t edge = edge_under_pointer();
+        const wf::pointf_t at = wf::get_core().get_cursor_position();
         const int64_t now = wf::get_current_time();
-        if (edge.empty())
+        if (edge.output.empty())
         {
-            if (!at_edge.empty())
+            if (!at_edge.output.empty())
             {
                 leave();
             }
             return;
         }
-        if (edge != at_edge)
+        if (!(edge == at_edge))
         {
             at_edge = edge;
-            detect.enter(now);
+            edge.by_rest ? rest.enter(at.x, at.y, now) : detect.enter(now);
+        }
+        else if (edge.by_rest)
+        {
+            rest.move(at.x, at.y, now);
         }
         else
         {

@@ -40,7 +40,7 @@ PanelWindow {
     // (0.11) then fits maximized windows to the larger space and, doing
     // so, takes them out of full screen. A browser's video left full
     // screen as soon as it got there.
-    readonly property bool inOverlay: raised || (windowReflections && !fullscreenApplication)
+    readonly property bool inOverlay: raised || revealed || (windowReflections && !fullscreenApplication)
     WlrLayershell.layer: inOverlay ? WlrLayer.Overlay : WlrLayer.Top
     // Lets the compositor tell this surface from the shell's others.
     WlrLayershell.namespace: "mavernix-dock"
@@ -86,7 +86,9 @@ PanelWindow {
         closeMenu()
         closeFolder()
         const fromIsThere = from !== null && Quickshell.screens.some(screen => screen.name === from.name)
-        if (changingScreen || !fromIsThere || to === null || !visible || sunk >= 1 || switchMs <= 0) {
+        // a dock out of sight has nothing to slide away
+        const outOfSight = !visible || sunk >= 1 || (fullscreenApplication && !inOverlay)
+        if (changingScreen || !fromIsThere || to === null || outOfSight || switchMs <= 0) {
             arriveAtOnce()
             return
         }
@@ -120,6 +122,7 @@ PanelWindow {
         leavingDeadline.stop()
         switchSunk = 1
         shownScreen = wantedScreen
+        arriveShown()
         slide.restart()
     }
 
@@ -128,6 +131,80 @@ PanelWindow {
         slide.stop()
         settle()
         shownScreen = wantedScreen
+        arriveShown()
+    }
+
+    // a dock that comes to a screen comes into view, over a full screen window too
+    function arriveShown() {
+        revealMove.stop()
+        revealSunk = 0
+        revealed = fullscreenApplication
+    }
+
+    // over a full screen window the dock comes up for a dig at its edge
+    // and goes again once the pointer has left it
+    property bool revealed: false
+    property real revealSunk: 0
+    readonly property bool revealHeld: pointerInside || atScreenEdge.hovered || menuIndex >= 0 || folderIndex >= 0
+        || dragged !== null || draggedIconSize > 0
+
+    function reveal() {
+        if (revealed || !fullscreenApplication || changingScreen) {
+            return
+        }
+        // one that hides itself comes up by its own rule once it is in reach
+        if (!hidesItself) {
+            revealSunk = 1
+            revealMove.from = 1
+            revealMove.to = 0
+            revealMove.restart()
+        }
+        revealed = true
+    }
+
+    function conceal() {
+        revealMove.stop()
+        revealed = false
+        revealSunk = 0
+    }
+
+    onFullscreenApplicationChanged: {
+        if (!fullscreenApplication) {
+            conceal()
+        }
+    }
+    onHidSunkChanged: {
+        if (revealed && hidesItself && hidSunk >= 1 && !keptInView) {
+            conceal()
+        }
+    }
+
+    NumberAnimation {
+        id: revealMove
+        target: dock
+        property: "revealSunk"
+        duration: dock.hideMotion.duration_ms ?? 0
+        easing.type: ThemeValues.easing(dock.hideMotion.curve ?? "ease-in-out")
+        onFinished: {
+            if (dock.revealSunk >= 1) {
+                dock.conceal()
+            }
+        }
+    }
+
+    Timer {
+        id: revealGoing
+        interval: Math.max(dock.hideMotion.hide_delay_ms ?? 0, 1)
+        running: dock.revealed && !dock.revealHeld && !revealMove.running && !dock.changingScreen
+        onTriggered: {
+            if (!dock.hidesItself) {
+                revealMove.from = 0
+                revealMove.to = 1
+                revealMove.restart()
+            } else if (dock.hidSunk >= 1) {
+                dock.conceal()
+            }
+        }
     }
 
     function settle() {
@@ -1139,7 +1216,7 @@ PanelWindow {
     }
     // 0 in view, 1 out of sight.
     property real hidSunk: inView ? 0 : 1
-    readonly property real sunk: Math.max(hidSunk, switchSunk)
+    readonly property real sunk: Math.max(hidSunk, switchSunk, revealSunk)
     Behavior on hidSunk {
         NumberAnimation {
             duration: dock.hideMotion.duration_ms ?? 0

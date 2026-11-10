@@ -67,4 +67,42 @@ bool dig_detect_t::fire(int64_t now_ms)
     on_edge = false;
     return true;
 }
+void rest_detect_t::enter(double x, double y, int64_t now_ms)
+{
+    on_edge = true;
+    due = now_ms + REST_MS;
+    entered_x = x;
+    entered_y = y;
+}
+
+void rest_detect_t::move(double x, double y, int64_t now_ms)
+{
+    if (on_edge && (std::abs(x - entered_x) > SLACK || std::abs(y - entered_y) > SLACK))
+    {
+        due = now_ms + REST_MS;
+    }
+}
+
+void rest_detect_t::leave()
+{
+    on_edge = false;
+    due = -1;
+}
+
+bool rest_detect_t::resting() const
+{
+    return on_edge;
+}
+
+int64_t rest_detect_t::due_ms() const
+{
+    return due;
+}
+
+bool rest_detect_t::fire()
+{
+    const bool rested = on_edge;
+    leave();
+    return rested;
+}
 } // namespace dock_dig

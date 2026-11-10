@@ -59,6 +59,8 @@ ShellRoot {
             const moves = userChoices.value("dock", "follows_dig") ?? true
             if (kind === "move" && moves && !dock.busy && !appGrid.open) {
                 shell.dugScreen = output
+            } else if (kind === "reveal" && output === dock.screen?.name) {
+                dock.reveal()
             }
         }
     }

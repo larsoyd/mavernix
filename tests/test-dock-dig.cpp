@@ -177,6 +177,48 @@ class TestDockDig : public QObject
         QCOMPARE(detect.due_ms(), 490);
     }
 
+    void a_touch_that_holds_still_rests()
+    {
+        rest_detect_t rest;
+        rest.enter(100, 719, 1000);
+        QVERIFY(rest.resting());
+        QCOMPARE(rest.due_ms(), 1150);
+        rest.move(102, 719, 1100);
+        rest.move(98, 717, 1120);
+        QCOMPARE(rest.due_ms(), 1150);
+        QVERIFY(rest.fire());
+        QVERIFY(!rest.resting());
+        QCOMPARE(rest.due_ms(), -1);
+    }
+
+    void moving_off_the_spot_starts_the_rest_over()
+    {
+        rest_detect_t rest;
+        rest.enter(100, 719, 0);
+        rest.move(103, 719, 60);
+        QCOMPARE(rest.due_ms(), 210);
+        rest.move(100, 716, 90);
+        QCOMPARE(rest.due_ms(), 240);
+        // the spot is where it entered, not where it last was
+        rest.move(104, 719, 100);
+        rest.move(105, 719, 110);
+        QCOMPARE(rest.due_ms(), 260);
+        rest.move(101, 719, 130);
+        QCOMPARE(rest.due_ms(), 260);
+    }
+
+    void a_rest_ends_on_leaving()
+    {
+        rest_detect_t rest;
+        rest.enter(100, 719, 0);
+        rest.leave();
+        QVERIFY(!rest.resting());
+        QCOMPARE(rest.due_ms(), -1);
+        QVERIFY(!rest.fire());
+        rest.move(200, 719, 50);
+        QCOMPARE(rest.due_ms(), -1);
+    }
+
     void the_screen_beside_the_docks_has_an_edge()
     {
         QCOMPARE(edges_to_dig({LEFT, RIGHT}, 0), (std::vector<bool>{false, true}));
