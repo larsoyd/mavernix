@@ -7,6 +7,7 @@
 #pragma once
 
 #include <wayfire/opengl.hpp>
+#include <wayfire/scene-render.hpp>
 #include <wayfire/util/duration.hpp>
 #include <wayfire/view-transform.hpp>
 #include <wayfire/view.hpp>
@@ -47,6 +48,10 @@ class warp_transformer_t : public wf::scene::view_2d_transformer_t
         wf::scene::damage_callback push_damage, wf::output_t *shown_on) override;
 
     bool has_held_picture();
+    // draws the strip moved by offset, which is zero on the window's own screen
+    void draw(const wf::scene::render_instruction_t& data, wf::gles_texture_t picture, wf::pointf_t offset);
+    // the other screens must repaint with each step
+    void damage_carrier();
 
     OpenGL::program_t program;
     // The window and the icon.
@@ -58,6 +63,8 @@ class warp_transformer_t : public wf::scene::view_2d_transformer_t
     void hold_picture();
 
     std::weak_ptr<wf::view_interface_t> _view;
+    // set when the icon is on another screen than the window
+    wf::scene::node_ptr carrier;
     effect_t effect;
     wf::geometry_t icon;
     // Runs from 0 (the window as it is) to 1 (inside the icon).

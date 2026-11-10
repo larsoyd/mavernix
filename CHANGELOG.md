@@ -25,6 +25,7 @@
 
 ### Fixed
 
+- A window minimised on a screen the dock is not on flows across to its tile on the dock's screen, and comes back from there to its own screen, as on OS X. It used to aim at an empty spot on its own screen.
 - Unplugging the screen that was last clicked on and plugging a screen in again no longer stops the compositor.
 - Names of desktop icons have the soft dark shadow they have on OS X, so white text stays readable on any picture, and a picked name gets Mavericks' selection colour, shape and dark lower edge. It turns grey while a window is in front of the desktop.
 - Tabs in Qt programs make one control in Sea Lion, as on OS X: a thin line stands between them, the selected tab sits flush with its neighbours, and a tab is as wide around its name as on the original. A new import brings Mavericks' own lines.

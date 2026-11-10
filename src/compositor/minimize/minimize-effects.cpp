@@ -2,6 +2,8 @@
 // "scale" with Wayfire's animate plugin, which runs them (and reverses them
 // for restoring). animate's `minimize_animation` option picks one.
 
+#include <wayfire/core.hpp>
+#include <wayfire/output.hpp>
 #include <wayfire/plugin.hpp>
 #include <wayfire/plugins/animate/animate.hpp>
 #include <wayfire/plugins/common/shared-core-data.hpp>
@@ -33,6 +35,12 @@ class warp_animation_t : public wf::animate::animation_base_t
         {
             icon = wf::from_integer_box(toplevel->get_minimize_hint());
         }
+        // the hint is in the dock's screen, which may be another one than the window's
+        wf::output_t *dock = dock_output();
+        if (dock && view->get_output() && dock != view->get_output() && icon.width > 0)
+        {
+            icon = icon + wf::origin(dock->get_layout_geometry()) + -wf::origin(view->get_output()->get_layout_geometry());
+        }
 
         auto warp = std::make_shared<warp_transformer_t>(view, effect, duration, icon);
         view->get_transformed_node()->add_transformer(warp, wf::TRANSFORMER_HIGHLEVEL + 1,
@@ -43,6 +51,10 @@ class warp_animation_t : public wf::animate::animation_base_t
     bool step() override
     {
         auto warp = current_warp();
+        if (warp)
+        {
+            warp->damage_carrier();
+        }
         return warp && warp->is_running();
     }
 
@@ -60,6 +72,18 @@ class warp_animation_t : public wf::animate::animation_base_t
     }
 
   private:
+    static wf::output_t *dock_output()
+    {
+        for (auto other : wf::get_core().get_all_views())
+        {
+            if (other->get_app_id() == "mavernix-dock" && other->is_mapped())
+            {
+                return other->get_output();
+            }
+        }
+        return nullptr;
+    }
+
     std::shared_ptr<warp_transformer_t> current_warp()
     {
         if (!view)
