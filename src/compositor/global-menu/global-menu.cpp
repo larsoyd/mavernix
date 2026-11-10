@@ -406,7 +406,16 @@ class GlobalMenu : public wf::plugin_interface_t, public wf::per_output_tracker_
         windows.erase(output);
         if (active == output)
         {
-            active = wf::get_core().seat->get_active_output();
+            // the seat still names the output that is leaving
+            active = nullptr;
+            for (wf::output_t* other : wf::get_core().output_layout->get_outputs())
+            {
+                if (other != output)
+                {
+                    active = other;
+                    break;
+                }
+            }
         }
         tell_watchers();
     }
