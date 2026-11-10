@@ -118,6 +118,21 @@ static std::optional<launcher_t> launcher_in(const QFileInfo& file)
     return launcher;
 }
 
+// the folder, or the nearest one above it while it is missing
+static QString nearest_folder(QString path)
+{
+    while (!QFileInfo(path).isDir())
+    {
+        const QString above = QFileInfo(path).path();
+        if (above == path)
+        {
+            break;
+        }
+        path = above;
+    }
+    return path;
+}
+
 void FolderContents::look()
 {
     if (!watcher.directories().isEmpty())
@@ -127,10 +142,14 @@ void FolderContents::look()
 
     QFileInfoList files;
     const QDir folder(folderPath);
-    if (!folderPath.isEmpty() && folder.exists())
+    if (!folderPath.isEmpty())
     {
-        watcher.addPath(folderPath);
-        files = folder.entryInfoList(QDir::AllEntries | QDir::NoDotAndDotDot);
+        // a folder made later is noticed through the one above it
+        watcher.addPath(nearest_folder(folderPath));
+        if (folder.exists())
+        {
+            files = folder.entryInfoList(QDir::AllEntries | QDir::NoDotAndDotDot);
+        }
     }
 
     const QString order = wantedOrder;

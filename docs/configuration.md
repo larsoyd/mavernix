@@ -238,6 +238,8 @@ Both are kept by desktop entry ID, so they belong to a desktop like everything e
 
 An empty value, or Use Original, brings back the application's own.
 
+To put a program on the desktop, right-click it in the dock or the app grid and choose Create Desktop Shortcut. The shortcut is a copy of its desktop entry in the desktop's folder, under the name and with the icon you gave it in Settings, and the entry is offered only while the desktop shows its files.
+
 To take an application out of the app grid, right-click it there and choose Hide from the App Grid, or untick Show in the app grid in Settings, App Icons & Names. That's also where you bring it back. The search and the dock's Programs folder still list it. It's saved as `[app_grid] hidden = ["htop", ...]`, by desktop entry ID.
 
 ## The icon theme

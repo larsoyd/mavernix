@@ -153,6 +153,7 @@ button = "Empty Trash"
 [dock.words]
 keep = "Keep in Dock"
 remove = "Remove from Dock"
+shortcut = "Create Desktop Shortcut"
 open_named = "Open “%1”"
 empty_trash = "Empty Trash"
 magnification_on = "Turn Magnification On"

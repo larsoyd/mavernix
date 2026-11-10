@@ -11,6 +11,7 @@ import Quickshell.Wayland
 import Quickshell.Io
 import Shell.Native
 import "DockLayout.js" as DockLayout
+import "DesktopShortcut.js" as DesktopShortcut
 import "DockScreen.js" as DockScreen
 import "DroppedFiles.js" as DroppedFiles
 import "StackSize.js" as StackSize
@@ -1773,6 +1774,7 @@ PanelWindow {
         dockFolders: folders
         magnificationWanted: dock.magnificationWanted
         trashIsEmpty: dock.trashIsEmpty
+        shortcutsOffered: DesktopShortcut.offered(dock.settings, dock.choices)
         addableFolders: dock.addableFolders
         resizedByUser: (dock.choices.changed.dock ?? ({})).icon_size !== undefined
     }
@@ -1865,6 +1867,8 @@ PanelWindow {
             if (sounds !== null) {
                 sounds.play("dock-item-remove")
             }
+        } else if (id === menus.shortcutId) {
+            DesktopShortcut.create(Quickshell, settings, choices, tile.entry, themeIcons)
         } else if (id === menus.clipboardPauseId) {
             shell.clipboardHistory.paused = !shell.clipboardHistory.paused
         } else if (id === menus.clipboardClearId) {

@@ -19,6 +19,8 @@ QtObject {
     // is empty.
     property bool magnificationWanted: false
     property bool trashIsEmpty: true
+    // the desktop shows its files, so a program can get a launcher there
+    property bool shortcutsOffered: false
     // The user has given the dock a size of their own.
     property bool resizedByUser: false
     // Folders the dock's own menu offers to add ([{ label, kept }], see
@@ -39,6 +41,7 @@ QtObject {
     readonly property int clipboardPauseId: 11
     readonly property int clipboardClearId: 12
     readonly property int clipboardSettingsId: 13
+    readonly property int shortcutId: 14
     // Ranges of ids, kept in ascending order: the dock tests them from the
     // highest down. A program's windows, a folder's orders and views, a
     // program's own entries (its desktop entry's actions), a listed folder's
@@ -147,6 +150,9 @@ QtObject {
                 items.push(ticked(keepId, words.keep ?? "Keep in dock", place.kept))
             } else {
                 items.push(entry(removeId, words.remove ?? "Remove from dock"))
+            }
+            if (shortcutsOffered && tile.entry) {
+                items.push(entry(shortcutId, words.shortcut ?? "Create Desktop Shortcut"))
             }
             items.push(separator())
         }

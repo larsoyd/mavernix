@@ -11,6 +11,7 @@ import Quickshell.Wayland
 import "AppGridLayout.js" as AppGridLayout
 import "ApplicationMatch.js" as ApplicationMatch
 import "ApplicationName.js" as ApplicationName
+import "DesktopShortcut.js" as DesktopShortcut
 import "StartProgram.js" as StartProgram
 import "ThemeValues.js" as ThemeValues
 
@@ -675,6 +676,7 @@ PanelWindow {
     readonly property int openId: 1
     readonly property int keepId: 2
     readonly property int hideId: 3
+    readonly property int shortcutId: 4
 
     function openMenu(entry, screenX, screenY) {
         menuEntry = entry
@@ -684,11 +686,18 @@ PanelWindow {
             { id: openId, label: words.open_label ?? "Open", enabled: true, separator: false,
               checkable: false, checked: false, shortcut: [], children: [] }
         ]
-        if (dock !== null) {
+        const shortcutOffered = DesktopShortcut.offered(settings, choices)
+        if (dock !== null || shortcutOffered) {
             items.push({ id: 0, label: "", enabled: false, separator: true,
                          checkable: false, checked: false, shortcut: [], children: [] })
+        }
+        if (dock !== null) {
             items.push({ id: keepId, label: words.keep_in_dock_label ?? "Keep in Dock", enabled: true,
                          separator: false, checkable: true, checked: dock.keeps(entry.id), shortcut: [], children: [] })
+        }
+        if (shortcutOffered) {
+            items.push({ id: shortcutId, label: words.shortcut_label ?? "Create Desktop Shortcut", enabled: true,
+                         separator: false, checkable: false, checked: false, shortcut: [], children: [] })
         }
         items.push({ id: 0, label: "", enabled: false, separator: true,
                      checkable: false, checked: false, shortcut: [], children: [] })
@@ -714,6 +723,8 @@ PanelWindow {
                 grid.close()
             } else if (id === grid.keepId) {
                 grid.dock.setKept(entry.id, !grid.dock.keeps(entry.id))
+            } else if (id === grid.shortcutId) {
+                DesktopShortcut.create(Quickshell, grid.settings, grid.choices, entry, themeIcons)
             } else if (id === grid.hideId) {
                 // Settings, App Icons shows it again.
                 const hidden = grid.choices.value("app_grid", "hidden") ?? []

@@ -75,6 +75,15 @@ tests = {
         'include': test_sources / 'shell/native',
         'dependencies': [qt_native, librsvg],
     },
+    'folder-contents': {
+        'sources': [
+            test_sources / 'shell/native/folder-contents.cpp',
+            test_sources / 'shell/native/file-moment.cpp',
+            qt.compile_moc(headers: test_sources / 'shell/native/folder-contents.hpp', dependencies: qt_native),
+        ],
+        'include': test_sources / 'shell/native',
+        'dependencies': [qt_native],
+    },
     'clipboard-history': {
         'sources': [
             test_sources / 'shell/native/clipboard-history.cpp',
@@ -248,6 +257,12 @@ test(
     'shell-weak-maps',
     python,
     args: [files('test_shell_weak_maps.py')],
+)
+
+test(
+    'file-action',
+    python,
+    args: [files('test_file_action.py')],
 )
 
 test(

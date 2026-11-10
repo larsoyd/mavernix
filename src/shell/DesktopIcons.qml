@@ -12,6 +12,7 @@ import Quickshell
 import Quickshell.Io
 import Quickshell.Wayland
 import Shell.Native
+import "DesktopShortcut.js" as DesktopShortcut
 import "DroppedFiles.js" as DroppedFiles
 import "ThemeValues.js" as ThemeValues
 
@@ -37,11 +38,7 @@ Item {
     readonly property bool shown: looks !== null && (userChoices.value("desktop_files", "show") ?? false)
     visible: shown
 
-    // The config's folder, "~" standing for the home folder.
-    readonly property string folder: {
-        const wanted = wishes.folder ?? "~/Desktop"
-        return wanted.startsWith("~") ? Quickshell.env("HOME") + wanted.substring(1) : wanted
-    }
+    readonly property string folder: DesktopShortcut.folder(Quickshell, settings)
     readonly property string order: userChoices.value("desktop_files", "order") ?? "name"
 
     FolderContents {

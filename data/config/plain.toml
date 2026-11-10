@@ -398,6 +398,8 @@ web = [
 # A program's menu (secondary click).
 open_label = "Open"
 keep_in_dock_label = "Keep in Dock"
+# Offered while the desktop shows its files.
+shortcut_label = "Create Desktop Shortcut"
 hide_label = "Hide from the App Grid"
 # Desktop entry IDs the grid leaves out, such as "htop"; Settings, App
 # Icons shows them again.
@@ -465,6 +467,7 @@ confirm = { title = "Delete everything in the wastebasket for good?", text = "Th
 options = "Options"
 keep = "Keep in dock"
 remove = "Remove from dock"
+shortcut = "Create desktop shortcut"
 open = "Open"
 open_named = "Show “%1”"
 quit = "Quit"
