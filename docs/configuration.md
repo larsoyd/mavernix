@@ -63,6 +63,15 @@ Two keys belong to the compositor, so they work even when nothing else does: Sup
 
 The keyboard layout is your system's (see `localectl status`) until you pick one in Settings, Keyboard, Input Sources.
 
+## The emoji menu
+
+`[shortcuts] emoji` opens it, and `[emoji]` sets its size (`columns`, `rows`), how many recently used emoji lead the list (`keep_recent`, 0 for none) and its wording.
+
+`insert` says how a chosen emoji reaches the program:
+
+- `"paste"`, the default, lends it to the clipboard and the selection, presses Shift+Insert, and puts back what was there as soon as the program has read it. It works in nearly every program, terminals included, and the emoji stays out of the clipboard history.
+- `"type"` sends it as key presses and never touches the clipboard. Terminals and GTK and Qt programs read those, but Chrome and programs running under X11 don't.
+
 ## Screens
 
 A high-density screen is drawn at twice its pixels, any other at its normal size. To change that, set `[display] scale`, or use Settings, Displays while the desktop runs.

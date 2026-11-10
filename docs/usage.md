@@ -34,6 +34,7 @@ The keys aren't the same on every desktop, so the table below has one column for
 | left or right half, then a quarter; whole screen; back | Super+arrows | Super+arrows |
 | the desktop to the left or right | Ctrl+Alt+Left, Right | Ctrl+Left, Right |
 | screenshot of the screen, of a part | Print, Shift+Print | Super+Shift+3, Super+Shift+4 (add Ctrl to only copy it) |
+| emoji | Super+. | Super+. |
 | lock | Super+L | Ctrl+Super+L |
 | a terminal | Super+Enter | Super+Enter |
 | end the session right away | Ctrl+Alt+Backspace | Ctrl+Alt+Backspace |
@@ -41,6 +42,8 @@ The keys aren't the same on every desktop, so the table below has one column for
 In a game, F3, F4 and F11 are the game's. Sea Lion's function keys go to the window in front when it's a game: full screen, an X11 program (Wine and most Steam games), started by Steam or Lutris, or listed under `[games]` in the config, which lists Minecraft. Ctrl+Up still opens all windows there.
 
 Screenshots are saved to the desktop and also copied, so you can paste them right away. The screenshot keys need `grim`, `slurp` and `wl-clipboard`. If pressing them does nothing, one of those is probably missing.
+
+The emoji menu opens at the pointer. Type to search by name or by a word like "lol", move with the arrow keys, and press Enter to put the marked emoji into the window you were typing in. A click does the same. Tab goes to the next group, and the ones you used last lead the list. A right click, a held press or Alt+Down on a hand or a person offers its skin tones, and the one you pick is remembered. It needs a colour emoji font such as Noto Color Emoji.
 
 The program switcher works like it does elsewhere. Hold Super, press Tab until the program you want is highlighted, then let go. Shift+Tab goes backwards, the arrow keys and the pointer work too, Escape closes it without switching, and a quick tap takes you back to the program you used last. With many programs open the icons get smaller so they all fit.
 

@@ -155,6 +155,35 @@ remember = true
 keep_images = true
 image_limit_mb = 20
 
+[emoji]
+# The emoji menu ([shortcuts] emoji) opens at the pointer, and the one chosen
+# goes into the window that had the keyboard. Enter takes the marked one,
+# Tab goes to the next group, and a right click, a held press or Alt+Down
+# offers skin tones. It needs a colour emoji font, such as Noto Color Emoji.
+#
+# insert = "paste" lends the emoji to the clipboard and the selection, presses
+# Shift+Insert, and puts back what was there once the program has read it.
+# That works in nearly every program. "type" sends it as keys and leaves the
+# clipboard alone, but Chrome and programs running under X11 misread those.
+insert = "paste"
+columns = 8
+rows = 7
+# How many recently used ones lead the list; 0 for none.
+keep_recent = 24
+search = "Search"
+recent = "Recently Used"
+found = "Search Results"
+none = "No Emoji Found"
+smileys = "Smileys"
+people = "People"
+nature = "Nature"
+food = "Food & Drink"
+travel = "Places"
+activities = "Activities"
+objects = "Objects"
+symbols = "Symbols"
+flags = "Flags"
+
 [status.tray]
 # Programs whose icon is a plain light shape, lost on a light panel. Drawn in
 # the panel's ink, like the status icons beside them.
@@ -292,6 +321,7 @@ minimize_window = "<super> KEY_H"
 fullscreen_window = "KEY_F11"
 search = "<super> KEY_SPACE"
 clipboard_history = "<super> KEY_V"
+emoji = "<super> KEY_DOT"
 lock = "<super> KEY_L"
 volume_up = "KEY_VOLUMEUP"
 volume_down = "KEY_VOLUMEDOWN"

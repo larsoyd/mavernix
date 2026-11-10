@@ -253,7 +253,7 @@ def resize_animation_section(animations):
 
 # Actions of the shell's run() (shell.qml).
 SHELL_ACTIONS = ["app_grid", "volume_up", "volume_down", "volume_mute", "lock", "notification_list", "search",
-                 "switch_program", "switch_program_back", "quit_app", "clipboard_history"]
+                 "switch_program", "switch_program_back", "quit_app", "clipboard_history", "emoji"]
 # Repeated while the key is held.
 REPEATING_ACTIONS = ["volume_up", "volume_down"]
 

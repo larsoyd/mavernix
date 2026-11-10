@@ -41,6 +41,7 @@ Fedora 44 and 45 have an older Wayfire and Quickshell than Mavernix needs, so `p
 | GSettings schemas | 51.0 | `gsettings-desktop-schemas` | the look of GTK programs |
 | Adwaita icons, DejaVu fonts | | `adwaita-icon-theme` `adwaita-icon-theme-legacy` `ttf-dejavu` | the plain theme's icons and fonts. Without the icons, the desktop falls back to Breeze, Papirus or hicolor. |
 | foot (optional) | | `foot` | the terminal that the dock and Super+Enter open. Prefer another terminal? Name it in the config instead. |
+| A colour emoji font (optional) | | `noto-fonts-emoji` | the pictures in the emoji menu |
 | 7-Zip, cpio, bzip2 and lbzip2, libicns, FFmpeg, Poppler, bubblewrap | | `7zip` `cpio` `bzip2` `lbzip2` `libicns` `ffmpeg` `poppler` `bubblewrap` | the Theme Installer: reading the installer, converting icons, sounds and drawings, and its sandbox |
 | Meson, Ninja, a C++17 compiler, GLM, Vulkan headers, Qt Shader Tools | Meson 1.12.1, Qt 6.12.0 | `base-devel` `meson` `ninja` `glm` `vulkan-headers` `qt6-shadertools` | building (Wayfire's own headers need GLM and the Vulkan headers, and the dock's shader is compiled with `qsb`) |
 

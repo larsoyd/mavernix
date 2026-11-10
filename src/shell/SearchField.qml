@@ -11,6 +11,8 @@ FocusScope {
     required property string themeDirectory
 
     property alias text: field.text
+    // shown in grey while the field is empty
+    property string placeholder: ""
     readonly property alias input: field
     // a handler that acts on a key sets event.accepted
     signal keyPressed(var event)
@@ -39,6 +41,18 @@ FocusScope {
 
         Keys.onPressed: event => fieldBox.keyPressed(event)
         onAccepted: fieldBox.accepted()
+    }
+
+    Text {
+        visible: field.text === "" && fieldBox.placeholder !== ""
+        x: field.x
+        y: field.y
+        width: field.width
+        elide: Text.ElideRight
+        text: fieldBox.placeholder
+        color: field.color
+        opacity: 0.4
+        font: field.font
     }
 
     // empties the field, shown while there is text

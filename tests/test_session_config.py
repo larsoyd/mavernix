@@ -1377,6 +1377,14 @@ class TestGameSettings(SessionTestCase):
         command = self.make.shortcut_section(self.make.with_quit_closing_app(config), {})
         self.assertIn("binding_quit_app = <super> KEY_Q", command)
 
+    def test_shipped_config_binds_the_emoji_menu(self):
+        config = tomllib.loads((CONFIG_DIR / "plain.toml").read_text())
+        command = self.make.shortcut_section(config, {})
+        self.assertIn("binding_emoji = <super> KEY_DOT", command)
+        asked = [line for line in command if line.startswith("command_emoji = ")]
+        self.assertEqual(len(asked), 1)
+        self.assertTrue(asked[0].endswith(" ipc call shell run emoji"), asked[0])
+
     def test_shake_sensitivity(self):
         self.assertEqual(self.make.shake_to_find_section({}), ["[shake-to-find]", "sensitivity = 3"])
         self.assertEqual(self.make.shake_to_find_section({"input": {"shake_sensitivity": 5}})[1], "sensitivity = 5")

@@ -21,7 +21,7 @@ depends=(
   '7zip' 'cpio' 'bzip2' 'lbzip2' 'libicns' 'ffmpeg' 'poppler' 'bubblewrap'
 )
 makedepends=('meson' 'ninja' 'glm' 'vulkan-headers' 'qt6-shadertools')
-checkdepends=('python-gobject' 'xorg-xwayland' 'dbus')
+checkdepends=('python-gobject' 'xorg-xwayland' 'dbus' 'libxkbcommon')
 optdepends=(
   'foot: the terminal the dock and Super+Enter open'
   "pipewire: sound, and the panel's volume item"
@@ -34,6 +34,7 @@ optdepends=(
   'wl-clipboard: pictures of the screen into the clipboard'
   'brightnessctl: brightness keys'
   'playerctl: media keys'
+  'noto-fonts-emoji: the pictures in the emoji menu'
   'network-manager-applet: asking for a network password NetworkManager needs again, and networks that sign in with a user name or a certificate'
   'dex: starting the programs in ~/.config/autostart'
   "hwdata: the graphics card's name in About This Computer"

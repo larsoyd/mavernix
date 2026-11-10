@@ -15,6 +15,7 @@
 #include "clipboard-history.hpp"
 #include "desktop-aside.hpp"
 #include "desktops.hpp"
+#include "emoji-set.hpp"
 #include "file-kind.hpp"
 #include "folder-contents.hpp"
 #include "folder-watch.hpp"
@@ -23,9 +24,11 @@
 #include "lid-watch.hpp"
 #include "main-screen.hpp"
 #include "menu-registrar.hpp"
+#include "pointer-place.hpp"
 #include "session-watch.hpp"
 #include "shortcut-pause.hpp"
 #include "sound-pack.hpp"
+#include "typed-text.hpp"
 #include "window-attention.hpp"
 #include "window-games.hpp"
 #include "window-picture-provider.hpp"
@@ -65,6 +68,7 @@ void ShellNativePlugin::registerTypes(const char* uri)
     qmlRegisterType<ClipboardSearch>(uri, major_version, minor_version, "ClipboardSearch");
     qmlRegisterType<DesktopAside>(uri, major_version, minor_version, "DesktopAside");
     qmlRegisterType<Desktops>(uri, major_version, minor_version, "Desktops");
+    qmlRegisterType<EmojiSet>(uri, major_version, minor_version, "EmojiSet");
     qmlRegisterType<FileKind>(uri, major_version, minor_version, "FileKind");
     qmlRegisterType<FolderContents>(uri, major_version, minor_version, "FolderContents");
     qmlRegisterType<FolderWatch>(uri, major_version, minor_version, "FolderWatch");
@@ -73,9 +77,11 @@ void ShellNativePlugin::registerTypes(const char* uri)
     qmlRegisterType<LidWatch>(uri, major_version, minor_version, "LidWatch");
     qmlRegisterType<MainScreen>(uri, major_version, minor_version, "MainScreen");
     qmlRegisterType<MenuRegistrar>(uri, major_version, minor_version, "MenuRegistrar");
+    qmlRegisterType<PointerPlace>(uri, major_version, minor_version, "PointerPlace");
     qmlRegisterType<SessionWatch>(uri, major_version, minor_version, "SessionWatch");
     qmlRegisterType<ShortcutPause>(uri, major_version, minor_version, "ShortcutPause");
     qmlRegisterType<SoundPack>(uri, major_version, minor_version, "SoundPack");
+    qmlRegisterType<TypedText>(uri, major_version, minor_version, "TypedText");
     qmlRegisterType<WindowAttention>(uri, major_version, minor_version, "WindowAttention");
     qmlRegisterType<WindowGames>(uri, major_version, minor_version, "WindowGames");
     qmlRegisterType<WindowPictures>(uri, major_version, minor_version, "WindowPictures");

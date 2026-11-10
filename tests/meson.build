@@ -86,6 +86,24 @@ tests = {
         'include': test_sources / 'apps/settings',
         'dependencies': [qt_widgets],
     },
+    'emoji-set': {
+        'sources': [
+            test_sources / 'shell/native/emoji-set.cpp',
+            qt.compile_moc(headers: test_sources / 'shell/native/emoji-set.hpp', dependencies: qt_native),
+        ],
+        'include': test_sources / 'shell/native',
+        'dependencies': [qt_native],
+    },
+    'typed-text': {
+        'sources': [
+            test_sources / 'shell/native/typed-text.cpp',
+            qt.compile_moc(headers: test_sources / 'shell/native/typed-text.hpp', dependencies: qt_native),
+            virtual_keyboard_header,
+            virtual_keyboard_code,
+        ],
+        'include': test_sources / 'shell/native',
+        'dependencies': [qt_native, wayland_client, kguiaddons, dependency('xkbcommon')],
+    },
     'clipboard-pane': {
         'sources': [
             test_sources / 'apps/settings/clipboard-pane.cpp',
@@ -188,6 +206,13 @@ test(
     python,
     args: [files('test_app_store.py')],
     env: {'APP_STORE_BACKEND_DIR': meson.project_source_root() / 'src' / 'apps' / 'app-store' / 'backend'},
+)
+
+test(
+    'emoji-list',
+    python,
+    args: [files('test_emoji_list.py')],
+    env: {'EMOJI_SOURCE_DIR': meson.project_source_root() / 'data' / 'emoji'},
 )
 
 test(

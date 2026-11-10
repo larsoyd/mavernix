@@ -4,6 +4,7 @@
 
 ### Added
 
+- An emoji menu: Super+. opens it at the pointer, with a search field, groups, the ones used last and skin tones, and puts the chosen emoji into the window you were typing in. Settings, Keyboard changes the key, `[emoji]` in the config the rest (see docs/configuration.md). It needs a colour emoji font.
 - The menu bar can be on every display: Settings, Mission Control, Show the menu bar on every display. All of them show the same menus, or each display's own window with Give each display the menus of its own window, as on OS X, where the bars of the other displays fade.
 - Focus follows mouse can leave the menu bar alone until you click a window: Settings, Extensions, Focus follows mouse.
 - REAPER's menus are in the menu bar, and its audio status follows Help as on macOS, kept up to date by REAPER itself. Clicking it opens REAPER's audio device settings. Turning global menus off gives REAPER its own bar back at its next start.

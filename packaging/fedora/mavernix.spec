@@ -31,6 +31,7 @@ BuildRequires:  pkgconfig(gtk+-x11-3.0)
 BuildRequires:  pkgconfig(dbusmenu-gtk3-0.4)
 BuildRequires:  pkgconfig(dbusmenu-glib-0.4)
 BuildRequires:  pkgconfig(wayland-client)
+BuildRequires:  pkgconfig(xkbcommon)
 BuildRequires:  pkgconfig(xcb)
 BuildRequires:  wayland-devel
 BuildRequires:  python3-gobject
@@ -83,6 +84,7 @@ Recommends:     bluez
 Recommends:     upower
 Recommends:     grim
 Recommends:     slurp
+Recommends:     google-noto-color-emoji-fonts
 Recommends:     wl-clipboard
 Recommends:     brightnessctl
 Recommends:     playerctl

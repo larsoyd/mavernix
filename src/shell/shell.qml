@@ -198,6 +198,13 @@ ShellRoot {
         }
     }
 
+    EmojiPicker {
+        id: emojiPicker
+        settings: shell.settings
+        mainScreen: shell.mainScreen
+        onOpening: shell.menuOpening(emojiPicker)
+    }
+
     // [panel] every_screen: every panel shows the same menus
     readonly property var panelScreens: (userChoices.value("panel", "every_screen") ?? false)
         ? Quickshell.screens : [mainScreen].filter(screen => screen !== null)
@@ -305,11 +312,13 @@ ShellRoot {
             quitActiveApp()
         } else if (action === "clipboard_history") {
             shell.showClipboard()
+        } else if (action === "emoji") {
+            emojiPicker.toggle()
         } else {
             console.warn("shell: the config asks for an action the shell does not have:", action,
                          "- known: app_grid, volume_up, volume_down, volume_mute, lock, notification_list,",
                          "search, window_overview, switch_program, switch_program_back, empty_trash, quit_app,",
-                         "clipboard_history")
+                         "clipboard_history, emoji")
         }
     }
 
