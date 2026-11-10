@@ -64,10 +64,16 @@ PanelWindow {
 
     readonly property var switchMotion: (settings.theme.animation ?? ({})).dock_switch ?? ({})
     readonly property int switchMs: switchMotion.duration_ms ?? DockScreen.slideMs(restingHeight)
-    // from the wish for another screen until the dock stands on it
-    property bool changingScreen: false
+    readonly property int switchCurve: ThemeValues.easing(switchMotion.curve ?? "ease-in-out-sine")
+    // picture, window, rise: the picture covers it, its windows are made anew, then both move
+    // nothing moves while windows are made, which holds back every frame of the shell
+    property string switchStep: ""
+    readonly property bool changingScreen: switchStep !== ""
     // 1 while the dock waits below its new screen's edge, 0 once it is up
     property real switchSunk: 0
+    property double switchBegan: 0
+    property int pictureMs: 0
+    property int windowMs: 0
 
     // nothing of the dock's may be open or held when it leaves
     readonly property bool busy: menuIndex >= 0 || folderIndex >= 0 || dragged !== null
@@ -77,8 +83,8 @@ PanelWindow {
         const from = shownScreen
         const to = wantedScreen
         if ((from?.name ?? "") === (to?.name ?? "")) {
-            // back where it is, or was about to leave
-            if (changingScreen && !slide.running) {
+            // back where it still stands
+            if (switchStep === "picture") {
                 arriveAtOnce()
             }
             return
@@ -92,8 +98,10 @@ PanelWindow {
             arriveAtOnce()
             return
         }
-        changingScreen = true
+        switchStep = "picture"
+        switchBegan = Date.now()
         const glass = windowReflections && glassWindow.visible ? glassWindow.contentItem : null
+        leaving.implicitHeight = dock.height
         if (!leaving.take(glass, dock.contentItem, from.devicePixelRatio)) {
             arriveAtOnce()
             return
@@ -105,30 +113,71 @@ PanelWindow {
     property var leavingFrom: null
     function showLeaving() {
         // given up meanwhile, or the old screen went away
-        if (!changingScreen || slide.running || leaving.visible
+        if (switchStep !== "picture" || leaving.visible
             || !Quickshell.screens.some(screen => screen.name === leavingFrom?.name)) {
             return
         }
         leaving.screen = leavingFrom
-        leaving.slid = 0
-        leaving.visible = true
+        leaving.show()
     }
 
-    // the picture covers the dock now, so the dock can go
+    // the picture stands over the dock now, so the dock can go
     function crossOver() {
-        if (!changingScreen || slide.running) {
+        if (switchStep !== "picture") {
             return
         }
         leavingDeadline.stop()
+        pictureMs = Date.now() - switchBegan
+        switchStep = "window"
+        dockFrames = 0
+        glassFrames = 0
         switchSunk = 1
         shownScreen = wantedScreen
         arriveShown()
-        slide.restart()
+        arrivalDeadline.restart()
+    }
+
+    // frames the dock's windows have handed over on the new screen
+    property int dockFrames: 0
+    property int glassFrames: 0
+    readonly property bool glassComes: windowReflections && glassWindow.visible
+    Connections {
+        target: dock.switchStep === "window" ? dock.contentItem.Window.window : null
+        function onFrameSwapped() {
+            dock.dockFrames += 1
+            dock.comeUpWhenDrawn(dock.contentItem)
+        }
+    }
+    Connections {
+        target: dock.switchStep === "window" && dock.glassComes ? glassWindow.contentItem.Window.window : null
+        function onFrameSwapped() {
+            dock.glassFrames += 1
+            dock.comeUpWhenDrawn(glassWindow.contentItem)
+        }
+    }
+    function comeUpWhenDrawn(drawn) {
+        // a second frame from each: the first can come while the other window is still being made
+        if (dockFrames >= 2 && (!glassComes || glassFrames >= 2)) {
+            comeUp()
+        } else {
+            drawn.Window.window?.update()
+        }
+    }
+
+    function comeUp() {
+        if (switchStep !== "window") {
+            return
+        }
+        arrivalDeadline.stop()
+        windowMs = Date.now() - switchBegan
+        switchStep = "rise"
+        rise.restart()
     }
 
     function arriveAtOnce() {
         leavingDeadline.stop()
-        slide.stop()
+        arrivalDeadline.stop()
+        rise.stop()
         settle()
         shownScreen = wantedScreen
         arriveShown()
@@ -212,7 +261,7 @@ PanelWindow {
         leaving.clear()
         leavingFrom = null
         switchSunk = 0
-        changingScreen = false
+        switchStep = ""
     }
 
     // a picture that never comes must not hold the dock back
@@ -225,34 +274,39 @@ PanelWindow {
         }
     }
 
-    DockLeaving {
-        id: leaving
-        implicitHeight: dock.height
-        travel: dock.restingHeight
-        WlrLayershell.layer: dock.inOverlay ? WlrLayer.Overlay : WlrLayer.Top
-        onTaken: dock.showLeaving()
-        onDrawn: dock.crossOver()
+    // nor a window that draws nothing, as under a full screen window
+    Timer {
+        id: arrivalDeadline
+        interval: 600
+        onTriggered: {
+            console.warn("[dock] screen_switch window=late ms=" + interval + " dock_frames=" + dock.dockFrames
+                         + " glass_frames=" + dock.glassFrames)
+            dock.comeUp()
+        }
     }
 
-    ParallelAnimation {
-        id: slide
-        NumberAnimation {
-            target: leaving
-            property: "slid"
-            from: 0
-            to: 1
-            duration: dock.switchMs
-            easing.type: ThemeValues.easing(dock.switchMotion.curve ?? "ease-in-out-sine")
+    DockLeaving {
+        id: leaving
+        travel: dock.restingHeight
+        slid: dock.switchStep === "rise" ? 1 - dock.switchSunk : 0
+        WlrLayershell.layer: dock.inOverlay ? WlrLayer.Overlay : WlrLayer.Top
+        onTaken: dock.showLeaving()
+        onShown: dock.crossOver()
+    }
+
+    NumberAnimation {
+        id: rise
+        target: dock
+        property: "switchSunk"
+        from: 1
+        to: 0
+        duration: dock.switchMs
+        easing.type: dock.switchCurve
+        onFinished: {
+            console.info("[dock] screen_switch to=" + (dock.screen?.name ?? "") + " picture_ms=" + dock.pictureMs
+                         + " window_ms=" + dock.windowMs + " done_ms=" + (Date.now() - dock.switchBegan))
+            dock.settle()
         }
-        NumberAnimation {
-            target: dock
-            property: "switchSunk"
-            from: 1
-            to: 0
-            duration: dock.switchMs
-            easing.type: ThemeValues.easing(dock.switchMotion.curve ?? "ease-in-out-sine")
-        }
-        onFinished: dock.settle()
     }
 
     // the minimise effect aims at this surface, which is new on a new screen
@@ -1051,7 +1105,7 @@ PanelWindow {
     readonly property real wantedTileSize:
         DockLayout.iconSize(looks, sizeWishes, screen?.height ?? 0) + 2 * tileMargin
     readonly property real tileSize:
-        DockLayout.fittingTileSize(looks, wantedTileSize, rowUnits, width)
+        DockLayout.fittingTileSize(looks, wantedTileSize, rowUnits, screen?.width ?? width)
 
     // Space between the screen's edge and the line the tiles stand on.
     readonly property int base: DockLayout.sized(looks.base, tileSize)
@@ -1072,7 +1126,7 @@ PanelWindow {
     // magnification_ramp_ms and change the pointed tile's size change in px.
     property real magnificationRamp: 0
     readonly property real magnificationTarget:
-        (magnifies && draggedIconSize === 0 && (pointer.hovered || menuHoldsPointer)) ? 1 : 0
+        (magnifies && draggedIconSize === 0 && (pointerInside || menuHoldsPointer)) ? 1 : 0
     onMagnificationTargetChanged: {
         const sizeNow = tileSize + (largestTileSize - tileSize) * magnificationRamp
         const sizeThen = tileSize + (largestTileSize - tileSize) * magnificationTarget
@@ -1193,7 +1247,8 @@ PanelWindow {
     // hand they keep the height from its start.
     readonly property real restingHeight: base + tileSize + looks.headroom
     property real heldRestingHeight: 0
-    exclusiveZone: hidesItself ? 0 : (draggedIconSize > 0 ? heldRestingHeight : restingHeight)
+    // none while it waits sunk on a new screen, so windows there make room as it rises, not before
+    exclusiveZone: hidesItself || switchStep === "window" ? 0 : (draggedIconSize > 0 ? heldRestingHeight : restingHeight)
 
     // --- Hiding ----------------------------------------------------------------------
     // With [dock] autohide the dock sinks below the screen's edge until the pointer
@@ -1253,8 +1308,9 @@ PanelWindow {
 
     // The pointer's x in window coordinates, not the watching item's: that item
     // moves with the shelf's end as icons grow.
-    readonly property bool pointerInside: pointer.hovered
     readonly property real pointerX: pointer.point.scenePosition.x
+    // not pointed at on its way to another screen, or it comes up swollen under the pointer
+    readonly property bool pointerInside: pointer.hovered && !changingScreen
 
     // What a tile opens is got ready only once the pointer rests on it, not
     // as the pointer passes over it: getting the application grid or a
@@ -1358,7 +1414,7 @@ PanelWindow {
         id: glassWindow
         screen: dock.screen
         anchors { left: true; right: true; bottom: true }
-        implicitHeight: dock.height
+        implicitHeight: dock.implicitHeight
         exclusionMode: ExclusionMode.Ignore
         WlrLayershell.namespace: "mavernix-dock-shelf"
         WlrLayershell.layer: WlrLayer.Overlay
@@ -1389,7 +1445,8 @@ PanelWindow {
 
                 x: tile?.iconX ?? 0
                 width: tile?.iconSize ?? 0
-                y: dock.fromBottom(dock.base + (tile?.lift ?? 0) + (dock.looks.icon_shadow?.raise ?? 0), height)
+                // by this window's own height: the dock's is not there yet while both are being made
+                y: glassWindow.height - dock.base - (tile?.lift ?? 0) - (dock.looks.icon_shadow?.raise ?? 0) - height
             }
         }
 

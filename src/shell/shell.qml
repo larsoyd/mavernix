@@ -57,7 +57,9 @@ ShellRoot {
         output: dock.screen?.name ?? ""
         onDug: (output, kind) => {
             const moves = userChoices.value("dock", "follows_dig") ?? true
-            if (kind === "move" && moves && !dock.busy && !appGrid.open) {
+            if (kind === "move" && moves && (dock.busy || appGrid.open)) {
+                console.info("[dock] dig refused: " + (appGrid.open ? "app grid open" : "dock busy") + " output=" + output)
+            } else if (kind === "move" && moves) {
                 shell.dugScreen = output
             } else if (kind === "reveal" && output === dock.screen?.name) {
                 dock.reveal()

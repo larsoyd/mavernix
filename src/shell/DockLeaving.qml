@@ -12,9 +12,8 @@ PanelWindow {
     property real slid: 0
     // how far the pictures go, in pixels
     property real travel: 0
-    // frames drawn since it was shown
-    property int frames: 0
-    signal drawn()
+    // the pictures are with the compositor, what they cover can go
+    signal shown()
 
     anchors {
         left: true
@@ -26,22 +25,30 @@ PanelWindow {
     color: "transparent"
     mask: Region {}
     visible: false
-    onVisibleChanged: frames = 0
 
-    // the dock's glass, when it has one of its own, and the dock over it
-    ItemPicture {
-        id: under
-        width: leaving.width
-        height: leaving.height
-        y: Math.round(leaving.slid * leaving.travel)
-        onTaken: leaving.oneTaken()
-    }
-    ItemPicture {
-        id: over
-        width: leaving.width
-        height: leaving.height
-        y: under.y
-        onTaken: leaving.oneTaken()
+    // as large as what was pictured, whatever the window is told to be meanwhile
+    Item {
+        id: stand
+        y: leaving.height - height
+
+        Item {
+            id: pictures
+            width: stand.width
+            height: stand.height
+            y: Math.round(leaving.slid * leaving.travel)
+
+            // the dock's glass, when it has one of its own, and the dock over it
+            ItemPicture {
+                id: under
+                anchors.fill: parent
+                onTaken: leaving.oneTaken()
+            }
+            ItemPicture {
+                id: over
+                anchors.fill: parent
+                onTaken: leaving.oneTaken()
+            }
+        }
     }
 
     property int awaited: 0
@@ -56,6 +63,8 @@ PanelWindow {
     // false when the pictures cannot be had, else taken follows
     function take(glass, dock, pixelRatio) {
         clear()
+        stand.width = dock.width
+        stand.height = dock.height
         awaited = glass ? 2 : 1
         return (!glass || under.take(glass, pixelRatio)) && over.take(dock, pixelRatio)
     }
@@ -66,14 +75,19 @@ PanelWindow {
         over.clear()
     }
 
-    // the second frame has the pictures on screen for sure
-    FrameAnimation {
-        running: leaving.visible && leaving.frames < 2
-        onTriggered: {
-            leaving.frames += 1
-            if (leaving.frames === 2) {
-                leaving.drawn()
-            }
+    function show() {
+        handedOver = false
+        visible = true
+    }
+
+    // the compositor takes requests in order, so what is asked of it after
+    // this window's first frame finds the pictures already there
+    property bool handedOver: false
+    Connections {
+        target: leaving.visible && !leaving.handedOver ? pictures.Window.window : null
+        function onFrameSwapped() {
+            leaving.handedOver = true
+            leaving.shown()
         }
     }
 }

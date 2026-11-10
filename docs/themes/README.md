@@ -236,7 +236,7 @@ Whether the dock hides itself is up to the user (`[dock] autohide`). Without the
 
 ### A dock that changes screens
 
-With several screens the dock is on one of them. When it moves to another, a picture of it slides out of the old screen while the dock rises on the new one.
+With several screens the dock is on one of them. When it moves to another, a picture of it slides out of the old screen while the dock rises on the new one. Both start together, a moment after the push, once the dock is ready on the new screen.
 
 ```toml
 [animation.dock_switch]
