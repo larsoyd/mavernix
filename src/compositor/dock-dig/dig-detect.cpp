@@ -1,72 +1,79 @@
 #include "dig-detect.hpp"
 
+#include <algorithm>
 #include <cmath>
 
 namespace dock_dig
 {
-namespace
-{
-const double LEAN_SCALE = 57.2957795;
-}
-
 dig_detect_t::dig_detect_t(needs_t needs) : needs(needs) {}
 
-void dig_detect_t::enter(int64_t now_ms)
+void dig_detect_t::begin_stroke()
 {
-    on_edge = true;
-    due = now_ms + needs.dig_ms;
-    last_move_ms = now_ms;
+    stroke_ms = 0;
     run_x = run_y = 0;
 }
 
-void dig_detect_t::move(double dx, double dy, int64_t now_ms)
+void dig_detect_t::enter(int64_t now_ms)
 {
-    if (!on_edge)
+    pushed = std::max(0.0, pushed - needs.fade * double(now_ms - last_ms));
+    last_ms = now_ms;
+    on_edge = true;
+    spent = false;
+    begin_stroke();
+}
+
+bool dig_detect_t::move(double dx, double dy, int64_t now_ms)
+{
+    if (!on_edge || spent)
     {
-        return;
+        return false;
     }
-    // the lean of the run before this move, a level run has none
-    const double lean = run_y == 0 ? 0 : std::abs(run_x) / std::abs(run_y) * LEAN_SCALE;
+    const int64_t waited = now_ms - last_ms;
+    last_ms = now_ms;
+    if (waited > needs.gap_ms)
+    {
+        begin_stroke();
+    }
+    else
+    {
+        stroke_ms += waited;
+    }
     run_x += dx;
     run_y += dy;
-    if (now_ms - last_move_ms > needs.gap_ms || lean > needs.lean)
+    // a stroke pushes while it goes inward fast enough and more inward than along
+    const bool pushing = stroke_ms > 0 && run_y >= needs.speed * double(stroke_ms) &&
+        std::abs(run_x) <= needs.lean * run_y;
+    if (!pushing)
     {
-        due = now_ms + needs.dig_ms;
-        run_x = run_y = 0;
+        pushed = std::max(0.0, pushed - needs.fade * double(waited));
+        begin_stroke();
+        return false;
     }
-    last_move_ms = now_ms;
+    pushed += double(waited);
+    if (pushed < double(needs.push_ms))
+    {
+        return false;
+    }
+    pushed = 0;
+    spent = true;
+    return true;
 }
 
 void dig_detect_t::leave()
 {
     on_edge = false;
-    due = -1;
 }
 
 bool dig_detect_t::digging() const
 {
-    return on_edge;
+    return on_edge && !spent;
 }
 
-int64_t dig_detect_t::due_ms() const
+double dig_detect_t::pushed_ms() const
 {
-    return due;
+    return pushed;
 }
 
-bool dig_detect_t::fire(int64_t now_ms)
-{
-    if (!on_edge)
-    {
-        return false;
-    }
-    due = -1;
-    if (now_ms - last_move_ms > needs.gap_ms)
-    {
-        return false;
-    }
-    on_edge = false;
-    return true;
-}
 void rest_detect_t::enter(double x, double y, int64_t now_ms)
 {
     on_edge = true;

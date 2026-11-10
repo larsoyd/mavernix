@@ -1,4 +1,4 @@
-// tells watchers when the pointer digs at a screen's bottom edge: move for a screen
+// tells watchers when the pointer pushes against a screen's bottom edge: move for a screen
 // the dock is not on, reveal for its own under a full screen window, as on OS X 10.9
 
 #include <algorithm>
@@ -17,6 +17,7 @@
 #include <wayfire/signal-definitions.hpp>
 #include <wayfire/toplevel-view.hpp>
 #include <wayfire/util.hpp>
+#include <wayfire/util/log.hpp>
 #include <wayfire/view.hpp>
 #include <wayfire/workspace-set.hpp>
 
@@ -52,6 +53,8 @@ class plugin_t : public wf::plugin_interface_t
     rest_detect_t rest;
     // the edge the pointer is on, kept until it leaves the row
     edge_t at_edge;
+    // the edge the pushes so far were at, another edge starts from nothing
+    edge_t pushed_edge;
     wf::wl_timer<false> timer;
     int buttons_down = 0;
 
@@ -122,25 +125,32 @@ class plugin_t : public wf::plugin_interface_t
         rest.leave();
     }
 
+    // only a rest comes due without a move
     void keep_time()
     {
-        const int64_t due = at_edge.by_rest ? rest.due_ms() : detect.due_ms();
-        if (due >= 0)
+        if (at_edge.by_rest && rest.due_ms() >= 0)
         {
-            const int64_t wait = std::max<int64_t>(due - wf::get_current_time(), 0);
-            timer.set_timeout(uint32_t(wait), [this] { fire(); });
+            const int64_t wait = std::max<int64_t>(rest.due_ms() - wf::get_current_time(), 0);
+            timer.set_timeout(uint32_t(wait), [this] {
+                if (rest.fire())
+                {
+                    tell();
+                }
+            });
         }
     }
 
-    void fire()
+    void tell()
     {
-        const bool through = at_edge.by_rest ? rest.fire() : detect.fire(wf::get_current_time());
-        keep_time();
+        const char *by = at_edge.by_rest ? "rest" : "push";
         // a held button is a drag or a press, not a dig
-        if (!through || buttons_down > 0)
+        if (buttons_down > 0)
         {
+            LOGI("[dock-dig] refused: button held output=", at_edge.output, " kind=", at_edge.kind, " by=", by);
             return;
         }
+        LOGI("[dock-dig] dug output=", at_edge.output, " kind=", at_edge.kind, " by=", by,
+            " watchers=", watchers.size());
         wf::json_t event;
         event["event"] = EVENT;
         event["output"] = at_edge.output;
@@ -170,6 +180,11 @@ class plugin_t : public wf::plugin_interface_t
         }
         if (!(edge == at_edge))
         {
+            if (!(edge == pushed_edge))
+            {
+                detect = dig_detect_t();
+                pushed_edge = edge;
+            }
             at_edge = edge;
             edge.by_rest ? rest.enter(at.x, at.y, now) : detect.enter(now);
         }
@@ -177,9 +192,9 @@ class plugin_t : public wf::plugin_interface_t
         {
             rest.move(at.x, at.y, now);
         }
-        else
+        else if (detect.move(signal->event->delta_x, signal->event->delta_y, now))
         {
-            detect.move(signal->event->delta_x, signal->event->delta_y, now);
+            tell();
         }
         keep_time();
     };
@@ -205,6 +220,8 @@ class plugin_t : public wf::plugin_interface_t
         }
         dock_output = data["output"].as_string();
         leave();
+        detect = dig_detect_t();
+        pushed_edge = {};
         return wf::ipc::json_ok();
     };
 
