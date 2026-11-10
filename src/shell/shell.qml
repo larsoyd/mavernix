@@ -2,6 +2,9 @@
 // Quickshell; DESKTOP_SHELL_SETTINGS names the JSON settings file written
 // by src/session/make_shell_config.py.
 
+// qt would step animations at the first screen's refresh rate, this steps them per drawn frame
+//@ pragma Env QSG_USE_SIMPLE_ANIMATION_DRIVER=1
+
 import QtQuick
 import Quickshell
 import Quickshell.Io

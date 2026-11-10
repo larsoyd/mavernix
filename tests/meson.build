@@ -222,6 +222,12 @@ test(
 )
 
 test(
+    'shell-frame-steps',
+    python,
+    args: [files('test_shell_frame_steps.py')],
+)
+
+test(
     'cursors',
     python,
     args: [files('test_cursors.py')],
