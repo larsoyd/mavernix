@@ -371,12 +371,17 @@ class simple_decoration_node_t : public wf::scene::node_t, public wf::pointer_in
         using rim_part_t = wf::decor::decoration_theme_t::rim_part_t;
         const double rim = RIM_WIDTH;
         const double corner_height = theme.get_rim_corner_height();
+        const double bottom_corner_height = theme.get_rim_bottom_corner_height();
+        // a window shorter than both corners has no room for a rim and its sides would get a negative length
+        if (size.height < corner_height + bottom_corner_height)
+        {
+            return;
+        }
 
         wf::geometry_t top{origin.x - rim, origin.y - rim, size.width + 2 * rim, rim + corner_height};
         update_rim_picture(rim_end_t::TOP, top.width, top.height, data.target.scale, activated);
         data.pass->add_texture(rim_top_texture.tex.get_texture(), data.target, top, data.damage);
 
-        const double bottom_corner_height = theme.get_rim_bottom_corner_height();
         wf::geometry_t bottom{origin.x - rim, origin.y + size.height - bottom_corner_height,
             size.width + 2 * rim, bottom_corner_height + rim};
         update_rim_picture(rim_end_t::BOTTOM, bottom.width, bottom.height, data.target.scale, activated);
