@@ -62,6 +62,7 @@ class SessionTestCase(unittest.TestCase):
         paths = (SESSION_SOURCE_DIR / "paths.py.in").read_text()
         paths = paths.replace("@LIBRARY_DIR@", str(folder / "lib" / "mavernix"))
         paths = paths.replace("@DATA_DIR@", str(data))
+        paths = paths.replace("@QT_PLUGIN_DIR@", str(folder / "qt" / "plugins"))
         (folder / "paths.py").write_text(paths)
 
         self.home = folder / "home"
@@ -1948,7 +1949,7 @@ wait $shell || true
         self.assertEqual(self.libreoffice_registry(qt_theme="no"), "<oor:items>\n</oor:items>\n")
 
     def test_libreoffice_keeps_its_own_rim_when_no_theme_was_written(self):
-        self.assertEqual(self.libreoffice_registry(themed=False), "<oor:items>\n</oor:items>\n")
+        self.assertNotIn("NotebookbarColorTransparency", self.libreoffice_registry(themed=False))
 
     def test_a_nested_desktop_leaves_the_real_sessions_libreoffice_alone(self):
         self.assertEqual(self.libreoffice_registry(environment={"DESKTOP_NESTED": "1"}), "<oor:items>\n</oor:items>\n")
@@ -1963,6 +1964,36 @@ wait $shell || true
         self.assertIn("carried on", result.stdout)
         self.assertIn("configure-desktop", result.stderr)
         self.assertEqual(registry.read_bytes(), b"\xff\xfe</oor:items>")
+
+    def libreoffice_launchers(self, setup_line="write_libreoffice_launchers", **options):
+        log = self.home / "ran"
+        self.home.mkdir(parents=True, exist_ok=True)
+        setup = (f"python3() {{ echo \"$@\" >> {shlex.quote(str(log))}; return ${{FAILS:-0}}; }}\n"
+                 f"session_dir=/session\n{setup_line}")
+        result = self.session_functions("write_libreoffice_launchers", setup=setup, **options)
+        return result, log.read_text() if log.exists() else ""
+
+    def test_libreoffice_gets_its_launchers_in_the_sessions_folder_of_programs(self):
+        _, ran = self.libreoffice_launchers()
+        self.assertEqual(ran, f"/session/write_libreoffice_launchers.py {self.home / 'state' / 'bin'}\n")
+
+    def test_libreoffice_loses_its_launchers_when_its_own_file_dialog_is_wanted(self):
+        _, ran = self.libreoffice_launchers(qt_theme="no")
+        self.assertEqual(ran, f"/session/write_libreoffice_launchers.py {self.home / 'state' / 'bin'} --off\n")
+
+    def test_launchers_that_cannot_be_written_do_not_stop_the_login(self):
+        result, _ = self.libreoffice_launchers("set -e\nwrite_libreoffice_launchers\necho carried on", environment={"FAILS": "1"})
+        self.assertIn("carried on", result.stdout)
+        self.assertIn("configure-desktop", result.stderr)
+
+    def test_libreoffice_keeps_its_colour_icons_only_while_it_has_its_launchers(self):
+        self.assertIn('oor:name="SymbolStyle" oor:op="fuse"><value>elementary', self.libreoffice_registry())
+        self.assertNotIn("SymbolStyle", self.libreoffice_registry(qt_theme="no"))
+
+    def test_setting_the_desktop_up_writes_libreoffices_launchers(self):
+        source = (SESSION_SOURCE_DIR / "configure-desktop").read_text()
+        steps = re.search(r"^configure_everything\(\) \{(.*?)^\}", source, re.M | re.S)[1].split()
+        self.assertIn("write_libreoffice_launchers", steps)
 
     def test_writing_the_themes_sets_up_each_program_that_needs_its_own_step(self):
         steps = ("link_kvantum_theme", "link_qt6ct_settings", "link_mozilla_style", "link_gimp_style", "link_libreoffice_style")
@@ -3262,6 +3293,95 @@ class TestLibreOfficeBarRim(SessionTestCase):
         self.link("/run/theme")
         self.assertTrue(registry.is_symlink())
         self.assertIn(self.rim(255), kept.read_text())
+
+    ICONS = '<item oor:path="/org.openoffice.Office.Common/Misc"><prop oor:name="SymbolStyle" oor:op="fuse"><value>elementary</value></prop></item>\n'
+
+    def test_colour_icons_come_and_go_apart_from_the_rim(self):
+        registry = self.profile("")
+        self.link("--colour-icons")
+        self.assertEqual(registry.read_text(), self.HEAD + self.ICONS + self.TAIL)
+        self.link("/run/theme", "--colour-icons")
+        self.link("/run/theme", "--colour-icons")
+        self.assertEqual(registry.read_text(), self.HEAD + self.ICONS + self.rim(255) + self.TAIL)
+        self.link("/run/theme")
+        self.assertEqual(registry.read_text(), self.HEAD + self.rim(255) + self.TAIL)
+
+    def test_icons_the_user_chose_stay(self):
+        registry = self.profile(self.OTHER)
+        self.link("--colour-icons")
+        self.link()
+        self.assertEqual(registry.read_text(), self.HEAD + self.OTHER + self.TAIL)
+
+
+class TestLibreOfficeLaunchers(SessionTestCase):
+    def setUp(self):
+        super().setUp()
+        self.program = self.home / "opt/libreoffice/program"
+        self.program.mkdir(parents=True)
+        soffice = self.program / "soffice"
+        soffice.write_text('#!/bin/sh\necho "desktop=$OOO_FORCE_DESKTOP theme=$QT_QPA_PLATFORMTHEME"\n'
+                           'printf "<%s>" "$@"\nexit 7\n')
+        soffice.chmod(0o755)
+        (self.program / "libvclplug_kf6lo.so").touch()
+        self.system = self.home / "usr/local bin"
+        self.system.mkdir(parents=True)
+        (self.system / "libreoffice").symlink_to(soffice)
+        writer = self.system / "lowriter"
+        writer.write_text(f'#!/bin/sh\n{shlex.quote(str(soffice))} --writer "$@"\n')
+        writer.chmod(0o755)
+        self.plugins = Path(self.folder.name) / "qt/plugins"
+        (self.plugins / "platformthemes").mkdir(parents=True)
+        (self.plugins / "platformthemes/KDEPlasmaPlatformTheme6.so").touch()
+        self.bin = self.home / "state/bin"
+        self.path = f"{self.bin}:{self.system}"
+
+    def write(self, *arguments):
+        return self.run_script("write_libreoffice_launchers.py", self.bin, *arguments, environment={"PATH": self.path})
+
+    def start(self, name, *arguments):
+        return subprocess.run([name, *arguments], env={"PATH": self.path}, capture_output=True, text=True, timeout=10)
+
+    def launchers(self):
+        return sorted(os.listdir(self.bin)) if self.bin.exists() else []
+
+    def test_each_installed_name_starts_it_as_a_plasma_program(self):
+        self.write()
+        self.write()
+        self.assertEqual(self.launchers(), ["libreoffice", "lowriter"])
+        started = self.start("libreoffice", "--calc", "two words.ods", "")
+        self.assertEqual(started.stdout, "desktop=plasma6 theme=kde\n<--calc><two words.ods><>")
+        self.assertEqual(started.returncode, 7)
+        self.assertEqual(self.start("lowriter").stdout, "desktop=plasma6 theme=kde\n<--writer>")
+
+    def test_without_its_kde_plugin_it_starts_as_before(self):
+        self.write()
+        (self.program / "libvclplug_kf6lo.so").unlink()
+        self.write()
+        self.assertEqual(self.launchers(), [])
+        self.assertEqual(self.start("libreoffice").stdout, "desktop= theme=\n<>")
+
+    def test_without_kdes_part_for_qt_programs_it_starts_as_before(self):
+        (self.plugins / "platformthemes/KDEPlasmaPlatformTheme6.so").unlink()
+        self.write()
+        self.assertEqual(self.launchers(), [])
+
+    def test_switched_off_only_its_own_launchers_go(self):
+        self.write()
+        own = self.bin / "lowriter"
+        own.write_text("#!/bin/sh\necho mine\n")
+        other = self.bin / "mavernix-sound"
+        other.write_text("sound")
+        self.write("--off")
+        self.assertEqual(self.launchers(), ["lowriter", "mavernix-sound"])
+        self.assertEqual(own.read_text(), "#!/bin/sh\necho mine\n")
+
+    def test_a_program_of_the_users_own_under_that_name_is_kept(self):
+        self.bin.mkdir(parents=True)
+        own = self.bin / "libreoffice"
+        own.write_text("#!/bin/sh\necho mine\n")
+        self.write()
+        self.assertEqual(own.read_text(), "#!/bin/sh\necho mine\n")
+        self.assertEqual(self.launchers(), ["libreoffice", "lowriter"])
 
 
 class TestReaperMenu(SessionTestCase):

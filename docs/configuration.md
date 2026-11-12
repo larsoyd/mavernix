@@ -269,6 +269,20 @@ Icons you gave single applications in App Icons & Names still win in the dock. C
 KDE programs such as Dolphin read their icon theme from `kdeglobals`. If you ever used Plasma, yours in `~/.config/kdeglobals` names Plasma's icon theme. So the session's own `kdeglobals` locks the choice (`Theme[$i]` in `[Icons]`), and KDE programs show the same icons as other programs. That lock only applies inside this session; Plasma keeps its own choice.
 
 
+## LibreOffice's file dialog
+
+LibreOffice asks KDE for its file dialog only when it runs as a Plasma program. Otherwise it is a GTK program that builds a file dialog of its own, which the desktop cannot replace. So the session starts it as a Plasma program: Open and Save show the file dialog other programs show, with LibreOffice's own choices below it, such as Save with password. LibreOffice is then drawn by Qt in the theme's look, and its menus still go to the menu bar.
+
+```toml
+[libreoffice]
+kde_file_dialog = false
+```
+
+With `false` it is a GTK program again. Either way it takes effect when LibreOffice next starts after `mavernix-reload` or a login.
+
+The session does this with small launchers for LibreOffice's commands (`libreoffice`, `soffice`, `lowriter` and the others) in its own folder of programs, ahead of the system's on the `PATH`. They set `OOO_FORCE_DESKTOP=plasma6` and `QT_QPA_PLATFORMTHEME=kde` for LibreOffice alone. Without LibreOffice's KDE plugin or KDE's platform theme for Qt (`plasma-integration`) no launcher is written. As a Plasma program LibreOffice would also change to Breeze's icons, so each profile keeps the icons it shows as a GTK program (`elementary`) unless you chose an icon style yourself.
+
+
 ## Steam's window buttons
 
 Steam draws its own close, minimize and zoom buttons at the right of its windows. With `[steam] window_buttons = true`, they take the theme's look and move to the left, in the Mac's order, in the main window, the friends list, chats and Steam's other windows:

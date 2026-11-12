@@ -368,8 +368,24 @@ link_libreoffice_style() {
     if [[ -f "$app_theme/share/themes/DesktopTheme/gtk-3.0/gtk.css" && $(config_flag gtk use_theme yes) == yes ]]; then
         arguments=("$app_theme/share/themes/DesktopTheme")
     fi
+    # As a Plasma program it would change to Breeze's icons.
+    if [[ $(config_flag libreoffice kde_file_dialog yes) == yes ]]; then
+        arguments+=(--colour-icons)
+    fi
     if ! python3 "$session_dir/link_libreoffice_style.py" "${arguments[@]}"; then
-        echo "configure-desktop: could not set the rim of LibreOffice's tabbed bar (message above); the desktop starts anyway." >&2
+        echo "configure-desktop: could not set LibreOffice's look in its profile (message above); the desktop starts anyway." >&2
+    fi
+}
+
+# LibreOffice shows KDE's file dialog only when it runs as a Plasma program,
+# so its commands get launchers ahead of the system's on the PATH.
+write_libreoffice_launchers() {
+    local arguments=("$state_dir/bin")
+    if [[ $(config_flag libreoffice kde_file_dialog yes) != yes ]]; then
+        arguments+=(--off)
+    fi
+    if ! python3 "$session_dir/write_libreoffice_launchers.py" "${arguments[@]}"; then
+        echo "configure-desktop: could not write LibreOffice's launchers (message above); it keeps its own file dialog." >&2
     fi
 }
 
@@ -439,6 +455,7 @@ configure_everything() {
     write_shell_settings
     write_compositor_settings
     write_application_themes
+    write_libreoffice_launchers
     link_reaper_menu
     write_interface_settings
     write_default_programs

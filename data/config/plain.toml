@@ -358,6 +358,13 @@ next_desktop = "<ctrl> <alt> KEY_RIGHT"
 # window_to_previous_desktop = "<ctrl> <shift> KEY_LEFT"
 # window_to_next_desktop = "<ctrl> <shift> KEY_RIGHT"
 
+[libreoffice]
+# Start LibreOffice as a KDE program, so that Open and Save show the same
+# file dialog as other programs, with LibreOffice's own choices below it
+# (from its next start). It is then drawn by Qt. With false it is a GTK
+# program again, with GTK's file dialog.
+kde_file_dialog = true
+
 [steam]
 # Steam's window buttons in the theme's look, at the left as on a Mac, from
 # the next login and Steam's next start. It patches one of Steam's own

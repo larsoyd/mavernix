@@ -6,6 +6,8 @@ from pathlib import Path
 LIBRARY_DIR = Path("@LIBRARY_DIR@")
 # Everything that is read, not run: the shell's QML, configs, themes, sounds.
 DATA_DIR = Path("@DATA_DIR@")
+# Where Qt programs find their plugins, such as a platform theme.
+QT_PLUGIN_DIR = Path("@QT_PLUGIN_DIR@")
 
 SESSION_DIR = LIBRARY_DIR / "session"
 SHELL_DIR = DATA_DIR / "shell"

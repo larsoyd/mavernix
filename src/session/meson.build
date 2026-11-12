@@ -6,6 +6,7 @@ session_dir = mavernix_libdir / 'session'
 paths = configuration_data()
 paths.set('LIBRARY_DIR', get_option('prefix') / mavernix_libdir)
 paths.set('DATA_DIR', get_option('prefix') / mavernix_datadir)
+paths.set('QT_PLUGIN_DIR', qt_widgets.get_variable(pkgconfig: 'libdir', configtool: 'QT_INSTALL_LIBS') / 'qt6' / 'plugins')
 configure_file(input: 'paths.sh.in', output: 'paths.sh', configuration: paths,
     install_dir: session_dir)
 configure_file(input: 'paths.py.in', output: 'paths.py', configuration: paths,
@@ -46,6 +47,7 @@ install_data(
     'toml_text.py',
     'user_choices.py',
     'write_interface_settings.py',
+    'write_libreoffice_launchers.py',
     'run_xsettings.py',
     'steam_window_buttons.py',
     'kded5rc',
