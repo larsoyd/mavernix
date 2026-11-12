@@ -846,6 +846,19 @@ def folder_name(size, scale):
     return f"{size}x{size}@{scale}"
 
 
+def write_program_art(theme_directory):
+    """Copies the drawn program icons, named NAME-SIZE.png, into the theme
+    and returns the sizes written."""
+    written = set()
+    for artwork in sorted(Path(__file__).with_name("program-art").glob("*.png")):
+        name, size = artwork.stem.rsplit("-", 1)
+        target = theme_directory / folder_name(int(size), 1) / "apps" / f"{name}.png"
+        target.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(artwork, target)
+        written.add((int(size), 1))
+    return written
+
+
 def index_text(contexts_by_size):
     """The theme's index file; contexts_by_size is {(size, scale): contexts}."""
     directories = []
@@ -932,6 +945,8 @@ def main():
                 contexts_by_size.setdefault((SIDE_BAR_SIZE, scale), set()).add(context)
 
     emblem_folders = write_emblem_folders(theme_directory)
+    for size_and_scale in write_program_art(theme_directory):
+        contexts_by_size.setdefault(size_and_scale, set()).add("apps")
     for size_and_scale in write_action_icons(arguments.work, theme_directory, ACTION_TEMPLATES, ACTION_PICTURES):
         contexts_by_size.setdefault(size_and_scale, set()).add("actions")
     for size_and_scale in write_side_bar_emblems(theme_directory):

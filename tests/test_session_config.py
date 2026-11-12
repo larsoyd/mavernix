@@ -930,6 +930,25 @@ class TestSeaLionIcons(unittest.TestCase):
             self.assertEqual(link.read_bytes(), b"picture")
         self.assertFalse(os.path.lexists(theme / "32x32" / "mimetypes" / "text-x-python.png"))
 
+    def test_office_art_becomes_a_program_icon_at_every_size(self):
+        from PIL import Image
+        programs = ("writer", "calc", "impress", "draw", "math", "base", "startcenter")
+        with tempfile.TemporaryDirectory() as folder:
+            theme = Path(folder)
+            written = self.make_icons.write_program_art(theme)
+            self.assertEqual(written, {(size, 1) for size in self.make_icons.SIZES})
+            seen = set()
+            for name in programs:
+                for size in self.make_icons.SIZES:
+                    picture = theme / f"{size}x{size}" / "apps" / f"libreoffice-{name}.png"
+                    self.assertTrue(picture.is_file(), picture)
+                    with self.subTest(picture=picture.name, size=size), Image.open(picture) as icon:
+                        self.assertEqual((icon.size, icon.mode), ((size, size), "RGBA"))
+                        drawn = sum(icon.getchannel("A").histogram()[129:])
+                        self.assertGreater(drawn, size * size // 5)
+                    seen.add(picture.read_bytes())
+            self.assertEqual(len(seen), len(programs) * len(self.make_icons.SIZES))
+
 
 class TestRestoredInstaller(unittest.TestCase):
     """A disk image of a restored installer volume: the base system itself, its
