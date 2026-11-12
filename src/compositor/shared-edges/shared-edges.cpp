@@ -159,7 +159,9 @@ class seam_strip_node_t : public wf::scene::node_t, public wf::pointer_interacti
 
     void handle_pointer_button(const wlr_pointer_button_event& event) override
     {
-        const auto hit = seam_at(output, wf::get_core().get_cursor_position());
+        const auto origin = wf::origin(output->get_layout_geometry());
+        const auto pointer = wf::get_core().get_cursor_position();
+        const auto hit = seam_at(output, {pointer.x - origin.x, pointer.y - origin.y});
         if (hit && (event.state == WL_POINTER_BUTTON_STATE_PRESSED) && (event.button == BTN_LEFT))
         {
             pressed(*hit);
@@ -430,22 +432,20 @@ class shared_edges_t : public wf::plugin_interface_t,
     };
 
     // asks the workspace so a popup or window above the seam keeps its clicks
-    std::optional<seam_strip_node_t::hit_t> seam_at(wf::output_t* on, wf::pointf_t at)
+    std::optional<seam_strip_node_t::hit_t> seam_at(wf::output_t* on, wf::pointf_t local)
     {
         if (!enabled)
         {
             return {};
         }
 
-        const auto under = on->wset()->get_node()->find_node_at(at);
+        const auto under = on->wset()->get_node()->find_node_at(local);
         wayfire_toplevel_view view = under ? wf::toplevel_cast(wf::node_to_view(under->node.get())) : nullptr;
         if (!view || !is_tiled_and_resizable(view))
         {
             return {};
         }
 
-        const auto origin = wf::origin(on->get_layout_geometry());
-        const wf::pointf_t local = {at.x - origin.x, at.y - origin.y};
         const auto box = view->toplevel()->pending().geometry;
         const std::pair<uint32_t, double> distances[] = {
             {WLR_EDGE_RIGHT, box.x + box.width - local.x},
