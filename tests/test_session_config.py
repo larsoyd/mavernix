@@ -2493,6 +2493,57 @@ class TestGtkWindowButtons(SessionTestCase):
             self.assertIn("assets/window-close-normal.png", (gtk / "gtk.css").read_text())
 
 
+class TestGtkDialogButtons(SessionTestCase):
+    BUTTON = {"slice": [5, 20, 5, 20], "normal": "box.png", "pressed": "pressed.png", "disabled": "off.png",
+              "default": "default.png", "default_pressed": "default-pressed.png"}
+
+    def setUp(self):
+        super().setUp()
+        sys.path[:0] = [self.folder.name, str(SESSION_SOURCE_DIR)]
+        try:
+            import make_app_theme
+        finally:
+            del sys.path[:2]
+        self.make = make_app_theme
+
+    def rules(self, controls):
+        css, _ = self.make.gtk_css({"controls": controls}, self.home, "gtk-3.0")
+        return {selector.strip(): body for selector, body in re.findall(r"([^{}]+)\{([^}]*)\}", css)}
+
+    def body_for(self, rules, selector):
+        found = [body for selectors, body in rules.items() if selector in [s.strip() for s in selectors.split(",")]]
+        self.assertEqual(len(found), 1, f"selector={selector!r} rules={len(found)}")
+        return found[0]
+
+    def test_a_destructive_button_is_drawn_as_a_plain_one_in_every_state_stock_colours_red(self):
+        rules = self.rules({"button": self.BUTTON})
+        for state in ("", ":hover", ":backdrop"):
+            body = self.body_for(rules, f"button.text-button.destructive-action{state}")
+            self.assertIn('url("assets/box.png")', body)
+            self.assertIn("color: #000000;", body)
+            self.assertIn("text-shadow: none;", body)
+        self.assertIn('url("assets/pressed.png")', self.body_for(rules, "button.text-button.destructive-action:active"))
+
+    def test_alert_buttons_keep_the_whole_picture_where_stock_joins_them_into_a_strip(self):
+        rules = self.rules({"button": self.BUTTON})
+        box = "messagedialog.csd .dialog-action-area button.text-button"
+        for place in ("", ":first-child", ":last-child"):
+            body = self.body_for(rules, box + place)
+            self.assertIn("padding: 0;", body)
+            self.assertIn("border-style: solid;", body)
+        self.assertIn("margin:", self.body_for(rules, "messagedialog.csd .dialog-action-area"))
+
+    def test_a_theme_with_no_button_picture_leaves_stock_alerts_alone(self):
+        self.assertFalse([s for s in self.rules({"highlight_color": "#123456"}) if "messagedialog" in s or "destructive" in s])
+
+    def test_the_selection_fill_stays_off_the_chosen_tab(self):
+        rules = self.rules({"highlight_color": "#123456", "text_color": "#222222"})
+        body = self.body_for(rules, "notebook > header tab:selected")
+        self.assertIn("background-color: transparent;", body)
+        self.assertIn("color: #222222;", body)
+        self.assertFalse([s for s in self.rules({}) if "tab:selected" in s])
+
+
 class TitlebarStyleCase(SessionTestCase):
     def picture_theme(self, buttons_table):
         from PIL import Image

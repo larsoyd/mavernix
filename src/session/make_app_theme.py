@@ -797,6 +797,9 @@ def gtk_css(theme, theme_directory, version):
         lines += [
             f"selection, *:selected {{ background-color: {controls['highlight_color']}; color: {selected_text}; }}",
             "",
+            # some programs draw the chosen tab as selected, and stock marks it with a line
+            f"notebook > header tab:selected {{ background-color: transparent; color: {controls.get('text_color', '#000000')}; }}",
+            "",
         ]
 
     def stretching_rule(selector, file_name, slice_edges, more=()):
@@ -959,6 +962,17 @@ def gtk_css(theme, theme_directory, version):
         lines += button_rule("button.text-button.suggested-action, button.text-button.default", "default")
         lines += button_rule("button.text-button.suggested-action:active, button.text-button.default:active",
             "default_pressed")
+        # stock paints these red in rules that outrank the plain button's
+        warning = "button.text-button.destructive-action"
+        lines += stretching_rule(f"{warning}, {warning}:hover, {warning}:backdrop", button["normal"], button["slice"],
+                                 ["padding: 0;", f"color: {controls.get('text_color', '#000000')};", "text-shadow: none;"])
+        lines += button_rule(f"{warning}:active", "pressed")
+        # stock joins an alert's buttons into one strip, which cuts the pictures
+        alert = "messagedialog.csd .dialog-action-area"
+        lines += [f"{alert} {{ margin: 0 12px 12px 12px; }}",
+                  f"{alert} button.text-button, {alert} button.text-button:first-child, {alert} button.text-button:last-child {{",
+                  "  padding: 0; border-style: solid; margin: 0 4px;",
+                  "}"]
         lines.append("")
 
     # GTK 3 calls the boxes "check" and "radio"; GTK 4 kept the names.
