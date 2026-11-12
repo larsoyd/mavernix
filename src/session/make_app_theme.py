@@ -771,6 +771,24 @@ def csd_frame_lines(theme):
     ]
 
 
+def side_tab_lines():
+    """Tabs down a side: the chosen one is a box around its picture and label, where stock draws a line beside it."""
+    lines = []
+    for side in ("left", "right"):
+        header = f"notebook > header.{side}"
+        lines += [
+            f"{header} tabs tab {{ margin-left: 4px; margin-right: 4px; outline-offset: -2px; border-radius: 4px; }}",
+            f"{header} > tabs > tab:hover {{ box-shadow: none; background-color: alpha(currentColor, 0.05); }}",
+            f"{header} > tabs > tab:checked {{",
+            "  box-shadow: inset 0 1px 2px alpha(currentColor, 0.18); background-color: alpha(currentColor, 0.12);",
+            "}",
+            # some programs pin the tab's own padding, so the room goes inside it
+            f"{header} tab > box > image:first-child {{ margin-top: 6px; }}",
+            f"{header} tab > box > label:last-child {{ margin-bottom: 6px; }}",
+        ]
+    return lines + [""]
+
+
 def gtk_css(theme, theme_directory, version):
     """The CSS for one GTK version; returns (text, middles for cut_middles())."""
     controls = theme["controls"]
@@ -840,6 +858,7 @@ def gtk_css(theme, theme_directory, version):
 
     # [controls.tabs] is Kvantum-only: one border image per tab left gaps
     # and stray edges in GTK, so GTK keeps its stock tabs.
+    lines += side_tab_lines()
 
     popup_button = controls.get("popup_button")
     if popup_button is not None:

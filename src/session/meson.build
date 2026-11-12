@@ -28,6 +28,7 @@ install_data(
     'check_theme.py',
     'extensions.py',
     'link_gimp_style.py',
+    'link_libreoffice_style.py',
     'link_mozilla_style.py',
     'link_reaper_menu.py',
     'export_greeter_look.py',

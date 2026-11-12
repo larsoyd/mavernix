@@ -114,6 +114,7 @@ write_application_themes() {
     link_qt6ct_settings
     link_mozilla_style
     link_gimp_style
+    link_libreoffice_style
 }
 
 # The theme's values into the session's dconf database; open GTK programs
@@ -355,6 +356,20 @@ link_reaper_menu() {
     fi
     if ! python3 "$session_dir/link_reaper_menu.py" "${arguments[@]}"; then
         echo "configure-desktop: could not set up REAPER's plugins (message above); the desktop starts anyway." >&2
+    fi
+}
+
+# LibreOffice tints the rim of its tabbed bar per program, which no GTK theme reaches.
+link_libreoffice_style() {
+    if [[ -n "${DESKTOP_NESTED:-}" ]]; then
+        return 0
+    fi
+    local arguments=()
+    if [[ -f "$app_theme/share/themes/DesktopTheme/gtk-3.0/gtk.css" && $(config_flag gtk use_theme yes) == yes ]]; then
+        arguments=("$app_theme/share/themes/DesktopTheme")
+    fi
+    if ! python3 "$session_dir/link_libreoffice_style.py" "${arguments[@]}"; then
+        echo "configure-desktop: could not set the rim of LibreOffice's tabbed bar (message above); the desktop starts anyway." >&2
     fi
 }
 

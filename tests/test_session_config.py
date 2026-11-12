@@ -1932,6 +1932,52 @@ wait $shell || true
         self.linked_mozilla_profile(qt_theme="no")
         self.assertFalse(link.is_symlink())
 
+    def libreoffice_registry(self, themed=True, **options):
+        if themed:
+            self.run_script("make_app_theme.py", THEMES_DIR / "plain", self.home / "app-theme")
+        registry = self.home / ".config/libreoffice/4/user/registrymodifications.xcu"
+        registry.parent.mkdir(parents=True, exist_ok=True)
+        if not registry.exists():
+            registry.write_text("<oor:items>\n</oor:items>\n")
+        setup = f"session_dir={shlex.quote(str(SESSION_SOURCE_DIR))}\nlink_libreoffice_style"
+        self.session_functions("link_libreoffice_style", setup=setup, **options)
+        return registry.read_text()
+
+    def test_libreoffice_loses_its_tinted_rim_with_the_written_theme_and_gets_it_back_without(self):
+        self.assertIn("NotebookbarColorTransparency", self.libreoffice_registry())
+        self.assertEqual(self.libreoffice_registry(qt_theme="no"), "<oor:items>\n</oor:items>\n")
+
+    def test_libreoffice_keeps_its_own_rim_when_no_theme_was_written(self):
+        self.assertEqual(self.libreoffice_registry(themed=False), "<oor:items>\n</oor:items>\n")
+
+    def test_a_nested_desktop_leaves_the_real_sessions_libreoffice_alone(self):
+        self.assertEqual(self.libreoffice_registry(environment={"DESKTOP_NESTED": "1"}), "<oor:items>\n</oor:items>\n")
+
+    def test_a_libreoffice_registry_that_cannot_be_read_does_not_stop_the_login(self):
+        self.run_script("make_app_theme.py", THEMES_DIR / "plain", self.home / "app-theme")
+        registry = self.home / ".config/libreoffice/4/user/registrymodifications.xcu"
+        registry.parent.mkdir(parents=True)
+        registry.write_bytes(b"\xff\xfe</oor:items>")
+        setup = f"set -e\nsession_dir={shlex.quote(str(SESSION_SOURCE_DIR))}\nlink_libreoffice_style\necho carried on"
+        result = self.session_functions("link_libreoffice_style", setup=setup)
+        self.assertIn("carried on", result.stdout)
+        self.assertIn("configure-desktop", result.stderr)
+        self.assertEqual(registry.read_bytes(), b"\xff\xfe</oor:items>")
+
+    def test_writing_the_themes_sets_up_each_program_that_needs_its_own_step(self):
+        steps = ("link_kvantum_theme", "link_qt6ct_settings", "link_mozilla_style", "link_gimp_style", "link_libreoffice_style")
+        stubs = "".join(f"{step}() {{ echo {step}; }}\n" for step in steps)
+        self.home.mkdir(parents=True)
+        setup = f"python3() {{ :; }}\n{stubs}session_dir=/nowhere\nwrite_application_themes"
+        result = self.session_functions("write_application_themes", setup=setup)
+        self.assertEqual(result.stdout.split(), list(steps))
+
+    def test_every_script_the_login_runs_is_installed(self):
+        run = set(re.findall(r'\$session_dir/(\w+\.py)', (SESSION_SOURCE_DIR / "configure-desktop").read_text()))
+        build = (SESSION_SOURCE_DIR / "meson.build").read_text()
+        self.assertIn("link_libreoffice_style.py", run)
+        self.assertEqual([name for name in sorted(run) if f"'{name}'" not in build], [])
+
     def linked_reaper(self, built=True, **options):
         folder = self.home / ".config/REAPER"
         folder.mkdir(parents=True, exist_ok=True)
@@ -2543,6 +2589,21 @@ class TestGtkDialogButtons(SessionTestCase):
         self.assertIn("color: #222222;", body)
         self.assertFalse([s for s in self.rules({}) if "tab:selected" in s])
 
+    def test_a_chosen_side_tab_is_a_box_around_its_picture_and_label(self):
+        rules = self.rules({})
+        for side in ("left", "right"):
+            chosen = self.body_for(rules, f"notebook > header.{side} > tabs > tab:checked")
+            self.assertIn("background-color: alpha(currentColor, 0.12);", chosen)
+            self.assertIn("box-shadow: inset 0 1px 2px alpha(currentColor, 0.18);", chosen)
+            self.assertIn("box-shadow: none;", self.body_for(rules, f"notebook > header.{side} > tabs > tab:hover"))
+            tab = self.body_for(rules, f"notebook > header.{side} tabs tab")
+            self.assertIn("outline-offset: -2px;", tab)
+            self.assertIn("margin-left: 4px;", tab)
+            self.assertIn("margin-right: 4px;", tab)
+            self.assertIn("margin-top: 6px;", self.body_for(rules, f"notebook > header.{side} tab > box > image:first-child"))
+            self.assertIn("margin-bottom: 6px;", self.body_for(rules, f"notebook > header.{side} tab > box > label:last-child"))
+        self.assertFalse([s for s in rules if "header.top" in s or "header.bottom" in s])
+
 
 class TitlebarStyleCase(SessionTestCase):
     def picture_theme(self, buttons_table):
@@ -3143,6 +3204,64 @@ class TestGimpTitlebar(SessionTestCase):
         (folder / "mavernix").mkdir()
         self.link("/run/theme")
         self.assertFalse((folder / "gimp.css").exists())
+
+
+class TestLibreOfficeBarRim(SessionTestCase):
+    HEAD = '<?xml version="1.0" encoding="UTF-8"?>\n<oor:items xmlns:oor="http://openoffice.org/2001/registry">\n'
+    OTHER = '<item oor:path="/org.openoffice.Office.Common/Misc"><prop oor:name="SymbolStyle" oor:op="fuse"><value>auto</value></prop></item>\n'
+    TAIL = "</oor:items>\n"
+
+    def rim(self, value):
+        return ('<item oor:path="/org.openoffice.Office.Common/Misc"><prop oor:name="NotebookbarColorTransparency" oor:op="fuse">'
+                f"<value>{value}</value></prop></item>\n")
+
+    def profile(self, body, version="4"):
+        folder = self.home / ".config/libreoffice" / version / "user"
+        folder.mkdir(parents=True)
+        registry = folder / "registrymodifications.xcu"
+        registry.write_text(self.HEAD + body + self.TAIL)
+        return registry
+
+    def link(self, *theme):
+        return self.run_script("link_libreoffice_style.py", *theme)
+
+    def test_every_profile_gets_a_bar_rim_in_the_dialog_colour(self):
+        registries = [self.profile(self.OTHER, "4"), self.profile("", "5")]
+        self.link("/run/theme")
+        self.link("/run/theme")
+        self.assertEqual(registries[0].read_text(), self.HEAD + self.OTHER + self.rim(255) + self.TAIL)
+        self.assertEqual(registries[1].read_text(), self.HEAD + self.rim(255) + self.TAIL)
+
+    def test_a_value_the_user_chose_stays(self):
+        registry = self.profile(self.rim(40) + self.OTHER)
+        self.link("/run/theme")
+        self.assertEqual(registry.read_text(), self.HEAD + self.rim(40) + self.OTHER + self.TAIL)
+        self.link()
+        self.assertEqual(registry.read_text(), self.HEAD + self.rim(40) + self.OTHER + self.TAIL)
+
+    def test_leaving_the_theme_gives_the_program_its_own_rim_back(self):
+        registry = self.profile(self.OTHER)
+        self.link("/run/theme")
+        self.link()
+        self.assertEqual(registry.read_text(), self.HEAD + self.OTHER + self.TAIL)
+
+    def test_a_profile_never_started_and_a_file_of_another_shape_are_left_alone(self):
+        (self.home / ".config/libreoffice/4/user").mkdir(parents=True)
+        odd = self.home / ".config/libreoffice/5/user/registrymodifications.xcu"
+        odd.parent.mkdir(parents=True)
+        odd.write_text("not a registry")
+        self.link("/run/theme")
+        self.assertEqual(os.listdir(self.home / ".config/libreoffice/4/user"), [])
+        self.assertEqual(odd.read_text(), "not a registry")
+
+    def test_a_linked_registry_file_stays_a_link(self):
+        registry = self.profile(self.OTHER)
+        kept = self.home / "dotfiles.xcu"
+        registry.rename(kept)
+        registry.symlink_to(kept)
+        self.link("/run/theme")
+        self.assertTrue(registry.is_symlink())
+        self.assertIn(self.rim(255), kept.read_text())
 
 
 class TestReaperMenu(SessionTestCase):
