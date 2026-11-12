@@ -33,5 +33,6 @@ subdir('window-pictures')
 subdir('x11-settings')
 subdir('x11-windows')
 subdir('xwayland-first-buffer')
+subdir('zone-picker')
 
 subdir('dock-window-reflections')

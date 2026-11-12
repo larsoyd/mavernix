@@ -28,6 +28,11 @@ tests = {
         'include': test_sources / 'compositor/dock-dig',
         'dependencies': [],
     },
+    'zone-picker': {
+        'sources': [test_sources / 'compositor/zone-picker/zone-layout.cpp'],
+        'include': test_sources / 'compositor/zone-picker',
+        'dependencies': [],
+    },
     'shake-to-find': {
         'sources': [test_sources / 'compositor/shake-to-find/shake-detect.cpp'],
         'include': test_sources / 'compositor/shake-to-find',

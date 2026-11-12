@@ -41,7 +41,6 @@ struct snap_step
     uint32_t edges;
 };
 
-// Any `current_edges` that is not a half, a quarter or the whole screen is
-// treated like a floating window.
+// edges that are no half, quarter or whole screen count as floating, but Down restores them
 snap_step next_snap_step(uint32_t current_edges, snap_direction direction);
 } // namespace snap_keys

@@ -26,7 +26,7 @@ const place_t PLACES[] = {
     {"upper right quarter", EDGE_TOP | EDGE_RIGHT},
     {"lower left quarter", EDGE_BOTTOM | EDGE_LEFT},
     {"lower right quarter", EDGE_BOTTOM | EDGE_RIGHT},
-    // Combinations no key makes are treated as floating.
+    // combinations no key makes count as floating, but for Down
     {"left edge only", EDGE_LEFT},
     {"top and bottom only", EDGE_TOP | EDGE_BOTTOM},
 };
@@ -100,8 +100,9 @@ class TestSnapKeys : public QObject
         row("upper right quarter", {"tile upper left quarter", "nothing", "tile whole screen", "tile right half"});
         row("lower left quarter", {"nothing", "tile lower right quarter", "tile left half", "restore"});
         row("lower right quarter", {"tile lower left quarter", "nothing", "tile right half", "restore"});
-        row("left edge only", {"tile left half", "tile right half", "tile whole screen", "minimize"});
-        row("top and bottom only", {"tile left half", "tile right half", "tile whole screen", "minimize"});
+        // tiled some other way, a strip down the middle for one: Down gives the old size back
+        row("left edge only", {"tile left half", "tile right half", "tile whole screen", "restore"});
+        row("top and bottom only", {"tile left half", "tile right half", "tile whole screen", "restore"});
     }
 
     void arrow_key()

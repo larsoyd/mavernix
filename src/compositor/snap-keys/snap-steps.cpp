@@ -216,7 +216,8 @@ snap_step next_snap_step(uint32_t current_edges, snap_direction direction)
         return step_up(place);
 
     case snap_direction::DOWN:
-        return step_down(place);
+        // tiled some other way, a strip down the middle for one, it goes back to its old size
+        return (current_edges && !place.tiled) ? RESTORE : step_down(place);
     }
     return NOTHING;
 }

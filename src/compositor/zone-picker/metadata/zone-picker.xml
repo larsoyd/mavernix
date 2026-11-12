@@ -1,0 +1,86 @@
+<?xml version="1.0"?>
+<wayfire>
+	<plugin name="zone-picker">
+		<_short>Zone Picker</_short>
+		<_long>While a window is dragged toward the top of a screen a plate of layouts is offered there, and a drop on one of its zones tiles the window to that part of the screen. The plate itself is drawn by a program that asks through the control socket (method "zone-picker/watch").</_long>
+		<category>Window Management</category>
+		<option name="enabled" type="bool">
+			<_short>Enabled</_short>
+			<_long>Whether the plate is offered at all.</_long>
+			<default>true</default>
+		</option>
+		<option name="layouts" type="string">
+			<_short>Layouts</_short>
+			<_long>The layouts on the plate, split by "|". Each is a list of zones split by ";", and a zone is "name,x,y,width,height" in percent of the room windows may use.</_long>
+			<default>Left Half,0,0,50,100;Right Half,50,0,50,100|Whole Screen,0,0,100,100</default>
+		</option>
+		<option name="distance" type="int">
+			<_short>Distance</_short>
+			<_long>How many pixels below the top of the room for windows the pointer wakes the plate.</_long>
+			<default>75</default>
+			<min>1</min>
+		</option>
+		<option name="peek" type="int">
+			<_short>Peek</_short>
+			<_long>How many pixels of the plate show once it is woken. The pointer opens it there.</_long>
+			<default>30</default>
+			<min>1</min>
+		</option>
+		<option name="padding" type="int">
+			<_short>Padding</_short>
+			<_long>Pixels between the plate's rim and its layouts, and between the plate and the screen's sides.</_long>
+			<default>16</default>
+			<min>0</min>
+		</option>
+		<option name="gap" type="int">
+			<_short>Gap</_short>
+			<_long>Pixels between two layouts.</_long>
+			<default>14</default>
+			<min>0</min>
+		</option>
+		<option name="gutter" type="int">
+			<_short>Gutter</_short>
+			<_long>Pixels between two zones of one layout.</_long>
+			<default>2</default>
+			<min>0</min>
+		</option>
+		<option name="margin" type="int">
+			<_short>Margin</_short>
+			<_long>How many pixels outside the open plate the pointer may stray before it closes.</_long>
+			<default>10</default>
+			<min>0</min>
+		</option>
+		<option name="mini_share" type="double">
+			<_short>Layout width</_short>
+			<_long>How wide a layout is drawn, as a share of the screen's width.</_long>
+			<default>0.05</default>
+			<min>0.01</min>
+			<max>0.5</max>
+		</option>
+		<option name="mini_min" type="int">
+			<_short>Least layout width</_short>
+			<_long>The fewest pixels wide a layout is drawn.</_long>
+			<default>64</default>
+			<min>8</min>
+		</option>
+		<option name="mini_max" type="int">
+			<_short>Largest layout width</_short>
+			<_long>The most pixels wide a layout is drawn.</_long>
+			<default>160</default>
+			<min>8</min>
+		</option>
+		<option name="window_opacity" type="double">
+			<_short>Dragged window opacity</_short>
+			<_long>How opaque the dragged window is while the plate is open. It is drawn above the plate, so at 1 it hides the layouts under it.</_long>
+			<default>0.3</default>
+			<min>0</min>
+			<max>1</max>
+		</option>
+		<option name="window_fade_ms" type="int">
+			<_short>Dragged window fade</_short>
+			<_long>How many milliseconds the dragged window takes to turn see-through and back.</_long>
+			<default>150</default>
+			<min>0</min>
+		</option>
+	</plugin>
+</wayfire>
