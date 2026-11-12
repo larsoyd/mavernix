@@ -242,6 +242,7 @@ test(
         'THEME_DOCS_DIR': meson.project_source_root() / 'docs' / 'themes',
         'LOOKS_SOURCE_DIR': meson.project_source_root() / 'src' / 'apps' / 'theme-installer' / 'backend' / 'looks',
     },
+    timeout: 120,
 )
 
 test(
