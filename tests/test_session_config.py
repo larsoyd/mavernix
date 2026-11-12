@@ -515,9 +515,9 @@ class TestWindowAnimations(SessionTestCase):
         self.assertIn('enabled_for = type equals "toplevel"', sections[0])
         self.assertIn(["[themed-open-close]", "pop_duration = 200ms circle"], sections)
 
-        # the login cover and the dock leave the fade to other overlays
+        # the login cover, the dock and the plate of layouts leave the fade to other overlays
         self.assertIn('fade_enabled_for = type equals "overlay" & !(app_id equals "mavernix-entry")'
-                      ' & !(app_id contains "mavernix-dock")', sections[0])
+                      ' & !(app_id contains "mavernix-dock") & !(app_id equals "mavernix-zones")', sections[0])
 
         # A desktop's [window] quick_open_close_ms keeps the curve.
         make_wayfire_config.shorten_open_and_close(sections, 120)
@@ -687,6 +687,15 @@ class TestSeaLionUpdates(unittest.TestCase):
         made = tomllib.loads(self.make_theme.MENU_CLOSE_TABLE)
         self.assertNotIn("themes", self.updates[5])
         self.assertEqual(self.updates[5]["settings"]["animation.menu_close"], made["animation"]["menu_close"])
+
+    def test_older_themes_get_the_imports_plate_of_layouts(self):
+        made = tomllib.loads(self.make_theme.ZONE_PICKER_TABLE)
+        fonts = tomllib.loads(self.make_theme.FONTS_TABLE)["fonts"]
+        update = self.updates[21]
+        self.assertNotIn("themes", update)
+        self.assertEqual(update["settings"]["zone_picker"], made["zone_picker"])
+        self.assertEqual(update["settings"]["animation.zone_picker"], made["animation"]["zone_picker"])
+        self.assertEqual(update["settings"]["fonts"], {"zone_picker": fonts["zone_picker"]})
 
     def test_older_light_themes_get_the_imports_panel_edge(self):
         for start in (["#00000000"], ["#000000"]):
@@ -2340,6 +2349,92 @@ class TestPointerSize(SessionTestCase):
         settings.write_text(json.dumps({"theme": {"cursors": {"theme": "Adwaita", "size": 36}}, "config": {}}))
         self.run_script("write_interface_settings.py", settings, "--window-buttons-only")
         self.assertIn("set org.gnome.desktop.interface cursor-size 36", log.read_text().splitlines())
+
+
+class TestZonePicker(SessionTestCase):
+    def module(self):
+        sys.path[:0] = [self.folder.name, str(SESSION_SOURCE_DIR)]
+        try:
+            import make_wayfire_config
+        finally:
+            del sys.path[:2]
+        return make_wayfire_config
+
+    def refused(self, config):
+        with self.assertRaises(SystemExit) as stopped:
+            self.module().zone_picker_section(config, {})
+        return str(stopped.exception)
+
+    def test_layouts_and_looks_reach_the_plugin(self):
+        module = self.module()
+        self.assertIn("zone-picker", module.BASE_PLUGINS)
+        halves = [{"name": "Left Half", "box": [0, 0, 50, 100]}, {"name": "Right Half", "box": [50, 0, 50, 100]}]
+        thirds = [{"name": "Middle Third", "box": [33.3333, 0, 33.3334, 100]}]
+        config = {"window": {"snap_to_edges": True, "zone_layouts": [halves, thirds], "zone_picker_distance": 90}}
+        theme = {"zone_picker": {"padding": 20, "gap": 12, "gutter": 4, "peek": 24, "margin": 8,
+                                 "layout_width_share": 0.04, "layout_min_width": 70, "layout_max_width": 150,
+                                 "dragged_window_opacity": 0.25, "dragged_window_fade_ms": 120}}
+        self.assertEqual(module.zone_picker_section(config, theme), [
+            "[zone-picker]",
+            "enabled = true",
+            "layouts = Left Half,0,0,50,100;Right Half,50,0,50,100|Middle Third,33.3333,0,33.3334,100",
+            "distance = 90",
+            "padding = 20",
+            "gap = 12",
+            "gutter = 4",
+            "peek = 24",
+            "margin = 8",
+            "mini_share = 0.04",
+            "mini_min = 70",
+            "mini_max = 150",
+            "window_opacity = 0.25",
+            "window_fade_ms = 120",
+        ])
+
+    def test_shipped_themes_give_every_size_the_plate_is_laid_out_with(self):
+        sys.path.insert(0, str(LOOKS_DIR.parent))
+        self.addCleanup(sys.path.remove, str(LOOKS_DIR.parent))
+        import make_theme
+        sizes = set(self.module().ZONE_PICKER_LOOKS)
+        self.assertLessEqual(sizes, set(tomllib.loads(make_theme.ZONE_PICKER_TABLE)["zone_picker"]))
+        plain = tomllib.loads((THEMES_DIR / "plain" / "theme.toml").read_text())
+        self.assertLessEqual(sizes, set(plain["zone_picker"]))
+
+    def test_a_theme_without_looks_leaves_the_plugins_own(self):
+        config = {"window": {"snap_to_edges": True, "zone_layouts": [[{"name": "Whole", "box": [0, 0, 100, 100]}]]}}
+        self.assertEqual(self.module().zone_picker_section(config, {}),
+                         ["[zone-picker]", "enabled = true", "layouts = Whole,0,0,100,100", "distance = 75"])
+
+    def test_it_is_off_without_snapping_layouts_or_by_choice(self):
+        layouts = [[{"name": "Whole", "box": [0, 0, 100, 100]}]]
+        module = self.module()
+        for window in ({"snap_to_edges": False, "zone_layouts": layouts},
+                       {"snap_to_edges": True, "zone_layouts": layouts, "zone_picker": False},
+                       {"snap_to_edges": True, "zone_layouts": []},
+                       {"snap_to_edges": True}):
+            self.assertEqual(module.zone_picker_section({"window": window}, {})[1], "enabled = false", window)
+
+    def test_a_layout_the_plugin_could_not_read_is_refused(self):
+        def config(zone):
+            return {"window": {"snap_to_edges": True, "zone_layouts": [[zone]]}}
+        for mark in ",;|#\\\n":
+            self.assertIn("name", self.refused(config({"name": f"Left{mark}Half", "box": [0, 0, 50, 100]})), repr(mark))
+        self.assertIn("name", self.refused(config({"name": "", "box": [0, 0, 50, 100]})))
+        self.assertIn("name", self.refused(config({"box": [0, 0, 50, 100]})))
+        for box in ([0, 0, 50], [0, 0, 0, 100], [60, 0, 50, 100], [0, 60, 50, 50], [-1, 0, 50, 100],
+                    [0, 0, "50", 100], [0, 0, True, 100], "wide", None):
+            self.assertIn("box", self.refused(config({"name": "Zone", "box": box})), repr(box))
+        self.assertIn("zone_layouts", self.refused({"window": {"snap_to_edges": True, "zone_layouts": [[]]}}))
+        self.assertIn("zone_layouts", self.refused({"window": {"snap_to_edges": True, "zone_layouts": "halves"}}))
+
+    def test_the_plain_desktop_offers_layouts(self):
+        plain = tomllib.loads((CONFIG_DIR / "plain.toml").read_text())
+        section = self.module().zone_picker_section(plain, {})
+        self.assertEqual(section[1], "enabled = true")
+        layouts = section[2].removeprefix("layouts = ").split("|")
+        self.assertEqual(len(layouts), 6)
+        self.assertEqual(layouts[0], "Left Half,0,0,50,100;Right Half,50,0,50,100")
+        self.assertEqual(layouts[1], "Whole Screen,0,0,100,100")
 
 
 class TestGtkWindowButtons(SessionTestCase):

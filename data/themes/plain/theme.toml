@@ -399,6 +399,33 @@ mark_reach = 6
 name = { color = "#202020", gap = 10, padding = 6 }
 appear_after_ms = 150
 
+[zone_picker]
+# The plate of layouts that hangs below the top of the screen while a window
+# is dragged there: the plate, each layout's small screen, its zones, and the
+# mark on the zone under the pointer with that zone's name below the plate.
+background = { color = "#f4f4f4f0", radius = 10, border = { color = "#b0b0b0", width = 1 } }
+screen = { color = "#00000018", radius = 2 }
+zone = { color = "#00000038", radius = 2 }
+zone_refused = { color = "#00000012", radius = 2 }
+mark = { color = "#3a6ea580", radius = 3, border = { color = "#3a6ea5", width = 2 } }
+mark_reach = 2
+name = { color = "#ffffff", gap = 8, shadow_color = "#000000c0", shadow_blur = 3, shadow_drop = 1, most_width = 360 }
+padding = 16
+gap = 14
+gutter = 2
+peek = 30
+margin = 10
+layout_width_share = 0.05
+layout_min_width = 64
+layout_max_width = 160
+dragged_window_opacity = 0.3
+dragged_window_fade_ms = 150
+
+[animation.zone_picker]
+slide_ms = 200
+bezier = [0.25, 0.1, 0.25, 1.0]
+name_fade_ms = 100
+
 [search]
 # The panel's search: a field with results below, in a menu-style box.
 width = 420

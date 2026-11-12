@@ -308,6 +308,11 @@ curve = "ease-out"
 [animation.volume_display]    # overlays.md
 stay_ms = 1000
 fade_out_ms = 500
+
+[animation.zone_picker]       # overlays.md
+slide_ms = 250
+bezier = [0.25, 0.1, 0.25, 1.0]
+name_fade_ms = 100
 ```
 
 You'll find the dock's `[dock.launch_bounce]` and `magnification_ramp_ms`, the banners' `[animation.banner]`, the screenshot flash and the lock screen's shake on their parts' pages.

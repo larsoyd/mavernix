@@ -35,6 +35,7 @@
 #include "window-games.hpp"
 #include "window-picture-provider.hpp"
 #include "window-pictures.hpp"
+#include "zone-picker.hpp"
 
 // The shell's own icon theme, which the user may pick apart from the
 // programs' (Settings, App Style). Set here, inside the shell alone: the
@@ -89,6 +90,7 @@ void ShellNativePlugin::registerTypes(const char* uri)
     qmlRegisterType<WindowAttention>(uri, major_version, minor_version, "WindowAttention");
     qmlRegisterType<WindowGames>(uri, major_version, minor_version, "WindowGames");
     qmlRegisterType<WindowPictures>(uri, major_version, minor_version, "WindowPictures");
+    qmlRegisterType<ZonePicker>(uri, major_version, minor_version, "ZonePicker");
 }
 
 void ShellNativePlugin::initializeEngine(QQmlEngine* engine, const char* uri)

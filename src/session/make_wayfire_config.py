@@ -46,6 +46,7 @@ BASE_PLUGINS = [
     "window-pictures",
     "snap-keys",
     "shared-edges",
+    "zone-picker",
     "reachable-title-bars",
     "shortcut-capture",
     "held-modifiers",
@@ -171,9 +172,10 @@ def animation_sections(theme):
     # the login cover must hide the desktop from its first frame, not fade in over it
 
     # the dock slides between screens, a fade would leave it standing where it was
+    # the plate of layouts slides out from the top by itself
     animate = ["[animate]", 'enabled_for = type equals "toplevel"',
                'fade_enabled_for = type equals "overlay" & !(app_id equals "mavernix-entry")'
-               ' & !(app_id contains "mavernix-dock")']
+               ' & !(app_id contains "mavernix-dock") & !(app_id equals "mavernix-zones")']
     sections = [animate]
     plugins = []
 
@@ -1093,6 +1095,51 @@ def window_handling_sections(config, theme, grid_section, grid_key_lines):
     return [move, ["[resize]", f"activate = {resize_with}"], shared_edges]
 
 
+# marks the plugin splits its layouts by, and ones the settings file reads its own way
+ZONE_NAME_MARKS = ",;|#\\\n"
+
+# what the compositor needs of the theme's [zone_picker], by the plugin's names
+ZONE_PICKER_LOOKS = {"padding": "padding", "gap": "gap", "gutter": "gutter", "peek": "peek", "margin": "margin",
+                     "layout_width_share": "mini_share", "layout_min_width": "mini_min",
+                     "layout_max_width": "mini_max", "dragged_window_opacity": "window_opacity",
+                     "dragged_window_fade_ms": "window_fade_ms"}
+
+
+def zone_text(zone):
+    """One zone of [window] zone_layouts as the plugin reads it."""
+    name = zone.get("name") if isinstance(zone, dict) else None
+    if not isinstance(name, str) or not name or any(mark in name for mark in ZONE_NAME_MARKS):
+        fail(f"window.zone_layouts: a zone's name must be text without , ; | # \\ or a line break, got {name!r}")
+    box = zone.get("box")
+    numbers = isinstance(box, list) and len(box) == 4 and all(
+        isinstance(value, (int, float)) and not isinstance(value, bool) for value in box)
+    if not numbers or min(box) < 0 or box[2] <= 0 or box[3] <= 0 or box[0] + box[2] > 100.05 or box[1] + box[3] > 100.05:
+        fail(f'window.zone_layouts: the box of "{name}" must be [left, top, width, height] in percent '
+             f"inside the screen, got {box!r}")
+    return ",".join([name] + [f"{value:.6g}" for value in box])
+
+
+def zone_picker_section(config, theme):
+    """The plate of layouts offered while a window is dragged toward the top.
+
+    From the config's [window] zone_picker, zone_layouts and
+    zone_picker_distance, with the plate's sizes from the theme's
+    [zone_picker]. It rides on snapping, so it is off without it.
+    """
+    window = config.get("window", {})
+    layouts = window.get("zone_layouts", [])
+    if not isinstance(layouts, list) or any(not isinstance(layout, list) or not layout for layout in layouts):
+        fail("window.zone_layouts must be a list of layouts, each a list of one or more zones")
+    wanted = bool(window.get("zone_picker", True) and window.get("snap_to_edges", False) and layouts)
+    section = ["[zone-picker]", f"enabled = {yes_or_no(wanted)}"]
+    if layouts:
+        section.append("layouts = " + "|".join(";".join(zone_text(zone) for zone in layout) for layout in layouts))
+    section.append(f"distance = {int(window.get('zone_picker_distance', 75))}")
+    looks = theme.get("zone_picker", {})
+    section += [f"{option} = {looks[key]}" for key, option in ZONE_PICKER_LOOKS.items() if key in looks]
+    return section
+
+
 def wayfire_curve(curve, where):
     """A theme's curve as Wayfire writes one.
 
@@ -1347,6 +1394,7 @@ def main():
     plugins += desktop_plugins
     grid_section = next(section for section in sections if section[0] == "[grid]")
     sections += window_handling_sections(config, theme, grid_section, compositor_keys.pop("grid", []))
+    sections.append(zone_picker_section(config, theme))
     for section, lines in compositor_keys.items():
         if section != "core":
             sections.append([f"[{section}]"] + lines)

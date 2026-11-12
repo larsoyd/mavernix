@@ -14,6 +14,22 @@ title_double_click = "maximize"
 snap_to_edges = true
 snap_distance = 12
 snap_corner_distance = 60
+# A window dragged toward the top of the screen is offered a plate of
+# layouts there, and dropped on one of its zones takes that part of the
+# screen. It needs snap_to_edges. The distance is how many pixels below the
+# menu bar the pointer wakes the plate.
+zone_picker = true
+zone_picker_distance = 75
+# The layouts on the plate, each a list of zones. A zone's box is its left,
+# top, width and height in percent of the room windows may use.
+zone_layouts = [
+    [{ name = "Left Half", box = [0, 0, 50, 100] }, { name = "Right Half", box = [50, 0, 50, 100] }],
+    [{ name = "Whole Screen", box = [0, 0, 100, 100] }],
+    [{ name = "Left Third", box = [0, 0, 33.3333, 100] }, { name = "Middle Third", box = [33.3333, 0, 33.3334, 100] }, { name = "Right Third", box = [66.6667, 0, 33.3333, 100] }],
+    [{ name = "Left Two Thirds", box = [0, 0, 66.6667, 100] }, { name = "Right Third", box = [66.6667, 0, 33.3333, 100] }],
+    [{ name = "Left Third", box = [0, 0, 33.3333, 100] }, { name = "Right Two Thirds", box = [33.3333, 0, 66.6667, 100] }],
+    [{ name = "Upper Left", box = [0, 0, 50, 50] }, { name = "Upper Right", box = [50, 0, 50, 50] }, { name = "Lower Left", box = [0, 50, 50, 50] }, { name = "Lower Right", box = [50, 50, 50, 50] }],
+]
 # Held, lets a window be moved (main button) or resized (secondary button)
 # from anywhere on it. "" for no such key.
 drag_key = "<super>"
@@ -663,6 +679,8 @@ windows_snap_note = "Dragging a window to a side, a corner or the top resizes it
 windows_snap_distance = "Snap when this close:"
 windows_snap_near = "Close"
 windows_snap_far = "Far"
+windows_zone_picker = "Show layouts when a window is dragged to the top"
+windows_zone_picker_note = "Dropping the window on a part of a layout resizes it, so it fills that part of the screen."
 windows_resize_reach = "Edge to resize by:"
 windows_reach_narrow = "Narrow"
 windows_reach_wide = "Wide"

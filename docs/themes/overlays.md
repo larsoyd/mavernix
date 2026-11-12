@@ -99,6 +99,44 @@ unread_left = 12
 unread_top = 9
 ```
 
+## Layouts for a dragged window
+
+Drag a window toward the top of the screen and a plate of layouts hangs down there (`src/shell/ZonePlate.qml`). Each layout is a small screen cut into zones, and the zone under the pointer is marked and named below the plate. The desktop's config says which layouts there are (`[window] zone_layouts`); the theme says how the plate looks and how large it is. Its upper corners stay hidden, as if it hung from the menu bar.
+
+```toml
+[fonts]
+zone_picker = { family = "DejaVu Sans", size = 13, bold = true }   # the marked zone's name; left out: the interface font
+
+[zone_picker]
+background = { color = "#f4f4f4f0", radius = 10 }   # any fill: the plate
+screen = { color = "#00000018", radius = 2 }        # any fill: behind one layout's zones
+zone = { color = "#00000038", radius = 2 }          # any fill: a zone
+zone_refused = { color = "#00000012", radius = 2 }  # a zone the dragged window cannot be made small or large enough for
+mark = { color = "#3a6ea580", radius = 3, border = { color = "#3a6ea5", width = 2 } }   # over the zone under the pointer
+mark_reach = 2                 # how far the mark reaches beyond its zone
+# The marked zone's name: its colour, how far under the plate it begins, its
+# shadow (colour, blur and drop in pixels) and the most room it takes before
+# it is cut short with an ellipsis.
+name = { color = "#ffffff", gap = 8, shadow_color = "#000000c0", shadow_blur = 3, shadow_drop = 1, most_width = 360 }
+padding = 16                   # between the plate's rim and the layouts, and at least this far from the screen's sides
+gap = 14                       # between two layouts
+gutter = 2                     # between two zones of one layout
+peek = 30                      # how much of the plate shows first; the pointer opens it there
+margin = 10                    # how far outside the open plate the pointer may stray before it closes
+layout_width_share = 0.05      # a layout's width as a share of the screen's; its height follows the screen's shape
+layout_min_width = 64          # never narrower, on a small screen
+layout_max_width = 160         # never wider, on a large one
+dragged_window_opacity = 0.3   # the dragged window is drawn above the plate, so over an open plate it turns this see-through
+dragged_window_fade_ms = 150   # and takes this long to, and back
+
+[animation.zone_picker]
+slide_ms = 250                 # the plate sliding out and back
+bezier = [0.25, 0.1, 0.25, 1.0]   # that slide's curve, as a CSS cubic-bezier
+name_fade_ms = 100             # the name appearing and going
+```
+
+When the layouts don't fit side by side, they are drawn narrower, down to `layout_min_width`, and then the last ones are left out.
+
 ## Volume display
 
 When you change the volume with a key, this shows the level on screen for a moment. A theme without `[volume_display]` doesn't have one. `[animation.volume_display]` sets how long it stays and how long it takes to fade (`stay_ms`, `fade_out_ms`).

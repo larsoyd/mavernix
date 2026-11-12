@@ -443,3 +443,34 @@ table = "panel"
 key = "separator"
 was = ["#000000"]
 now = ["#00000080"]
+
+# A window dragged toward the top of the screen is offered a plate of layouts.
+[[update]]
+revision = 21
+
+[update.settings.zone_picker]
+background = { color = "#00000059", radius = 12 }
+screen = { color = "#00000040", radius = 3 }
+zone = { color = "#ffffff59", radius = 2 }
+zone_refused = { color = "#ffffff1a", radius = 2 }
+mark = { color = "#ffffffb3", radius = 2, border = { color = "#ffffff", width = 2 } }
+mark_reach = 2
+name = { color = "#ffffff", gap = 8, shadow_color = "#000000b0", shadow_blur = 3, shadow_drop = 2, most_width = 360 }
+padding = 16
+gap = 14
+gutter = 2
+peek = 30
+margin = 10
+layout_width_share = 0.05
+layout_min_width = 64
+layout_max_width = 160
+dragged_window_opacity = 0.3
+dragged_window_fade_ms = 150
+
+[update.settings."animation.zone_picker"]
+slide_ms = 250
+bezier = [0.25, 0.1, 0.25, 1.0]
+name_fade_ms = 100
+
+[update.settings.fonts]
+zone_picker = { family = ".Lucida Grande UI", size = 14, bold = true }

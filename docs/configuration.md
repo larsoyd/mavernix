@@ -57,6 +57,18 @@ Closing and quitting work like this:
 - `quit_app` closes every window of the front program. It has no key unless you give it one.
 - With `[window] quit_closes_app = true` (Settings, Windows), the `close_window` key and Quit in the menu bar close all of the program's windows, as on OS X.
 
+The layouts offered to a window dragged toward the top of the screen are `[window] zone_layouts`: a list of layouts, each a list of zones with a `name` and a `box` of left, top, width and height in percent of the room windows may use.
+
+```toml
+[window]
+zone_layouts = [
+    [{ name = "Left Half", box = [0, 0, 50, 100] }, { name = "Right Half", box = [50, 0, 50, 100] }],
+    [{ name = "Middle", box = [20, 0, 60, 100] }],
+]
+```
+
+A name can't hold `,` `;` `|` `#` or `\`. Zones of one layout may overlap, and then the later one is picked where they do. `zone_picker = false` (Settings, Windows) turns the plate off, and `zone_picker_distance` is how many pixels below the menu bar the pointer wakes it. It needs `snap_to_edges`. How the plate looks is the theme's ([Overlays](themes/overlays.md)).
+
 In the program switcher, Down on the marked program shows its windows, most recently used first, and letting go of the key goes to the marked one. `[window] switcher_windows = false` (Settings, Windows) turns that off.
 
 Two keys belong to the compositor, so they work even when nothing else does: Super+Enter opens a terminal, and Ctrl+Alt+Backspace ends the session right away. [Using the desktop](usage.md) lists the keys for each desktop.

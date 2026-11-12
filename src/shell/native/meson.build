@@ -48,6 +48,7 @@ moc_sources = qt.compile_moc(
         'window-games.hpp',
         'window-pictures.hpp',
         'xmenu-properties.hpp',
+        'zone-picker.hpp',
     ],
     dependencies: qt_native,
 )
@@ -92,6 +93,7 @@ shared_module(
         'window-picture-provider.cpp',
         'window-pictures.cpp',
         'xmenu-properties.cpp',
+        'zone-picker.cpp',
         moc_sources,
     ],
     dependencies: [qt_native, librsvg, gio, kguiaddons, dependency('xcb'), wayland_client],

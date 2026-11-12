@@ -50,6 +50,15 @@ WindowsPane::WindowsPane(Choices& choices, QWidget* parent) : QWidget(parent), c
     connect(snap, &QCheckBox::toggled, this,
         [this, table](bool on) { this->choices.set(table, QStringLiteral("snap_to_edges"), on); });
 
+    // a plate of layouts under a window dragged toward the top, it rides on snapping
+    const QVariant zones_chosen = choices.value(table, QStringLiteral("zone_picker"));
+    auto* zones = new QCheckBox(word("windows_zone_picker", "Show layouts when a window is dragged to the top"));
+    zones->setChecked(!zones_chosen.isValid() || zones_chosen.toBool());
+    zones->setEnabled(snap->isChecked());
+    connect(snap, &QCheckBox::toggled, zones, &QWidget::setEnabled);
+    connect(zones, &QCheckBox::toggled, this,
+        [this, table](bool on) { this->choices.set(table, QStringLiteral("zone_picker"), on); });
+
     // As on OS X: Quit, from the menu bar or its key, ends the whole program.
     auto* quit_all = new QCheckBox(word("windows_quit_closes_app", "Quit closes all of a program's windows"));
     quit_all->setChecked(choices.value(table, QStringLiteral("quit_closes_app")).toBool());
@@ -167,6 +176,8 @@ WindowsPane::WindowsPane(Choices& choices, QWidget* parent) : QWidget(parent), c
         word("windows_snap_note",
             "At the left or right side: that half. In a corner: that quarter. At the top: the whole screen.")));
     form->addRow(word("windows_snap_distance", "Snap when this close:"), snap_row);
+    form->addCheck(with_note(zones, word("windows_zone_picker_note",
+        "Dropping the window on a part of a layout resizes it, so it fills that part of the screen.")));
     form->addRow(word("windows_resize_reach", "Edge to resize by:"), reach_row);
     form->addDivider();
     form->addCheck(with_note(quit_all, word("windows_quit_closes_app_note",

@@ -67,6 +67,25 @@ ShellRoot {
         }
     }
 
+    // the plate of layouts under a dragged window, one per screen, each told by the compositor
+    property var zonePlates: ({})
+    ZonePicker {
+        onTold: plate => {
+            const plates = Object.assign({}, shell.zonePlates)
+            plates[plate.output] = plate
+            shell.zonePlates = plates
+        }
+    }
+    Variants {
+        model: Quickshell.screens
+        ZonePlate {
+            required property var modelData
+            screen: modelData
+            settings: shell.settings
+            told: shell.zonePlates[modelData.name] ?? null
+        }
+    }
+
     // X11 programs, games above all, take the main screen for their own.
     MainScreen {
         name: shell.mainScreen ? shell.mainScreen.name : ""

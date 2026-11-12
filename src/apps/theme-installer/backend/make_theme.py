@@ -185,6 +185,33 @@ duration_ms = 130
 blink_ms = 60
 """
 
+# the plate of layouts under a dragged window, in the program switcher's colours
+# older imports get it through the updates list
+ZONE_PICKER_TABLE = """[zone_picker]
+background = { color = "#00000059", radius = 12 }
+screen = { color = "#00000040", radius = 3 }
+zone = { color = "#ffffff59", radius = 2 }
+zone_refused = { color = "#ffffff1a", radius = 2 }
+mark = { color = "#ffffffb3", radius = 2, border = { color = "#ffffff", width = 2 } }
+mark_reach = 2
+name = { color = "#ffffff", gap = 8, shadow_color = "#000000b0", shadow_blur = 3, shadow_drop = 2, most_width = 360 }
+padding = 16
+gap = 14
+gutter = 2
+peek = 30
+margin = 10
+layout_width_share = 0.05
+layout_min_width = 64
+layout_max_width = 160
+dragged_window_opacity = 0.3
+dragged_window_fade_ms = 150
+
+[animation.zone_picker]
+slide_ms = 250
+bezier = [0.25, 0.1, 0.25, 1.0]
+name_fade_ms = 100
+"""
+
 # Bandstand, the music player, as iTunes 11 draws itself in OS X 10.9.5. Its
 # pictures are iTunes' own (MUSIC_PICTURES, cut by make_music_pictures): the
 # transport buttons, volume slider, LCD with its progress bar and Up Next
@@ -409,6 +436,7 @@ app_store_text    = {{ family = "{TITLE_FONT_FAMILY}", size = 12 }}
 app_store_small   = {{ family = "{TITLE_FONT_FAMILY}", size = 10 }}
 app_store_button  = {{ family = "{TITLE_FONT_FAMILY}", size = 9, bold = true }}
 program_switcher = {{ family = "{TITLE_FONT_FAMILY}", size = 14, bold = true }}
+zone_picker = {{ family = "{TITLE_FONT_FAMILY}", size = 14, bold = true }}
 desktop_icon = {{ family = "{TITLE_FONT_FAMILY}", size = 12, bold = true }}
 banner_title = {{ family = "{TITLE_FONT_FAMILY}", size = 13, bold = true }}
 banner_text  = {{ family = "{TITLE_FONT_FAMILY}", size = 11 }}
@@ -1705,6 +1733,8 @@ Down = "\u2193"
 Backspace = "\u232b"
 
 {MENU_CLOSE_TABLE}
+
+{ZONE_PICKER_TABLE}
 [dock]
 icon_size = {DOCK_ICON_SIZE}
 compact_icon_size = {DOCK_COMPACT_ICON_SIZE}

@@ -63,6 +63,7 @@ On `sea-lion`, tapping doesn't click and scrolling is "natural". You can change 
 ## Windows
 
 - Drag a window by its title bar to the left or right edge of the screen and it fills that half. Drag it into a corner for a quarter, or to the top for the whole screen. Drag it away again and it goes back to its old size.
+- Drag a window toward the top of the screen and a plate of layouts hangs down there: halves, thirds, two thirds beside one, quarters and the whole screen. Drop the window on a part of a layout and it fills that part of the screen. A part that's drawn faint is one the window can't be made small enough for. The very top edge still gives the whole screen.
 - Super with the arrow keys works step by step: Left puts a window on the left half, then Up moves it to the top-left quarter.
 - When two tiled windows sit side by side, they share the edge between them. Drag that edge and one grows while the other shrinks.
 - Hold Super and drag anywhere on a window to move it. Use the right mouse button instead to resize it.
