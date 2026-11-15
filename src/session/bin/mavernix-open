@@ -1,0 +1,84 @@
+#!/usr/bin/env python3
+"""Opens a file or link for xdg-open in this desktop, as its own service with
+the shell's environment and folder, as the Dock starts programs. The program
+that asked neither waits for it nor hands it its environment or cgroups.
+
+    mavernix-open FILE|URL
+
+Without a running shell it refuses, and xdg-open opens it the usual way.
+"""
+
+import os
+import re
+import subprocess
+import sys
+import syslog
+import urllib.parse
+from pathlib import Path
+
+TAG = "mavernix-programs"
+XDG_OPEN = "/usr/bin/xdg-open"
+# xdg-open drops this before it runs the program, so only the service's own xdg-open sees it
+OPEN_HERE = "MAVERNIX_OPEN_HERE"
+
+
+def refuse(reason):
+    syslog.openlog(TAG)
+    syslog.syslog(syslog.LOG_WARNING, f"open refused: {reason}")
+    sys.exit(f"mavernix-open: refused: {reason}")
+
+
+def shell():
+    """The environment and folder of this desktop's running shell."""
+    settings = os.environ.get("DESKTOP_SHELL_SETTINGS")
+    if not settings:
+        refuse("DESKTOP_SHELL_SETTINGS is not set")
+    pid_file = Path(settings).parent / "shell.pid"
+    try:
+        pid = int(pid_file.read_text())
+        entries = Path(f"/proc/{pid}/environ").read_bytes().split(b"\0")
+        folder = os.readlink(f"/proc/{pid}/cwd")
+    except (OSError, ValueError) as error:
+        refuse(f"no shell from {pid_file}: {error}")
+    environment = dict(os.fsdecode(entry).split("=", 1) for entry in entries if b"=" in entry)
+    if environment.get("DESKTOP_SHELL_SETTINGS") != settings:
+        refuse(f"pid {pid} in {pid_file} is not this desktop's shell")
+    return environment, folder
+
+
+def ask(environment, *question):
+    try:
+        return subprocess.run(["xdg-mime", "query", *question], capture_output=True, text=True,
+                              env=environment, timeout=10).stdout.strip()
+    except (OSError, subprocess.TimeoutExpired):
+        return ""
+
+
+def handler(target, environment):
+    """The desktop entry id xdg-open will pick, which names the service."""
+    scheme = re.match(r"([A-Za-z][A-Za-z0-9+.-]*):", target)
+    if scheme and scheme[1] != "file":
+        kind = "x-scheme-handler/" + scheme[1]
+    else:
+        path = urllib.parse.unquote(urllib.parse.urlsplit(target).path) if scheme else target
+        kind = ask(environment, "filetype", path)
+    entry = ask(environment, "default", kind) if kind else ""
+    return entry.removesuffix(".desktop") or "xdg-open"
+
+
+def main():
+    if len(sys.argv) != 2:
+        sys.exit("usage: mavernix-open FILE|URL")
+    target = sys.argv[1]
+    environment, folder = shell()
+    name = handler(target, environment)
+    environment[OPEN_HERE] = "1"
+    try:
+        os.execvpe("mavernix-start-program",
+                   ["mavernix-start-program", "--in", folder, name, XDG_OPEN, target], environment)
+    except OSError as error:
+        refuse(f"could not run mavernix-start-program: {error}")
+
+
+if __name__ == "__main__":
+    main()

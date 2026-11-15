@@ -2269,6 +2269,96 @@ class TestStartProgram(unittest.TestCase):
         self.assertEqual(module.exec_word('my$app "50%" \\'), '"my$$app \\"50%%\\" \\\\"')
 
 
+class TestOpen(unittest.TestCase):
+    """bin/mavernix-open, which xdg-open hands what it opens to in this desktop."""
+
+    def setUp(self):
+        folder = tempfile.TemporaryDirectory()
+        self.addCleanup(folder.cleanup)
+        self.root = Path(folder.name).resolve()
+        self.settings = self.root / "state" / "shell.json"
+        self.settings.parent.mkdir()
+        self.record = self.root / "started.json"
+        self.bin = self.root / "bin"
+        self.bin.mkdir()
+        self.stand_in("mavernix-start-program", f"""import json, os, sys
+with open({str(self.record)!r}, "w") as file:
+    json.dump({{"arguments": sys.argv[1:], "folder": os.getcwd(), "environment": dict(os.environ)}}, file)
+""")
+        self.stand_in("xdg-mime", """import sys
+answers = {"query default x-scheme-handler/https": "google-chrome.desktop",
+           "query filetype /papers/my report.pdf": "application/pdf",
+           "query default application/pdf": "org.gnome.Evince.desktop"}
+print(answers.get(" ".join(sys.argv[1:]), ""))
+""")
+        self.home = self.root / "home"
+        self.home.mkdir()
+
+    def stand_in(self, name, body):
+        script = self.bin / name
+        script.write_text(f"#!{sys.executable}\n{body}")
+        script.chmod(0o755)
+
+    def start_shell(self, settings):
+        environment = {"PATH": f"{self.bin}:/usr/bin:/bin", "DESKTOP_SHELL_SETTINGS": str(settings),
+                       "XDG_SESSION_DESKTOP": "mavernix", "SHELL_ONLY": "yes"}
+        shell = subprocess.Popen(["sleep", "60"], env=environment, cwd=self.home)
+        self.addCleanup(shell.wait)
+        self.addCleanup(shell.kill)
+        (self.settings.parent / "shell.pid").write_text(f"{shell.pid}\n")
+        return shell
+
+    def open(self, target):
+        caller = {"PATH": "/usr/bin:/bin", "DESKTOP_SHELL_SETTINGS": str(self.settings),
+                  "STEAMVIDEOTOKEN": "secret"}
+        return subprocess.run([sys.executable, str(SESSION_SOURCE_DIR / "bin" / "mavernix-open"), target],
+                              capture_output=True, text=True, env=caller, cwd=self.root, timeout=30)
+
+    def started(self):
+        self.assertTrue(self.record.exists(), "mavernix-start-program was not run")
+        return json.loads(self.record.read_text())
+
+    def test_a_link_starts_like_a_program_from_the_dock(self):
+        self.start_shell(self.settings)
+        result = self.open("https://example.com/watch?v=1")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        started = self.started()
+        self.assertEqual(started["arguments"],
+                         ["--in", str(self.home), "google-chrome", "/usr/bin/xdg-open", "https://example.com/watch?v=1"])
+        self.assertEqual(started["folder"], str(self.root))
+        self.assertEqual(started["environment"].get("SHELL_ONLY"), "yes")
+        self.assertNotIn("STEAMVIDEOTOKEN", started["environment"])
+        self.assertEqual(started["environment"].get("MAVERNIX_OPEN_HERE"), "1")
+
+    def test_a_file_is_named_after_the_program_for_its_type(self):
+        self.start_shell(self.settings)
+        result = self.open("file:///papers/my%20report.pdf")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(self.started()["arguments"][2], "org.gnome.Evince")
+
+    def test_a_kind_without_a_program_keeps_the_openers_name(self):
+        self.start_shell(self.settings)
+        result = self.open("magnet:?xt=urn:btih:0")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(self.started()["arguments"][2], "xdg-open")
+
+    def test_without_a_running_shell_it_refuses(self):
+        shell = self.start_shell(self.settings)
+        shell.kill()
+        shell.wait()
+        result = self.open("https://example.com")
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("refused", result.stderr)
+        self.assertFalse(self.record.exists())
+
+    def test_a_pid_left_from_another_desktop_is_refused(self):
+        self.start_shell(self.root / "other" / "shell.json")
+        result = self.open("https://example.com")
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("not this desktop's shell", result.stderr)
+        self.assertFalse(self.record.exists())
+
+
 class TestAutostartWaitsForTray(unittest.TestCase):
     def setUp(self):
         folder = tempfile.TemporaryDirectory()
