@@ -1,0 +1,8 @@
+<?xml version="1.0"?>
+<wayfire>
+	<plugin name="screenshot-pointer">
+		<_short>Screenshot Pointer</_short>
+		<_long>Lets a screenshot program hide the pointer for a few seconds at most, so a capture without the pointer shows none.</_long>
+		<category>Utility</category>
+	</plugin>
+</wayfire>

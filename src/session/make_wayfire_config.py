@@ -51,6 +51,7 @@ BASE_PLUGINS = [
     "shortcut-capture",
     "held-modifiers",
     "screen-modes",
+    "screenshot-pointer",
     "desktop-focus",
     "desktop-aside",
     "window-attention",
