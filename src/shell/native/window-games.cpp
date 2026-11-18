@@ -72,6 +72,11 @@ void WindowGames::takeLauncher(const QJsonObject& description)
 {
     const QString appId = description.value("app-id").toString();
     const int pid = description.value("pid").toInt(-1);
+    // a withdrawn x11 window has no pid and says nothing about the launch
+    if (pid <= 0)
+    {
+        return;
+    }
     const QStringList ids = entryIdsOfCgroup(contents(QString("/proc/%1/cgroup").arg(pid)));
     if (ids == launchers.value(appId))
     {
