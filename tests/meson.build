@@ -142,6 +142,19 @@ tests = {
         'include': test_sources / 'apps/settings',
         'dependencies': [qt_widgets],
     },
+    'desktop-pane': {
+        'sources': [
+            test_sources / 'apps/settings/desktop-pane.cpp',
+            test_sources / 'apps/settings/picture-chooser.cpp',
+            test_sources / 'apps/settings/pane-resets.cpp',
+            test_sources / 'apps/settings/pane-parts.cpp',
+            test_sources / 'apps/settings/choices.cpp',
+            qt.compile_moc(headers: [test_sources / 'apps/settings/desktop-pane.hpp',
+                                    test_sources / 'apps/settings/picture-chooser.hpp'], dependencies: qt_widgets),
+        ],
+        'include': test_sources / 'apps/settings',
+        'dependencies': [qt_widgets, dependency('qt6', modules: ['Concurrent'])],
+    },
     'overview': {
         'sources': [
             test_sources / 'apps/settings/overview.cpp',
@@ -206,6 +219,14 @@ app_grid_layout_test = executable(
     cpp_args: ['-DSHELL_DIR="' + (meson.project_source_root() / 'src' / 'shell') + '"'],
 )
 test('app-grid-layout', app_grid_layout_test, env: {'QT_QPA_PLATFORM': 'offscreen'})
+
+desktop_places_test = executable(
+    'test-desktop-places',
+    ['test-desktop-places.cpp', qt.compile_moc(sources: 'test-desktop-places.cpp', dependencies: qt_test)],
+    dependencies: [qt_test, dependency('qt6', modules: ['Core', 'Qml'])],
+    cpp_args: ['-DSHELL_DIR="' + (meson.project_source_root() / 'src' / 'shell') + '"'],
+)
+test('desktop-places', desktop_places_test, env: {'QT_QPA_PLATFORM': 'offscreen'})
 
 dock_screen_test = executable(
     'test-dock-screen',

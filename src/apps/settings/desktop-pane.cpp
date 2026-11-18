@@ -67,6 +67,19 @@ DesktopPane::DesktopPane(Choices& choices, QWidget* parent) : QWidget(parent)
     connect(files, &QCheckBox::toggled, this,
         [&choices](bool on) { choices.set(QStringLiteral("desktop_files"), QStringLiteral("show"), on); });
     form->addCheck(files);
+    for (const auto& [key, fallback] : {std::pair{"snap_to_grid", "Snap icons to grid"},
+             std::pair{"deselect_after_opening", "Deselect icons after opening"}})
+    {
+        const QString name = QLatin1String(key);
+        auto* box =
+            new QCheckBox(words.value(QStringLiteral("desktop_") + name, QString::fromLatin1(fallback)).toString());
+        box->setChecked(choices.value(QStringLiteral("desktop_files"), name).toBool());
+        box->setEnabled(files->isChecked());
+        connect(files, &QCheckBox::toggled, box, &QWidget::setEnabled);
+        connect(box, &QCheckBox::toggled, this,
+            [&choices, name](bool on) { choices.set(QStringLiteral("desktop_files"), name, on); });
+        form->addCheck(box);
+    }
 
     // The name the menu bar shows while no window is active, over the
     // desktop's own first menu ([desktop_menus] name). A desktop without

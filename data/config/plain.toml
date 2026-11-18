@@ -534,6 +534,10 @@ home_folder = "Home"
 # Files of a folder shown as icons on the desktop.
 show = true
 folder = "~/Desktop"
+# Icons sit in the slots of the grid, also when dropped between them.
+snap_to_grid = false
+# Opening icons leaves none picked.
+deselect_after_opening = false
 # Launchers placed on the desktop once, at a user's first login.
 place_once = ["mavernix-theme-installer"]
 # File actions, each given the paths. A command left out removes its menu
@@ -556,6 +560,7 @@ rename = "Rename"
 trash = "Move to Wastebasket"
 # Entries left out here are not offered.
 clean_up = "Tidy Up"
+snap_to_grid = "Snap to Grid"
 sort_by_name = "Sort by Name"
 sort_by_kind = "Sort by Kind"
 sort_by_modified = "Sort by Date Modified"
@@ -798,6 +803,8 @@ menu_bar_transparency = "Transparency:"
 menu_bar_transparency_low = "Opaque"
 menu_bar_transparency_high = "Clear"
 desktop_show_files = "Show the files of the Desktop folder"
+desktop_snap_to_grid = "Snap icons to grid"
+desktop_deselect_after_opening = "Deselect icons after opening"
 desktop_picture_choose = "Choose a picture…"
 desktop_picture_default = "Use the default"
 trackpad_title = "Touchpad"

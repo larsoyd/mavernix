@@ -12,6 +12,7 @@ import Quickshell
 import Quickshell.Io
 import Quickshell.Wayland
 import Shell.Native
+import "DesktopPlaces.js" as DesktopPlaces
 import "DesktopShortcut.js" as DesktopShortcut
 import "DroppedFiles.js" as DroppedFiles
 import "ThemeValues.js" as ThemeValues
@@ -59,76 +60,24 @@ Item {
     readonly property int rows: Math.max(1, Math.floor(
         (height - topRoom - (looks?.top ?? 8) - (looks?.bottom_room ?? 100)) / rowPitch))
 
-    // The top left corner of the icon in a slot. Slots are counted down the
-    // columns, the first column at the screen's far side.
-    function slotX(slot) {
-        const column = Math.floor(slot / rows)
-        return width - (looks?.edge_to_icon_middle ?? 60) - column * columnPitch - iconSize / 2
-    }
-    function slotY(slot) {
-        return topRoom + (looks?.top ?? 8) + (slot % rows) * rowPitch
-    }
-    function slotAt(x, y) {
-        const column = Math.max(0, Math.round(
-            (width - (looks?.edge_to_icon_middle ?? 60) - iconSize / 2 - x) / columnPitch))
-        const row = Math.max(0, Math.min(rows - 1, Math.round((y - topRoom - (looks?.top ?? 8)) / rowPitch)))
-        return column * rows + row
-    }
+    readonly property var grid: ({
+        width: width, top: topRoom + (looks?.top ?? 8), rows: rows, edge: looks?.edge_to_icon_middle ?? 60,
+        iconSize: iconSize, columnPitch: columnPitch, rowPitch: rowPitch
+    })
+    // on the grid even icons placed earlier by hand sit in slots
+    readonly property bool snapToGrid: userChoices.value("desktop_files", "snap_to_grid") ?? false
+    readonly property bool deselectAfterOpening: userChoices.value("desktop_files", "deselect_after_opening") ?? false
 
     // Files put by hand: name -> offset of the icon's left edge from the
     // screen's far side and its top from the screen's top. Measured from the
     // far side so the icons stay beside that edge on other screen sizes.
     readonly property var putByHand: userChoices.value("desktop_files", "places") ?? ({})
 
-    // Whether an icon at (x, y) covers any of a slot: each takes a box one
-    // pitch square, centred across on its picture.
-    function coversSlot(x, y, slot) {
-        const halfGap = (columnPitch - iconSize) / 2
-        const left = x - halfGap
-        const slotLeft = slotX(slot) - halfGap
-        return left < slotLeft + columnPitch && slotLeft < left + columnPitch
-            && y < slotY(slot) + rowPitch && slotY(slot) < y + rowPitch
-    }
-
-    // Where every file's icon is, in the order of `entries`: where it was put
-    // by hand, else the next slot no hand-placed icon covers (one placed
-    // between slots can cover up to four).
-    readonly property var places: {
-        const result = []
-        const putPlaces = []
-        for (const entry of entries) {
-            const put = putByHand[entry.name]
-            if (put !== undefined) {
-                const place = Qt.point(width - put[0], put[1])
-                putPlaces.push(place)
-                result.push(place)
-            } else {
-                result.push(null)
-            }
-        }
-        const taken = {}
-        const slotsToCheck = entries.length + 4 * putPlaces.length
-        for (let slot = 0; slot < slotsToCheck; slot++) {
-            for (const place of putPlaces) {
-                if (coversSlot(place.x, place.y, slot)) {
-                    taken[slot] = true
-                    break
-                }
-            }
-        }
-        let slot = 0
-        for (let index = 0; index < result.length; index++) {
-            if (result[index] !== null) {
-                continue
-            }
-            while (taken[slot]) {
-                slot++
-            }
-            result[index] = Qt.point(slotX(slot), slotY(slot))
-            slot++
-        }
-        return result
-    }
+    // one place per entry, same order
+    readonly property var places: DesktopPlaces.places(grid, entries.map(entry => {
+        const put = putByHand[entry.name]
+        return put === undefined ? null : { x: width - put[0], y: put[1] }
+    }), snapToGrid)
     function iconX(index) {
         return places[index]?.x ?? 0
     }
@@ -136,7 +85,7 @@ Item {
         return places[index]?.y ?? 0
     }
 
-    // Remembers places put by hand ({ name: Qt.point(left, top) }) and drops
+    // Remembers places put by hand ({ name: { x: left, y: top } }) and drops
     // files that are gone.
     function rememberPlaces(moved) {
         const next = {}
@@ -151,8 +100,8 @@ Item {
         userChoices.set("desktop_files", "places", next)
     }
 
-    // Moves the picked icons so the dragged one has its middle at a place,
-    // keeping them on the screen and under the panel.
+    // dragged icon's middle lands at the point, all picked ones stay on screen
+    // and under the panel, on the grid they take free slots
     function movePicked(draggedPath, middleX, middleY) {
         const draggedIndex = entries.findIndex(entry => entry.path === draggedPath)
         if (draggedIndex < 0) {
@@ -160,33 +109,37 @@ Item {
         }
         const byX = middleX - iconSize / 2 - iconX(draggedIndex)
         const byY = middleY - iconSize / 2 - iconY(draggedIndex)
-        const moved = {}
+        const names = []
+        const dropped = []
+        const kept = []
         for (let index = 0; index < entries.length; index++) {
             if (isPicked(entries[index].path)) {
-                moved[entries[index].name] = Qt.point(
-                    Math.max(0, Math.min(width - iconSize, iconX(index) + byX)),
-                    Math.max(topRoom, Math.min(height - iconSize, iconY(index) + byY)))
+                names.push(entries[index].name)
+                dropped.push({ x: Math.max(0, Math.min(width - iconSize, iconX(index) + byX)),
+                               y: Math.max(topRoom, Math.min(height - iconSize, iconY(index) + byY)) })
+            } else if (putByHand[entries[index].name] !== undefined) {
+                kept.push(places[index])
             }
         }
-        rememberPlaces(moved)
+        rememberPlaces(placesByName(names, snapToGrid ? DesktopPlaces.onGrid(grid, kept, dropped) : dropped))
     }
 
     // Snaps every hand-placed icon to its nearest free slot.
     function cleanUp() {
-        const moved = {}
-        const taken = {}
+        const names = []
+        const put = []
         for (let index = 0; index < entries.length; index++) {
-            if (putByHand[entries[index].name] === undefined) {
-                continue
+            if (putByHand[entries[index].name] !== undefined) {
+                names.push(entries[index].name)
+                put.push(places[index])
             }
-            let slot = slotAt(iconX(index), iconY(index))
-            while (taken[slot]) {
-                slot++
-            }
-            taken[slot] = true
-            moved[entries[index].name] = Qt.point(slotX(slot), slotY(slot))
         }
-        rememberPlaces(moved)
+        rememberPlaces(placesByName(names, DesktopPlaces.onGrid(grid, [], put)))
+    }
+    function placesByName(names, points) {
+        const byName = {}
+        names.forEach((name, number) => { byName[name] = points[number] })
+        return byName
     }
 
     // --- What is picked ---------------------------------------------------------------
@@ -234,6 +187,12 @@ Item {
         }
         if (files.length > 0) {
             run(wishes.open_command, files)
+        }
+        afterOpening()
+    }
+    function afterOpening() {
+        if (deselectAfterOpening) {
+            pickNone()
         }
     }
     function trashPicked() {
@@ -517,6 +476,7 @@ Item {
                     }
                     if (fileItem.modelData.isLauncher) {
                         icons.launch(fileItem.modelData.path, paths)
+                        icons.afterOpening()
                         drop.accept(Qt.CopyAction)
                     } else {
                         icons.run(icons.wishes.move_in_command, [fileItem.modelData.path].concat(paths))
@@ -689,6 +649,7 @@ Item {
     readonly property int idCleanUp: 5
     readonly property int idDuplicate: 6
     readonly property int idRename: 7
+    readonly property int idSnapToGrid: 8
     readonly property int orderBase: 100
 
     readonly property var menuItems: {
@@ -720,6 +681,10 @@ Item {
         if (words.clean_up !== undefined) {
             items.push(entry(idCleanUp, words.clean_up))
         }
+        if (words.snap_to_grid !== undefined) {
+            items.push(entry(idSnapToGrid, words.snap_to_grid, snapToGrid))
+            items.push(separator)
+        }
         for (let number = 0; number < orders.length; number++) {
             const word = words["sort_by_" + orders[number]]
             if (word !== undefined) {
@@ -741,6 +706,12 @@ Item {
             trashPicked()
         } else if (id === idCleanUp) {
             cleanUp()
+        } else if (id === idSnapToGrid) {
+            // the icons stay in their slots when it is turned off again
+            if (!snapToGrid) {
+                cleanUp()
+            }
+            userChoices.set("desktop_files", "snap_to_grid", !snapToGrid)
         } else if (id === idDuplicate) {
             duplicatePicked()
         } else if (id === idRename) {

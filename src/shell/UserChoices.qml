@@ -62,6 +62,8 @@ Item {
         id: file
         path: choices.settings.user_choices_file ?? ""
         blockLoading: true
+        // an async write leaves text() one write behind, and set() builds on it
+        blockWrites: true
         printErrors: false
 
         // The settings window writes the file too; follow it at once.
