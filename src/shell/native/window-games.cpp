@@ -24,6 +24,7 @@ WindowGames::WindowGames(QObject* parent) : QObject(parent)
         if (event.value("event").toString() == "view-mapped")
         {
             takeWindow(event.value("view").toObject());
+            takeLauncher(event.value("view").toObject());
         }
     });
     compositor.open();
@@ -42,6 +43,7 @@ void WindowGames::startWatching()
         for (const QJsonValue& window : answer.value("list").toArray())
         {
             takeWindow(window.toObject());
+            takeLauncher(window.toObject());
         }
     });
 }
@@ -61,6 +63,22 @@ void WindowGames::takeWindow(const QJsonObject& description)
     }
     qDebug().noquote() << "[games] app=" + appId << "steam_id=" + game.steamId << "name=" + game.name;
     games.insert(appId, game);
+    changes += 1;
+    emit changed();
+}
+
+// the desktop entry whose launch made the window's systemd unit
+void WindowGames::takeLauncher(const QJsonObject& description)
+{
+    const QString appId = description.value("app-id").toString();
+    const int pid = description.value("pid").toInt(-1);
+    const QStringList ids = entryIdsOfCgroup(contents(QString("/proc/%1/cgroup").arg(pid)));
+    if (ids == launchers.value(appId))
+    {
+        return;
+    }
+    qDebug().noquote() << "[games] app=" + appId << "launcher=" + ids.join(',');
+    launchers.insert(appId, ids);
     changes += 1;
     emit changed();
 }
@@ -119,4 +137,9 @@ QString WindowGames::steamIcon(const QString& id) const
 QString WindowGames::lutrisIcon(const QString& gameName) const
 {
     return game_facts::lutrisIcon(gameName);
+}
+
+QStringList WindowGames::launcherEntries(const QString& appId, int) const
+{
+    return launchers.value(appId);
 }

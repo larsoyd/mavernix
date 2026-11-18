@@ -56,22 +56,22 @@ class GameFactsTest : public QObject
 
     void steam_libraries()
     {
-        const QString file = R"("libraryfolders"
-{
-	"0"
-	{
-		"path"		"/home/you/.local/share/Steam"
-		"label"		""
-		"apps"
-		{
-			"228980"		"353969662"
-		}
-	}
-	"1"
-	{
-		"path"		"/mnt/games/My \"Steam\" Library"
-	}
-})";
+        const QString file = "\"libraryfolders\"\n"
+                             "{\n"
+                             "\t\"0\"\n"
+                             "\t{\n"
+                             "\t\t\"path\"\t\t\"/home/you/.local/share/Steam\"\n"
+                             "\t\t\"label\"\t\t\"\"\n"
+                             "\t\t\"apps\"\n"
+                             "\t\t{\n"
+                             "\t\t\t\"228980\"\t\t\"353969662\"\n"
+                             "\t\t}\n"
+                             "\t}\n"
+                             "\t\"1\"\n"
+                             "\t{\n"
+                             "\t\t\"path\"\t\t\"/mnt/games/My \\\"Steam\\\" Library\"\n"
+                             "\t}\n"
+                             "}";
         QCOMPARE(steamLibraries(file),
                  QStringList({"/home/you/.local/share/Steam", "/mnt/games/My \"Steam\" Library"}));
         QCOMPARE(steamLibraries(""), QStringList());
@@ -100,6 +100,33 @@ class GameFactsTest : public QObject
                  QString("lutris_the-elder-scrolls-v-skyrim-special-edition"));
         QCOMPARE(lutrisIcon("Bastion"), QString("lutris_bastion"));
         QCOMPARE(lutrisIcon(""), QString());
+    }
+
+    void entry_ids_of_cgroup_data()
+    {
+        QTest::addColumn<QByteArray>("cgroup");
+        QTest::addColumn<QStringList>("ids");
+        const QByteArray user = "0::/user.slice/user-1000.slice/user@1000.service/app.slice/";
+        QTest::newRow("our service") << user + "app-app\\x2dmavernix\\x2dopen\\x5cx2dnectar.slice/"
+                                                "app-mavernix-open\\x2dnectar\\x2dpikmin@3cd31d27.service\n"
+                                     << QStringList{"mavernix-open-nectar-pikmin", "open-nectar-pikmin"};
+        QTest::newRow("kio service") << user + "app-kitty@14289cb3.service\n" << QStringList{"kitty"};
+        QTest::newRow("kio scope") << user + "app-org.kde.konsole-10169.scope\n" << QStringList{"org.kde.konsole"};
+        QTest::newRow("unescaped scope") << user + "app-mullvad-vpn-1660.scope\n" << QStringList{"mullvad-vpn", "vpn"};
+        QTest::newRow("service without random") << user + "app-foot.service\n" << QStringList{"foot"};
+        QTest::newRow("group inside the unit") << user + "app-gimp@1.service/main\n" << QStringList{"gimp"};
+        QTest::newRow("among v1 lines") << "1:net_cls:/\n" + user + "app-gimp@1.service\n" << QStringList{"gimp"};
+        QTest::newRow("dbus service") << user + "../background.slice/plasma-dolphin.service\n" << QStringList{};
+        QTest::newRow("only a slice") << user + "app-app\\x2dmavernix\\x2dsteam.slice\n" << QStringList{};
+        QTest::newRow("v1 only") << QByteArray("1:name=systemd:/app-gimp@1.service\n") << QStringList{};
+        QTest::newRow("nothing") << QByteArray() << QStringList{};
+    }
+
+    void entry_ids_of_cgroup()
+    {
+        QFETCH(QByteArray, cgroup);
+        QFETCH(QStringList, ids);
+        QCOMPARE(entryIdsOfCgroup(cgroup), ids);
     }
 };
 

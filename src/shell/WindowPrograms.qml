@@ -67,8 +67,24 @@ Singleton {
         if (own !== null) {
             return own
         }
-        const id = steamEntries[steamId(appId)] ?? namedEntries[gameName(appId)]
-        return id !== undefined ? DesktopEntries.byId(id) : null
+        const steam = steamId(appId)
+        const game = gameName(appId)
+        if (steam !== "" || game !== "" || known(appId) !== null) {
+            const id = steamEntries[steam] ?? namedEntries[game]
+            return id !== undefined ? DesktopEntries.byId(id) : null
+        }
+        return launcher(appId)
+    }
+
+    // the entry that started the window's process, unless that is a terminal running something else
+    function launcher(appId) {
+        for (const id of games.launcherEntries(appId, games.revision)) {
+            const found = DesktopEntries.byId(id)
+            if (found !== null) {
+                return found.categories.includes("TerminalEmulator") ? null : found
+            }
+        }
+        return null
     }
 
     function name(appId) {

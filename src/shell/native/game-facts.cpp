@@ -89,4 +89,34 @@ QString lutrisIcon(const QString& gameName)
     slug.remove(QRegularExpression("^-|-$"));
     return slug.isEmpty() ? QString() : "lutris_" + slug;
 }
+
+// app[-launcher]-ID[@random].service or app[-launcher]-ID-random.scope, with a dash in ID written \x2d
+QStringList entryIdsOfCgroup(const QByteArray& cgroup)
+{
+    static const QRegularExpression service("^app-(.+?)(?:@[^/]*)?\\.service$");
+    static const QRegularExpression scope("^app-(.+)-[^-]+\\.scope$");
+    const QByteArray path = cgroup.startsWith("0::") ? cgroup : cgroup.mid(cgroup.indexOf("\n0::") + 1);
+    if (!path.startsWith("0::"))
+    {
+        return {};
+    }
+    for (const QString& unit : QString::fromUtf8(path.mid(3, path.indexOf('\n') - 3)).split('/'))
+    {
+        auto found = service.match(unit);
+        found = found.hasMatch() ? found : scope.match(unit);
+        if (!found.hasMatch())
+        {
+            continue;
+        }
+        const QString name = found.captured(1);
+        const auto plain = [](const QString& escaped) {
+            QByteArray bytes = escaped.toUtf8();
+            bytes.replace("\\x", "%");
+            return QString::fromUtf8(QByteArray::fromPercentEncoding(bytes));
+        };
+        const qsizetype launcher = name.indexOf('-');
+        return launcher < 0 ? QStringList{plain(name)} : QStringList{plain(name), plain(name.mid(launcher + 1))};
+    }
+    return {};
+}
 }

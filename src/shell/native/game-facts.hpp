@@ -18,4 +18,5 @@ QStringList steamLibraries(const QString& libraryFolders);
 QString manifestName(const QString& manifest);
 QString clientIconOf(const QStringList& cachedFiles);
 QString lutrisIcon(const QString& gameName);
+QStringList entryIdsOfCgroup(const QByteArray& cgroup);
 }

@@ -25,6 +25,7 @@ class WindowGames : public QObject
     Q_INVOKABLE QString steamName(const QString& id) const;
     Q_INVOKABLE QString steamIcon(const QString& id) const;
     Q_INVOKABLE QString lutrisIcon(const QString& gameName) const;
+    Q_INVOKABLE QStringList launcherEntries(const QString& appId, int revision) const;
 
   signals:
     void changed();
@@ -32,9 +33,11 @@ class WindowGames : public QObject
   private:
     void startWatching();
     void takeWindow(const QJsonObject& description);
+    void takeLauncher(const QJsonObject& description);
     QStringList steamFolders() const;
 
     CompositorSocket compositor;
     QHash<QString, game_facts::ProcessGame> games;
+    QHash<QString, QStringList> launchers;
     int changes = 0;
 };
