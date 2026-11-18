@@ -8,6 +8,7 @@
 #   mavernix-file-action shortcut FOLDER ID [NAME [ICON]]
 #                                                  a launcher in FOLDER for the program with desktop entry ID,
 #                                                  under NAME and with ICON if the user chose their own
+#   mavernix-file-action send-to-desktop FILE...   a launcher on the desktop for each program entry, a link for anything else
 set -eu
 
 # A path in FOLDER for NAME + EXTENSION that is not taken yet: NAME, then
@@ -53,6 +54,43 @@ entry_file() {
     return 1
 }
 
+# a copy of ENTRY in FOLDER named after the program, with NAME and ICON when the user chose them
+place_launcher() {
+    folder=$1 entry=$2 fallback=$3
+    name=$4
+    [ -n "$name" ] || name=$(sed -n 's/^Name=//p' "$entry" | head -n 1)
+    [ -n "$name" ] || name=$fallback
+    mkdir -p "$folder"
+    launcher=$(free_path "$folder" "$(printf '%s' "$name" | tr / -)" .desktop)
+    # a chosen name and icon replace the program's own, not those of its actions
+    WANTED_NAME=$4 WANTED_ICON=$5 awk '
+        /^\[/ { in_entry = ($0 == "[Desktop Entry]") }
+        in_entry && /^Name=/ && ENVIRON["WANTED_NAME"] != "" { print "Name=" ENVIRON["WANTED_NAME"]; next }
+        in_entry && /^Icon=/ && ENVIRON["WANTED_ICON"] != "" { print "Icon=" ENVIRON["WANTED_ICON"]; next }
+        { print }' "$entry" > "$launcher"
+    # executable, so the desktop takes it as a trusted launcher
+    chmod 755 "$launcher"
+}
+
+# the folder the desktop shows, from the running shell's config when there is one
+desktop_folder() {
+    wanted=""
+    if [ -n "${DESKTOP_SHELL_SETTINGS:-}" ] && [ -f "$DESKTOP_SHELL_SETTINGS" ]; then
+        wanted=$(python3 -c 'import json, sys
+print(json.load(open(sys.argv[1]))["config"].get("desktop_files", {}).get("folder", ""))' "$DESKTOP_SHELL_SETTINGS") || wanted=""
+    fi
+    [ -n "$wanted" ] || wanted="~/Desktop"
+    case "$wanted" in
+    "~"*) wanted=$HOME${wanted#"~"} ;;
+    esac
+    printf '%s\n' "$wanted"
+}
+
+is_program_entry() {
+    case "$1" in *.desktop) ;; *) return 1 ;; esac
+    awk '/^\[/ { in_entry = ($0 == "[Desktop Entry]") } in_entry && $0 == "Type=Application" { found = 1 } END { exit !found }' "$1"
+}
+
 action=${1:-}
 [ $# -gt 0 ] && shift
 case "$action" in
@@ -84,22 +122,28 @@ duplicate)
 shortcut)
     [ $# -ge 2 ] && [ $# -le 4 ] || { echo "usage: mavernix-file-action shortcut FOLDER ID [NAME [ICON]]" >&2; exit 2; }
     entry=$(entry_file "$2") || { echo "mavernix-file-action: no desktop entry for $2" >&2; exit 1; }
-    name=${3:-}
-    [ -n "$name" ] || name=$(sed -n 's/^Name=//p' "$entry" | head -n 1)
-    [ -n "$name" ] || name=$2
-    mkdir -p "$1"
-    launcher=$(free_path "$1" "$(printf '%s' "$name" | tr / -)" .desktop)
-    # a chosen name and icon replace the program's own, not those of its actions
-    WANTED_NAME=${3:-} WANTED_ICON=${4:-} awk '
-        /^\[/ { in_entry = ($0 == "[Desktop Entry]") }
-        in_entry && /^Name=/ && ENVIRON["WANTED_NAME"] != "" { print "Name=" ENVIRON["WANTED_NAME"]; next }
-        in_entry && /^Icon=/ && ENVIRON["WANTED_ICON"] != "" { print "Icon=" ENVIRON["WANTED_ICON"]; next }
-        { print }' "$entry" > "$launcher"
-    # executable, so the desktop takes it as a trusted launcher
-    chmod 755 "$launcher"
+    place_launcher "$1" "$entry" "$2" "${3:-}" "${4:-}"
+    ;;
+send-to-desktop)
+    [ $# -ge 1 ] || { echo "usage: mavernix-file-action send-to-desktop FILE..." >&2; exit 2; }
+    for file in "$@"; do
+        [ -e "$file" ] || [ -L "$file" ] || { echo "mavernix-file-action: no such file $file" >&2; exit 1; }
+    done
+    folder=$(desktop_folder)
+    for file in "$@"; do
+        file=$(realpath -s "$file")
+        [ "$(dirname "$file")" -ef "$folder" ] && continue
+        if is_program_entry "$file"; then
+            place_launcher "$folder" "$file" "$(basename "$file" .desktop)" "" ""
+            continue
+        fi
+        mkdir -p "$folder"
+        split_name "$file"
+        ln -s "$file" "$(free_path "$folder" "$base" "$extension")"
+    done
     ;;
 *)
-    echo "usage: mavernix-file-action new-folder|move-into|duplicate|shortcut ..." >&2
+    echo "usage: mavernix-file-action new-folder|move-into|duplicate|shortcut|send-to-desktop ..." >&2
     exit 2
     ;;
 esac

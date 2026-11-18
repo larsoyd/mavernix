@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Service
+MimeType=all/all;
+Actions=sendToDesktop
+X-KDE-Protocols=file
+
+[Desktop Action sendToDesktop]
+Name=Create Desktop Shortcut
+Icon=user-desktop
+Exec=@LIBRARY_DIR@/session/bin/mavernix-file-action send-to-desktop %F

@@ -72,3 +72,10 @@ configure_file(
     configuration: paths,
     install_dir: get_option('datadir') / 'wayland-sessions',
 )
+
+configure_file(
+    input: 'send-to-desktop.desktop.in',
+    output: 'mavernix-send-to-desktop.desktop',
+    configuration: paths,
+    install_dir: get_option('datadir') / 'kio' / 'servicemenus',
+)
