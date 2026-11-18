@@ -3,13 +3,19 @@
 usage: file_shortcut.py FILE LAUNCHER NAME
 """
 
+import configparser
+import glob
 import hashlib
 import io
 import os
 import re
+import shlex
+import shutil
 import struct
 import subprocess
 import sys
+import tempfile
+from pathlib import Path
 
 import pefile
 from PIL import Image
@@ -61,10 +67,10 @@ def windows_icon(path):
     return struct.pack("<HHH", 0, 1, count) + b"".join(entries) + b"".join(blobs)
 
 
-def saved_icon(ico):
-    """The largest picture of ICO as a PNG in the user's data folder, or None."""
+def saved_icon(data):
+    """The largest picture in DATA as a PNG in the user's data folder, or None."""
     try:
-        picture = Image.open(io.BytesIO(ico))
+        picture = Image.open(io.BytesIO(data))
         out = io.BytesIO()
         picture.convert("RGBA").save(out, "PNG")
     except (OSError, ValueError, SyntaxError):
@@ -79,18 +85,56 @@ def saved_icon(ico):
     return path
 
 
-def kind_icon(path):
-    shown = subprocess.run(["gio", "info", "-a", "standard::icon", path], capture_output=True, text=True,
-                           timeout=10).stdout
+def file_info(path, attribute):
+    shown = subprocess.run(["gio", "info", "-a", attribute, path], capture_output=True, text=True, timeout=10).stdout
     for line in shown.splitlines():
-        if "standard::icon:" in line:
-            return line.split(":", 3)[-1].split(",")[0].strip()
-    return "application-x-generic"
+        if f"{attribute}:" in line:
+            return line.split(":", 3)[-1].strip()
+    return ""
+
+
+def kind_icon(path):
+    return file_info(path, "standard::icon").split(",")[0].strip() or "application-x-generic"
+
+
+def thumbnailers():
+    homes = [os.environ.get("XDG_DATA_HOME") or os.path.expanduser("~/.local/share")]
+    homes += (os.environ.get("XDG_DATA_DIRS") or "/usr/local/share:/usr/share").split(":")
+    for home in homes:
+        yield from sorted(glob.glob(os.path.join(home, "thumbnailers", "*.thumbnailer")))
+
+
+def preview(path):
+    """The picture the file's freedesktop thumbnailer draws for it, saved like an icon, or None."""
+    kind = file_info(path, "standard::content-type")
+    for entry in thumbnailers():
+        config = configparser.ConfigParser(interpolation=None)
+        try:
+            config.read(entry, encoding="utf-8")
+            section = config["Thumbnailer Entry"]
+        except (configparser.Error, KeyError, UnicodeDecodeError):
+            continue
+        if kind not in section.get("MimeType", "").split(";"):
+            continue
+        if section.get("TryExec") and not shutil.which(section["TryExec"]):
+            continue
+        with tempfile.TemporaryDirectory() as folder:
+            output = os.path.join(folder, "preview.png")
+            fields = {"i": path, "u": Path(path).as_uri(), "o": output, "s": "512", "%": "%"}
+            try:
+                command = [re.sub(r"%([iuos%])", lambda match: fields[match[1]], word)
+                           for word in shlex.split(section["Exec"])]
+                subprocess.run(command, capture_output=True, timeout=30, check=True)
+                with open(output, "rb") as file:
+                    return saved_icon(file.read())
+            except (OSError, ValueError, KeyError, IndexError, subprocess.SubprocessError):
+                return None
+    return None
 
 
 def icon_for(path):
     ico = windows_icon(path)
-    return (ico and saved_icon(ico)) or kind_icon(path)
+    return (ico and saved_icon(ico)) or preview(path) or kind_icon(path)
 
 
 def main():

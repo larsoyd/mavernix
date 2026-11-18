@@ -144,6 +144,61 @@ class SendToDesktop(unittest.TestCase):
         self.assertEqual(Image.open(icon).size, (48, 48))
         self.assertEqual(Image.open(icon).convert("RGB").getpixel((8, 8)), (200, 30, 40))
 
+    def previewer(self, command, needs="python3", kind="application/x-n64-rom", system=None, file=None):
+        folder = self.home / ".local/share/thumbnailers"
+        folder.mkdir(parents=True)
+        (folder / "a-broken.thumbnailer").write_text(f"MimeType={kind};\n")
+        share = self.root / "share"
+        (share / "thumbnailers").mkdir(parents=True)
+        (share / "mime").symlink_to("/usr/share/mime")
+        self.environment["XDG_DATA_DIRS"] = str(share)
+        entry = "[Thumbnailer Entry]\nTryExec={}\nExec={}\nMimeType={};\n"
+        (folder / "cartridge.thumbnailer").write_text(entry.format(needs, command, kind))
+        if system:
+            (share / "thumbnailers" / "a-system.thumbnailer").write_text(entry.format("python3", system, kind))
+        game = file or self.files / "kart.z64"
+        if not game.exists():
+            game.write_bytes(b"\x80\x37\x12\x40" + bytes(4092))
+        self.assertEqual(self.send(game).returncode, 0)
+        return self.entry(self.desktop / f"{game.stem}.desktop")["Icon"]
+
+    def test_a_file_with_a_preview_shows_its_preview(self):
+        icon = Path(self.previewer(f'python3 -c "{self.DRAW}" %o %s'))
+        self.assertTrue(icon.is_absolute(), icon)
+        with Image.open(icon) as picture:
+            self.assertEqual(picture.size, (512, 512))
+            self.assertEqual(picture.convert("RGB").getpixel((256, 256)), (250, 0, 250))
+
+    def test_the_users_own_previewer_wins_over_the_systems(self):
+        icon = Path(self.previewer(f'python3 -c "{self.DRAW}" %o %s', system="python3 -c 'raise SystemExit(1)'"))
+        self.assertTrue(icon.is_absolute(), icon)
+
+    def test_a_previewer_for_another_kind_is_not_asked(self):
+        notes = self.files / "notes.txt"
+        notes.write_text("hello\n")
+        self.assertEqual(self.previewer(f'python3 -c "{self.DRAW}" %o %s', file=notes), "text-plain")
+
+    def test_a_windows_programs_own_icon_wins_over_a_preview(self):
+        game = self.files / "game.exe"
+        game.write_bytes(windows_program_with_icon((48, (200, 30, 40)),))
+        kind = subprocess.run(["gio", "info", "-a", "standard::content-type", str(game)], capture_output=True,
+                              text=True, timeout=10).stdout.rsplit(":", 1)[-1].strip()
+        icon = self.previewer(f'python3 -c "{self.DRAW}" %o %s', kind=kind, file=game)
+        with Image.open(icon) as picture:
+            self.assertEqual(picture.convert("RGB").getpixel((8, 8)), (200, 30, 40))
+
+    DRAW = "from PIL import Image; import sys; Image.new('RGBA', (int(sys.argv[2]),) * 2, (250, 0, 250, 255)).save(sys.argv[1], 'PNG')"
+
+    def test_a_previewer_whose_program_is_missing_is_passed_over(self):
+        self.assertEqual(self.previewer(f'python3 -c "{self.DRAW}" %o %s', needs="no-such-previewer"),
+                         "application-x-n64-rom")
+
+    def test_a_previewer_with_a_broken_command_leaves_the_icon_of_its_kind(self):
+        self.assertEqual(self.previewer('python3 -c "unclosed'), "application-x-n64-rom")
+
+    def test_a_preview_that_fails_leaves_the_icon_of_its_kind(self):
+        self.assertEqual(self.previewer("python3 -c 'raise SystemExit(1)'"), "application-x-n64-rom")
+
     def test_a_link_to_a_file_opens_the_file_from_its_real_folder(self):
         game = self.files / "game.exe"
         game.write_bytes(b"MZ")
