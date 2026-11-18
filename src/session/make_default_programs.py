@@ -13,9 +13,14 @@ Written as OUTPUT-FOLDER/mimeapps.list, which start-desktop adds to
 XDG_CONFIG_DIRS. Without it, the first registered program in alphabetical
 order wins, so a web browser often opens pictures. The user's own
 ~/.config/mimeapps.list still comes first; uninstalled programs are skipped.
+
+The terminal that [commands] terminal runs goes into OUTPUT-FOLDER/kdeglobals,
+locked, so KDE programs open it too and not one Plasma left in the user's
+own kdeglobals.
 """
 
 import json
+import shlex
 import sys
 from pathlib import Path
 
@@ -49,12 +54,30 @@ def write_mimeapps_list(groups, output_folder):
     (Path(output_folder) / "mimeapps.list").write_text("\n".join(lines) + "\n")
 
 
+def read_terminal(shell_settings_file):
+    config = json.loads(Path(shell_settings_file).read_text())["config"]
+    command = config.get("commands", {}).get("terminal", {}).get("run", [])
+    if not isinstance(command, list) or not all(isinstance(word, str) for word in command):
+        raise SystemExit("[commands] terminal: 'run' must be a list of words.")
+    return command
+
+
+def write_kde_terminal(command, output_folder):
+    # an empty service too, or a TerminalService in the user's file comes first
+    lines = ["[General]", f"TerminalApplication[$i]={shlex.join(command)}", "TerminalService[$i]="]
+    Path(output_folder).mkdir(parents=True, exist_ok=True)
+    (Path(output_folder) / "kdeglobals").write_text("\n".join(lines) + "\n")
+
+
 def main():
     if len(sys.argv) != 3:
         raise SystemExit("usage: make_default_programs.py SHELL.json OUTPUT-FOLDER")
     groups = read_groups(sys.argv[1])
     if groups:
         write_mimeapps_list(groups, sys.argv[2])
+    terminal = read_terminal(sys.argv[1])
+    if terminal:
+        write_kde_terminal(terminal, sys.argv[2])
 
 
 if __name__ == "__main__":

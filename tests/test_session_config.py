@@ -2223,6 +2223,40 @@ wait $shell || true
                       (output / "xdg" / "gtk-3.0" / "settings.ini").read_text().splitlines())
 
 
+class TestDefaultPrograms(SessionTestCase):
+    def written_kdeglobals(self, config):
+        settings = self.home / "shell.json"
+        settings.parent.mkdir(parents=True, exist_ok=True)
+        if config is None:
+            self.run_script("make_shell_config.py", CONFIG_DIR / "plain.toml", settings)
+        else:
+            settings.write_text(json.dumps({"config": config}))
+        output = self.home / "default-programs"
+        self.run_script("make_default_programs.py", settings, output)
+        written = output / "kdeglobals"
+        return written.read_text().splitlines() if written.exists() else None
+
+    def test_kde_programs_open_the_terminal_super_enter_opens(self):
+        # unlocked, a terminal plasma left in the user's kdeglobals wins
+        self.assertEqual(self.written_kdeglobals(None),
+                         ["[General]", "TerminalApplication[$i]=foot", "TerminalService[$i]="])
+
+    def test_a_terminal_command_keeps_its_words(self):
+        config = {"commands": {"terminal": {"key": "<super> KEY_ENTER", "run": ["foot", "-e", "tmux new"]}}}
+        self.assertIn("TerminalApplication[$i]=foot -e 'tmux new'", self.written_kdeglobals(config) or [])
+
+    def test_a_terminal_command_that_is_not_a_list_is_refused(self):
+        settings = self.home / "shell.json"
+        settings.parent.mkdir(parents=True)
+        settings.write_text(json.dumps({"config": {"commands": {"terminal": {"run": "foot"}}}}))
+        result = self.run_script("make_default_programs.py", settings, self.home / "out", may_fail=True)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("[commands] terminal", result.stderr)
+
+    def test_without_a_terminal_command_kde_keeps_its_own(self):
+        self.assertIsNone(self.written_kdeglobals({"commands": {}}))
+
+
 class TestCsdFrames(SessionTestCase):
     FLOATING = ("window.csd:not(.popup):not(.maximized):not(.fullscreen):not(.tiled)"
                 ":not(.tiled-top):not(.tiled-right):not(.tiled-bottom):not(.tiled-left)")
