@@ -51,6 +51,7 @@ install_data(
     'run_xsettings.py',
     'steam_window_buttons.py',
     'kded5rc',
+    'file_shortcut.py',
     install_dir: session_dir,
 )
 install_subdir('quick-style', install_dir: mavernix_libdir / 'qml', strip_directory: true)

@@ -8,7 +8,7 @@
 #   mavernix-file-action shortcut FOLDER ID [NAME [ICON]]
 #                                                  a launcher in FOLDER for the program with desktop entry ID,
 #                                                  under NAME and with ICON if the user chose their own
-#   mavernix-file-action send-to-desktop FILE...   a launcher on the desktop for each program entry, a link for anything else
+#   mavernix-file-action send-to-desktop FILE...   a launcher on the desktop for each file, a link for each folder
 set -eu
 
 # A path in FOLDER for NAME + EXTENSION that is not taken yet: NAME, then
@@ -139,7 +139,12 @@ send-to-desktop)
         fi
         mkdir -p "$folder"
         split_name "$file"
-        ln -s "$file" "$(free_path "$folder" "$base" "$extension")"
+        if [ -d "$file" ]; then
+            ln -s "$file" "$(free_path "$folder" "$base" "")"
+            continue
+        fi
+        # a link would run the file from the desktop, away from what lies beside it
+        python3 "$(dirname "$0")/../file_shortcut.py" "$(realpath "$file")" "$(free_path "$folder" "$base" .desktop)" "$base"
     done
     ;;
 *)

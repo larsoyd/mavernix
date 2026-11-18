@@ -17,6 +17,7 @@ BuildRequires:  gcc-c++
 BuildRequires:  meson >= 1.3.0
 BuildRequires:  python3
 BuildRequires:  python3-pillow
+BuildRequires:  python3-pefile
 BuildRequires:  glm-devel
 BuildRequires:  vulkan-headers
 BuildRequires:  pkgconfig(wayfire) = %{wayfire_version}
@@ -54,6 +55,7 @@ Requires:       qt6-qtimageformats
 Requires:       qt6-qtimageformats
 Requires:       python3
 Requires:       python3-pillow
+Requires:       python3-pefile
 Requires:       kvantum
 Requires:       qt6ct
 Requires:       gsettings-desktop-schemas
