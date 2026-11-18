@@ -2070,6 +2070,34 @@ wait $shell || true
         self.assertIn("carried on", result.stdout)
         self.assertIn("configure-desktop", result.stderr)
 
+    def rom_previews(self, rc_text, environment=None):
+        rc = self.home / ".config/dolphinrc"
+        rc.parent.mkdir(parents=True, exist_ok=True)
+        if rc_text is None:
+            rc.mkdir()
+        else:
+            rc.write_text(rc_text)
+        setup = (f"set -euo pipefail\nsession_dir={shlex.quote(str(SESSION_SOURCE_DIR))}\n"
+                 f"enable_rom_previews\necho carried on")
+        runs = {"XDG_STATE_HOME": str(self.home / ".local/state"), **(environment or {})}
+        return self.session_functions("enable_rom_previews", setup=setup, environment=runs), rc
+
+    def test_dolphins_own_preview_list_gets_the_cartridges(self):
+        result, rc = self.rom_previews("[PreviewSettings]\nPlugins=imagethumbnail\n")
+        self.assertIn("carried on", result.stdout)
+        self.assertEqual(rc.read_text(), "[PreviewSettings]\nPlugins=imagethumbnail,mavernix-n64\n")
+        self.assertTrue((self.home / ".local/state/mavernix/n64-previews-added").exists())
+
+    def test_an_unreadable_dolphinrc_does_not_stop_the_desktop(self):
+        result, _ = self.rom_previews(None)
+        self.assertIn("carried on", result.stdout)
+        self.assertIn("configure-desktop", result.stderr)
+
+    def test_a_nested_desktop_leaves_dolphin_alone(self):
+        text = "[PreviewSettings]\nPlugins=imagethumbnail\n"
+        _, rc = self.rom_previews(text, environment={"DESKTOP_NESTED": "1"})
+        self.assertEqual(rc.read_text(), text)
+
     def exported_greeter_look(self, settings=None, environment=None):
         inbox = self.home / "inbox"
         (inbox / "ada").mkdir(parents=True, exist_ok=True)

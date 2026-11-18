@@ -266,6 +266,13 @@ test(
 )
 
 test(
+    'n64-art',
+    python,
+    args: [files('test_n64_art.py')],
+    timeout: 60,
+)
+
+test(
     'file-action',
     python,
     args: [files('test_file_action.py')],

@@ -389,6 +389,17 @@ write_libreoffice_launchers() {
     fi
 }
 
+# dolphin runs only the previews in its saved list, so the cartridge one joins it once
+enable_rom_previews() {
+    if [[ -n "${DESKTOP_NESTED:-}" ]]; then
+        return 0
+    fi
+    if ! python3 "$session_dir/n64_art.py" enable-in-dolphin "${XDG_CONFIG_HOME:-$HOME/.config}/dolphinrc" \
+        "${XDG_STATE_HOME:-$HOME/.local/state}/mavernix/n64-previews-added"; then
+        echo "configure-desktop: could not add the cartridge previews to Dolphin (message above); ROMs keep their plain icon." >&2
+    fi
+}
+
 # GIMP's stylesheet hides the GTK theme's window buttons, so it gets them from its own.
 link_gimp_style() {
     local theme="$app_theme/share/themes/DesktopTheme"
@@ -457,6 +468,7 @@ configure_everything() {
     write_application_themes
     write_libreoffice_launchers
     link_reaper_menu
+    enable_rom_previews
     write_interface_settings
     write_default_programs
     write_program_entries

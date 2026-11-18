@@ -5,6 +5,7 @@ install_subdir('config', install_dir: mavernix_datadir)
 install_subdir('extensions', install_dir: mavernix_datadir)
 install_subdir('themes', install_dir: mavernix_datadir)
 install_data('emoji/emoji.tsv', install_dir: mavernix_datadir / 'emoji')
+install_data('n64/cartridge.png', install_dir: mavernix_datadir / 'n64')
 subdir('icons')
 
 # The keys the theme documents name, which check_theme.py holds themes to.

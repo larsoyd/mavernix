@@ -52,6 +52,7 @@ install_data(
     'steam_window_buttons.py',
     'kded5rc',
     'file_shortcut.py',
+    'n64_art.py',
     install_dir: session_dir,
 )
 install_subdir('quick-style', install_dir: mavernix_libdir / 'qml', strip_directory: true)
@@ -79,4 +80,12 @@ configure_file(
     output: 'mavernix-send-to-desktop.desktop',
     configuration: paths,
     install_dir: get_option('datadir') / 'kio' / 'servicemenus',
+)
+
+# dolphin draws nintendo 64 roms as cartridges with the game's logo
+configure_file(
+    input: 'mavernix-n64.thumbnailer.in',
+    output: 'mavernix-n64.thumbnailer',
+    configuration: paths,
+    install_dir: get_option('datadir') / 'thumbnailers',
 )

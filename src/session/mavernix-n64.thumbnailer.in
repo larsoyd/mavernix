@@ -1,0 +1,4 @@
+[Thumbnailer Entry]
+TryExec=python3
+Exec=python3 @LIBRARY_DIR@/session/n64_art.py thumbnail @DATA_DIR@/n64/cartridge.png %i %o %s
+MimeType=application/x-n64-rom;
