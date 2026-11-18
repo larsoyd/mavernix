@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <defs>
+    <filter id="filter-1" filterUnits="userSpaceOnUse" x="6.52" y="188.27" width="1010.96" height="710.51" color-interpolation-filters="sRGB"><feGaussianBlur in="SourceGraphic" stdDeviation="11.66"/></filter>
+    <filter id="filter-2" filterUnits="userSpaceOnUse" x="39.85" y="196.275" width="944.3" height="643.675" color-interpolation-filters="sRGB"><feGaussianBlur in="SourceGraphic" stdDeviation="2.65"/></filter>
+    <linearGradient id="linear-gradient-1" x1="-30.7" y1="781.2" x2="-30.7" y2="836.4" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#7b7f86"/>
+      <stop offset="1" stop-color="#5d6168"/>
+    </linearGradient>
+    <linearGradient id="linear-gradient-2" x1="-30.7" y1="177" x2="-30.7" y2="823.6" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#c3c6cb"/>
+      <stop offset="0.45" stop-color="#a9adb3"/>
+      <stop offset="1" stop-color="#8c9097"/>
+    </linearGradient>
+    <linearGradient id="linear-gradient-3" x1="-30.7" y1="177" x2="-30.7" y2="823.6" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#000000" stop-opacity="0"/>
+      <stop offset="1" stop-color="#000000" stop-opacity="0.1"/>
+    </linearGradient>
+    <linearGradient id="linear-gradient-4" x1="-30.7" y1="306.4" x2="-30.7" y2="719.8" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#8d9197"/>
+      <stop offset="1" stop-color="#a6aab0"/>
+    </linearGradient>
+    <linearGradient id="linear-gradient-5" x1="-30.7" y1="306.4" x2="-30.7" y2="719.8" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#55595f"/>
+      <stop offset="0.5" stop-color="#7c8086"/>
+      <stop offset="1" stop-color="#d6d9dd"/>
+    </linearGradient>
+    <linearGradient id="linear-gradient-6" x1="-30.7" y1="306.4" x2="-30.7" y2="348.8" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#000000" stop-opacity="0.22"/>
+      <stop offset="1" stop-color="#000000" stop-opacity="0"/>
+    </linearGradient>
+    <linearGradient id="linear-gradient-7" x1="-30.7" y1="317" x2="-30.7" y2="709.2" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#fbfaf7"/>
+      <stop offset="1" stop-color="#ebe8e0"/>
+    </linearGradient>
+    <linearGradient id="linear-gradient-8" x1="-30.7" y1="317" x2="-30.7" y2="355.1" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#000000" stop-opacity="0.16"/>
+      <stop offset="1" stop-color="#000000" stop-opacity="0"/>
+    </linearGradient>
+  </defs>
+  <title>cart-blank</title>
+  <g id="Layer_1" data-name="Layer 1">
+    <g filter="url(#filter-1)">
+      <path id="ground_shadow" data-name="ground shadow" d="M43.5 317 C43.5 297 59.6 276.7 79.5 274.6 C308.5 208.8 715.5 208.8 944.5 274.6 C964.4 276.7 980.5 297 980.5 317 L980.5 787.6 L967.8 802.4 L967.8 847 C967.8 855.4 961.4 861.8 953 861.8 L71 861.8 C62.6 861.8 56.2 855.4 56.2 847 L56.2 802.4 L43.5 787.6 Z" fill="#000000" opacity="0.34"/>
+    </g>
+    <g filter="url(#filter-2)">
+      <path id="contact_shadow" data-name="contact shadow" d="M49.8 297.9 C49.8 278 66 257.6 85.9 255.5 C314.8 189.8 709.2 189.8 938.1 255.5 C958 257.6 974.2 278 974.2 297.9 L974.2 762.2 L961.4 777 L961.4 815.2 C961.4 823.6 955.1 830 946.6 830 L77.4 830 C68.9 830 62.6 823.6 62.6 815.2 L62.6 777 L49.8 762.2 Z" fill="#000000" opacity="0.38"/>
+    </g>
+    <path id="underside" d="M49.8 304.2 C49.8 284.3 66 264 85.9 261.8 C314.8 196.1 709.2 196.1 938.1 261.8 C958 264 974.2 284.3 974.2 304.2 L974.2 768.5 L961.4 783.4 L961.4 821.5 C961.4 830 955.1 836.4 946.6 836.4 L77.4 836.4 C68.9 836.4 62.6 830 62.6 821.5 L62.6 783.4 L49.8 768.5 Z" fill="url(#linear-gradient-1)" stroke="#55595f" stroke-width="3.18" stroke-linejoin="round"/>
+    <path id="body" d="M49.8 291.5 C49.8 271.6 66 251.2 85.9 249.1 C314.8 183.4 709.2 183.4 938.1 249.1 C958 251.2 974.2 271.6 974.2 291.5 L974.2 755.8 L961.4 770.6 L961.4 808.8 C961.4 817.3 955.1 823.6 946.6 823.6 L77.4 823.6 C68.9 823.6 62.6 817.3 62.6 808.8 L62.6 770.6 L49.8 755.8 Z" fill="url(#linear-gradient-2)" stroke="#6c7076" stroke-width="3.18" stroke-linejoin="round"/>
+    <polygon id="left_wing_shade" data-name="left wing shade" points="52,252.7 52,252.7 60.4,250.4 68.9,248.2 77.4,245.9 85.9,243.7 94.4,241.6 102.8,239.5 111.3,237.4 119.8,235.3 128.3,233.3 136.8,231.4 145.2,229.5 153.7,227.7 162.2,225.8 170.7,224.1 179.2,222.4 187.6,220.7 196.1,219 204.6,217.4 213.1,215.9 219.4,214.8 219.4,821.5 52,821.5" fill="url(#linear-gradient-3)"/>
+    <polygon id="right_wing_shade" data-name="right wing shade" points="804.6,214.8 804.6,214.8 813,216.3 821.5,217.9 830,219.4 838.5,221.1 847,222.8 855.4,224.5 863.9,226.3 872.4,228.1 880.9,229.9 889.4,231.8 897.8,233.9 906.3,235.9 914.8,237.9 923.3,240 931.8,242.1 940.2,244.2 948.7,246.5 957.2,248.7 965.7,251 972,252.7 972,821.5 804.6,821.5" fill="url(#linear-gradient-3)"/>
+    <line id="groove" x1="219.4" y1="227.5" x2="219.4" y2="819.4" fill="none" stroke="#6a6e74" stroke-width="4.24" stroke-linecap="round" stroke-miterlimit="10"/>
+    <line id="groove_lip" data-name="groove lip" x1="222.6" y1="229.6" x2="222.6" y2="817.3" fill="none" stroke="#ffffff" stroke-width="2.12" stroke-linecap="round" stroke-miterlimit="10" opacity="0.45"/>
+    <line id="groove-2" data-name="groove" x1="804.6" y1="227.5" x2="804.6" y2="819.4" fill="none" stroke="#6a6e74" stroke-width="4.24" stroke-linecap="round" stroke-miterlimit="10"/>
+    <line id="groove_lip-2" data-name="groove lip" x1="801.4" y1="229.6" x2="801.4" y2="817.3" fill="none" stroke="#ffffff" stroke-width="2.12" stroke-linecap="round" stroke-miterlimit="10" opacity="0.45"/>
+    <path id="top_highlight" data-name="top highlight" d="M81.6 253.4 C325.4 187.6 698.6 187.6 942.4 253.4" fill="none" stroke="#ffffff" stroke-width="3.18" stroke-linecap="round" stroke-miterlimit="10" opacity="0.55"/>
+    <path id="recess" d="M278.8 306.4 L745.2 306.4 C762.8 306.4 777 320.6 777 338.2 L777 688 C777 705.6 762.8 719.8 745.2 719.8 L278.8 719.8 C261.2 719.8 247 705.6 247 688 L247 338.2 C247 320.6 261.2 306.4 278.8 306.4 Z" fill="url(#linear-gradient-4)"/>
+    <path id="recess_rim" data-name="recess rim" d="M278.8 306.4 L745.2 306.4 C762.8 306.4 777 320.6 777 338.2 L777 688 C777 705.6 762.8 719.8 745.2 719.8 L278.8 719.8 C261.2 719.8 247 705.6 247 688 L247 338.2 C247 320.6 261.2 306.4 278.8 306.4 Z" fill="none" stroke="url(#linear-gradient-5)" stroke-width="3.18" stroke-miterlimit="10"/>
+    <path id="recess_shade" data-name="recess shade" d="M278.8 309.5 L745.2 309.5 C761.6 309.5 774.9 322.8 774.9 339.2 L774.9 322.3 C774.9 338.7 761.6 351.9 745.2 351.9 L278.8 351.9 C262.4 351.9 249.1 338.7 249.1 322.3 L249.1 339.2 C249.1 322.8 262.4 309.5 278.8 309.5 Z" fill="url(#linear-gradient-6)"/>
+    <path id="blank_label" data-name="blank label" d="M280.9 317 L743.1 317 C756 317 766.4 327.3 766.4 340.3 L766.4 685.8 C766.4 698.8 756 709.2 743.1 709.2 L280.9 709.2 C268 709.2 257.6 698.8 257.6 685.8 L257.6 340.3 C257.6 327.3 268 317 280.9 317 Z" fill="url(#linear-gradient-7)" stroke="#c9c6be" stroke-width="1.59" stroke-miterlimit="10"/>
+    <path id="label_shade" data-name="label shade" d="M280.9 319.1 L743.1 319.1 C754.7 319.1 764.3 328.6 764.3 340.3 L764.3 336 C764.3 347.7 754.7 357.2 743.1 357.2 L280.9 357.2 C269.3 357.2 259.7 347.7 259.7 336 L259.7 340.3 C259.7 328.6 269.3 319.1 280.9 319.1 Z" fill="url(#linear-gradient-8)"/>
+  </g>
+</svg>

@@ -693,6 +693,17 @@ def write_file_type_links(theme_directory, icons):
                 (folder / f"{name}.png").symlink_to(f"{target}.png")
 
 
+def write_file_icons(theme_directory):
+    """Copies the drawn file type icons, named NAME-SIZE.png, over the links to
+    borrowed icons, so the borrowed picture stays as it was."""
+    for artwork in sorted(Path(__file__).with_name("file-icons").glob("*.png")):
+        name, size = artwork.stem.rsplit("-", 1)
+        target = theme_directory / folder_name(int(size), 1) / "mimetypes" / f"{name}.png"
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.unlink(missing_ok=True)
+        shutil.copyfile(artwork, target)
+
+
 def centred(drawing, square_size):
     square = Image.new("RGBA", (square_size, square_size), (0, 0, 0, 0))
     square.paste(drawing, ((square_size - drawing.width) // 2, (square_size - drawing.height) // 2))
@@ -956,6 +967,9 @@ def main():
         fail(f"{MIME_DATABASE} is missing; install shared-mime-info")
     program_icons = {picture.stem for picture in PROGRAM_ICONS.glob("*/mimetypes/*")}
     write_file_type_links(theme_directory, file_type_icons(MIME_DATABASE, program_icons))
+    write_file_icons(theme_directory)
+    for size in SIZES:
+        contexts_by_size.setdefault((size, 1), set()).add("mimetypes")
 
     (theme_directory / "index.theme").write_text(index_text(contexts_by_size))
     print(f"wrote {len(ICONS) + len(BUNDLES) + len(SIDE_BAR_ICONS)} icons from {len(converted)} of the installer's "

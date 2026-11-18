@@ -844,6 +844,44 @@ class TestSeaLionIcons(unittest.TestCase):
                     resources = f"{source}/Contents/Resources/"
                     self.assertTrue(any(path.startswith(resources) and path.endswith(".icns") for path in self.taken))
 
+    def test_torrent_art_replaces_fallback_without_changing_generic_document(self):
+        with tempfile.TemporaryDirectory() as folder:
+            theme = Path(folder)
+            for size in self.make_icons.SIZES:
+                target = theme / f"{size}x{size}" / "mimetypes"
+                target.mkdir(parents=True)
+                (target / "text-x-generic.png").write_bytes(b"generic")
+                (target / "application-x-bittorrent.png").symlink_to("text-x-generic.png")
+            self.make_icons.write_file_icons(theme)
+            self.make_icons.write_file_icons(theme)
+            from PIL import Image
+            for size in self.make_icons.SIZES:
+                target = theme / f"{size}x{size}" / "mimetypes"
+                picture = target / "application-x-bittorrent.png"
+                self.assertFalse(picture.is_symlink())
+                with Image.open(picture) as icon:
+                    self.assertEqual(icon.size, (size, size))
+                    self.assertEqual(icon.mode, "RGBA")
+                self.assertEqual((target / "text-x-generic.png").read_bytes(), b"generic")
+
+    def test_cartridge_art_replaces_the_program_link_of_rom_files(self):
+        with tempfile.TemporaryDirectory() as folder:
+            theme = Path(folder)
+            for size in self.make_icons.SIZES:
+                target = theme / f"{size}x{size}" / "mimetypes"
+                target.mkdir(parents=True)
+                (target / "application-x-executable.png").write_bytes(b"program")
+                (target / "application-x-n64-rom.png").symlink_to("application-x-executable.png")
+            self.make_icons.write_file_icons(theme)
+            from PIL import Image
+            for size in self.make_icons.SIZES:
+                target = theme / f"{size}x{size}" / "mimetypes"
+                picture = target / "application-x-n64-rom.png"
+                self.assertFalse(picture.is_symlink())
+                with Image.open(picture) as icon:
+                    self.assertEqual((icon.size, icon.mode), ((size, size), "RGBA"))
+                self.assertEqual((target / "application-x-executable.png").read_bytes(), b"program")
+
     def file_type_icons(self, types, subclasses="", generic_icons="", icons="", program_icons=()):
         database = Path(tempfile.mkdtemp())
         self.addCleanup(shutil.rmtree, database)
