@@ -48,6 +48,7 @@ BASE_PLUGINS = [
     "shared-edges",
     "zone-picker",
     "reachable-title-bars",
+    "across-screens",
     "shortcut-capture",
     "held-modifiers",
     "screen-modes",

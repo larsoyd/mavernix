@@ -1,0 +1,8 @@
+<?xml version="1.0"?>
+<wayfire>
+	<plugin name="across-screens">
+		<_short>Windows Across Screens</_short>
+		<_long>Shows the part of a window that reaches onto another screen there too, and lets it be clicked.</_long>
+		<category>Window Management</category>
+	</plugin>
+</wayfire>

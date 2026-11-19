@@ -1510,6 +1510,9 @@ class TestGameSettings(SessionTestCase):
     def test_the_dock_hears_of_digs_at_other_screens(self):
         self.assertIn("dock-dig", self.make.BASE_PLUGINS)
 
+    def test_a_window_shows_on_every_screen_it_reaches(self):
+        self.assertIn("across-screens", self.make.BASE_PLUGINS)
+
     def test_shake_to_find_loads_its_plugin_only_when_asked(self):
         self.assertEqual(self.make.shake_to_find_plugins({}), [])
         self.assertEqual(self.make.shake_to_find_plugins({"input": {"shake_to_find": True}}), ["shake-to-find"])
