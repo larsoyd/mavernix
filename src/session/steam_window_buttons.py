@@ -2,14 +2,16 @@
 
     python steam_window_buttons.py STYLE_FILE
 
-Every Steam window takes its sheets from steamui/css/library.css. This puts a
-stub of the same size in its place that imports Steam's sheet and the style.
-Steam checks only sizes when it starts, but an update writes the sheet again,
-so this keeps checking until the session ends.
+Every Steam window takes the sheet that steamui/index.html links, whose name
+changes between builds. This puts a stub of the same size in its place that
+imports Steam's sheet and the style. Steam checks only sizes when it starts,
+but an update writes the sheet again or renames it, so this keeps checking
+until the session ends.
 """
 
 import json
 import os
+import re
 import shutil
 import sys
 import time
@@ -19,8 +21,10 @@ FLAG_NAME = ".cef-enable-remote-debugging"
 # a flag holding this was written by an older version, any other is the user's
 OUR_MARK = "mavernix\n"
 HEADER = b"/* mavernix window buttons */\n"
-ORIGINAL = "library.mavernix-original.css"
-STUB = HEADER + f'@import url("{ORIGINAL}");\n@import url("../mavernix/window-buttons.css");\n'.encode()
+KEPT = ".mavernix-original.css"
+LINK = re.compile(rb"<link\b[^>]*>")
+STYLESHEET = re.compile(rb"""rel=["']stylesheet["']""")
+SHEET_NAME = re.compile(rb"""href=["']/css/([^"'/?]+\.css)["'?]""")
 # steam stamps the package's own time on what it writes, so a fresh write shows only in ctime
 SETTLE_SECONDS = 1
 POLL_SECONDS = 0.5
@@ -76,14 +80,50 @@ def lose_stub(sheet):
     return "original_lost"
 
 
-def patch(folder, style):
-    css = folder / "steamui" / "css"
-    sheet, original = css / "library.css", css / ORIGINAL
-    ours = folder / "steamui" / "mavernix" / "window-buttons.css"
+def linked_sheet(folder):
+    """The first sheet of Steam's own that its page links, or None."""
     try:
-        data = sheet.read_bytes()
+        page = (folder / "steamui" / "index.html").read_bytes()
     except FileNotFoundError:
+        return None
+    for link in LINK.findall(page):
+        name = SHEET_NAME.search(link)
+        if name and STYLESHEET.search(link):
+            sheet = folder / "steamui" / "css" / name.group(1).decode()
+            return sheet if sheet.is_file() else None
+    return None
+
+
+def kept_copy(sheet):
+    return sheet.with_name(sheet.name.removesuffix(".css") + KEPT)
+
+
+def give_back(original):
+    """Puts a kept sheet back over its stub, or drops it when Steam wrote or removed that sheet."""
+    sheet = original.with_name(original.name.removesuffix(KEPT) + ".css")
+    try:
+        stubbed = sheet.read_bytes().startswith(HEADER)
+    except FileNotFoundError:
+        stubbed = False
+    if not stubbed:
+        original.unlink()
+        return
+    mode = sheet.stat().st_mode & 0o7777
+    os.replace(original, sheet)
+    sheet.chmod(mode)
+
+
+def patch(folder, style):
+    sheet = linked_sheet(folder)
+    if sheet is None:
         return "no_sheet"
+    original = kept_copy(sheet)
+    ours = folder / "steamui" / "mavernix" / "window-buttons.css"
+    for other in sheet.parent.glob("*" + KEPT):
+        if other != original:
+            give_back(other)
+    stub = HEADER + f'@import url("{original.name}");\n@import url("../mavernix/window-buttons.css");\n'.encode()
+    data = sheet.read_bytes()
     if data.startswith(HEADER):
         if not original.is_file():
             return lose_stub(sheet)
@@ -93,34 +133,24 @@ def patch(folder, style):
         return "style_updated"
     if data.startswith((b"/*", b"@import")):
         return "foreign_sheet"
-    if len(STUB) > len(data):
+    if len(stub) > len(data):
         return "sheet_too_small"
     if time.time() - sheet.stat().st_ctime < SETTLE_SECONDS:
         return "settling"
     ours.parent.mkdir(exist_ok=True)
     write(ours, style.encode())
     write(original, data)
-    write(sheet, STUB.ljust(len(data), b" "), sheet.stat().st_mode & 0o7777)
+    write(sheet, stub.ljust(len(data), b" "), sheet.stat().st_mode & 0o7777)
     return "patched"
 
 
 def unpatch(folder):
-    css = folder / "steamui" / "css"
-    sheet, original = css / "library.css", css / ORIGINAL
-    try:
-        data = sheet.read_bytes()
-    except FileNotFoundError:
-        return "no_sheet"
+    sheet = linked_sheet(folder)
+    if sheet and sheet.read_bytes().startswith(HEADER) and not kept_copy(sheet).is_file():
+        return lose_stub(sheet)
     result = "unchanged"
-    if data.startswith(HEADER):
-        if not original.is_file():
-            return lose_stub(sheet)
-        mode = sheet.stat().st_mode & 0o7777
-        os.replace(original, sheet)
-        sheet.chmod(mode)
-        result = "restored"
-    elif original.exists():
-        original.unlink()
+    for original in (folder / "steamui" / "css").glob("*" + KEPT):
+        give_back(original)
         result = "restored"
     if (folder / "steamui" / "mavernix").exists():
         shutil.rmtree(folder / "steamui" / "mavernix")

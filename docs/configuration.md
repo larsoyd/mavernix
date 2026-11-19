@@ -292,9 +292,9 @@ Steam draws its own close, minimize and zoom buttons at the right of its windows
 window_buttons = true
 ```
 
-It takes effect from the next login, once Steam starts again. Steam has no setting for its buttons, so the session puts a small stand-in for one of Steam's own stylesheets, `steamui/css/library.css`, that loads Steam's sheet and then the theme's buttons. It keeps the file's size, which is all Steam checks when it starts.
+It takes effect from the next login, once Steam starts again. Steam has no setting for its buttons, so the session puts a small stand-in for one of Steam's own stylesheets, the one `steamui/index.html` links from `steamui/css`, that loads Steam's sheet and then the theme's buttons. It keeps the file's size, which is all Steam checks when it starts.
 
-A Steam update writes the file again, and the session patches it once more, so the buttons are back from Steam's next start. A theme change also shows from Steam's next start. Setting it back to `false` gives Steam its own file again at the next login. Nothing is opened for other programs to reach Steam through. The session logs its work to `login.log` as `[steam-buttons]` lines.
+A Steam update writes the file again or gives it a new name, and the session patches it once more, so the buttons are back from Steam's next start. A theme change also shows from Steam's next start. Setting it back to `false` gives Steam its own file again at the next login. Nothing is opened for other programs to reach Steam through. The session logs its work to `login.log` as `[steam-buttons]` lines.
 
 ## The desktop's menus
 

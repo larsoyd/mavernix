@@ -3053,15 +3053,22 @@ class SteamFolderCase(unittest.TestCase):
         self.native = self.home / "data" / "Steam"
         self.flatpak = self.home / ".var/app/com.valvesoftware.Steam/.local/share/Steam"
 
-    def install(self, folder, sheet=STEAM_SHEET):
+    # the page as Steam ships it, the sheet named by a build hash
+    SHEET = "chunk~7c8d31ab0c.css"
+    PAGE = ('<!doctype html>\n<html>\n\t<head>\n\t\t<title>SharedJSContext</title>\n\t<script>globalThis.CLSTAMP="1";</script>'
+            '<link rel="stylesheet" href="/css/{}?contenthash=CVi2CKiF"><link rel="modulepreload" href="/chunk~f025431ab0.js?contenthash=C8f2gWku">'
+            '<script type="module" src="/library.js?contenthash=CVZWwsCP"></script></head>\n</html>\n')
+
+    def install(self, folder, sheet=STEAM_SHEET, name=SHEET, page=PAGE):
         css = folder / "steamui" / "css"
         css.mkdir(parents=True, exist_ok=True)
-        (css / "library.css").write_bytes(sheet)
-        (css / "library.css").chmod(0o755)
-        return css / "library.css"
+        (folder / "steamui" / "index.html").write_text(page.format(name))
+        (css / name).write_bytes(sheet)
+        (css / name).chmod(0o755)
+        return css / name
 
-    def original(self, folder):
-        return folder / "steamui" / "css" / "library.mavernix-original.css"
+    def original(self, folder, name=SHEET):
+        return folder / "steamui" / "css" / name.replace(".css", ".mavernix-original.css")
 
     def ours(self, folder):
         return folder / "steamui" / "mavernix" / "window-buttons.css"
@@ -3081,7 +3088,7 @@ class TestSteamSheetPatch(SteamFolderCase):
         stub = sheet.read_bytes()
         self.assertEqual(len(stub), len(self.STEAM_SHEET))
         self.assertEqual(stub.rstrip(b" "), self.module.HEADER
-                         + b'@import url("library.mavernix-original.css");\n@import url("../mavernix/window-buttons.css");\n')
+                         + b'@import url("chunk~7c8d31ab0c.mavernix-original.css");\n@import url("../mavernix/window-buttons.css");\n')
         self.assertEqual(self.original(self.native).read_bytes(), self.STEAM_SHEET)
         self.assertEqual(self.ours(self.native).read_text(), self.STYLE)
         self.assertEqual(sheet.stat().st_mode & 0o777, 0o755)
@@ -3137,6 +3144,53 @@ class TestSteamSheetPatch(SteamFolderCase):
         self.assertEqual(self.module.patch(self.native, self.STYLE), "no_sheet")
         self.assertEqual(list(self.native.iterdir()), [])
 
+    def test_a_page_that_links_no_sheet_of_steams_writes_nothing(self):
+        for page in ("<html><head></head></html>",
+                     '<link rel="modulepreload" href="/css/{}">',
+                     '<link rel="stylesheet" href="https://example.org/css/{}">',
+                     '<link rel="stylesheet" href="/css/../{}">',
+                     '<link rel="stylesheet" href="/css/missing.css">'):
+            sheet = self.install(self.native, page=page)
+            outside = sheet.parent.parent / sheet.name
+            outside.write_bytes(self.STEAM_SHEET)
+            self.assertEqual(self.module.patch(self.native, self.STYLE), "no_sheet", page)
+            self.assertEqual((sheet.read_bytes(), outside.read_bytes()), (self.STEAM_SHEET, self.STEAM_SHEET))
+            self.assertFalse(self.ours(self.native).parent.exists(), page)
+
+    def test_the_sheet_is_the_first_one_steams_page_links(self):
+        for name, page in (("library.css", '<link href="/css/{}" rel="stylesheet">'),
+                           ("chunk~0a1b2c3d4e.css", "<link rel='stylesheet' href='/css/{}?contenthash=Ab_c-1'>"),
+                           ("first.css", self.PAGE + '<link rel="stylesheet" href="/css/second.css">')):
+            sheet = self.install(self.native, name=name, page=page)
+            (sheet.parent / "second.css").write_bytes(self.STEAM_SHEET)
+            self.assertEqual(self.module.patch(self.native, self.STYLE), "patched", page)
+            self.assertIn(f'@import url("{self.original(self.native, name).name}");'.encode(), sheet.read_bytes())
+            self.assertEqual(self.original(self.native, name).read_bytes(), self.STEAM_SHEET)
+            self.assertEqual((sheet.parent / "second.css").read_bytes(), self.STEAM_SHEET)
+            self.assertEqual(self.module.unpatch(self.native), "restored")
+
+    def test_a_sheet_steam_renamed_is_patched_and_the_old_copy_dropped(self):
+        old = self.install(self.native, name="library.css")
+        self.module.patch(self.native, self.STYLE)
+        old.unlink()
+        update = b"button.DialogButton{color:#eee}" + b".Panel{display:grid}" * 90
+        sheet = self.install(self.native, update)
+        self.assertEqual(self.module.patch(self.native, self.STYLE), "patched")
+        self.assertTrue(sheet.read_bytes().startswith(self.module.HEADER))
+        self.assertEqual(self.original(self.native).read_bytes(), update)
+        self.assertCountEqual([path.name for path in sheet.parent.iterdir()], [self.SHEET, self.original(self.native).name])
+        self.assertEqual(self.module.patch(self.native, self.STYLE), "unchanged")
+
+    def test_a_stub_steams_page_no_longer_links_gets_its_sheet_back(self):
+        old = self.install(self.native, name="library.css")
+        self.module.patch(self.native, self.STYLE)
+        sheet = self.install(self.native)
+        self.assertEqual(self.module.patch(self.native, self.STYLE), "patched")
+        self.assertEqual(old.read_bytes(), self.STEAM_SHEET)
+        self.assertEqual(old.stat().st_mode & 0o777, 0o755)
+        self.assertFalse(self.original(self.native, "library.css").exists())
+        self.assertTrue(sheet.read_bytes().startswith(self.module.HEADER))
+
     def test_a_new_style_reaches_steam(self):
         self.install(self.native)
         self.module.patch(self.native, self.STYLE)
@@ -3171,6 +3225,24 @@ class TestSteamSheetPatch(SteamFolderCase):
         self.assertFalse(self.original(self.native).exists())
         self.assertFalse(self.ours(self.native).parent.exists())
 
+    def test_unpatch_after_steam_renamed_its_sheet_drops_every_file_of_ours(self):
+        old = self.install(self.native, name="library.css")
+        self.module.patch(self.native, self.STYLE)
+        old.unlink()
+        sheet = self.install(self.native)
+        self.assertEqual(self.module.unpatch(self.native), "restored")
+        self.assertEqual([path.name for path in sheet.parent.iterdir()], [self.SHEET])
+        self.assertEqual(sheet.read_bytes(), self.STEAM_SHEET)
+        self.assertFalse(self.ours(self.native).parent.exists())
+
+    def test_unpatch_gives_back_a_stub_steams_page_no_longer_links(self):
+        old = self.install(self.native, name="library.css")
+        self.module.patch(self.native, self.STYLE)
+        self.install(self.native)
+        self.assertEqual(self.module.unpatch(self.native), "restored")
+        self.assertEqual(old.read_bytes(), self.STEAM_SHEET)
+        self.assertCountEqual([path.name for path in old.parent.iterdir()], [self.SHEET, "library.css"])
+
     def test_unpatch_leaves_sheets_that_are_not_ours(self):
         for sheet_bytes in (self.STEAM_SHEET, b"/* Adwaita-for-Steam */\n" + b" " * 900):
             sheet = self.install(self.native, sheet_bytes)
@@ -3187,7 +3259,7 @@ class TestSteamSheetPatch(SteamFolderCase):
             self.module.patch_every_steam(self.STYLE, last)
             self.module.patch_every_steam(self.STYLE, last)
         for folder in (self.native, self.flatpak):
-            self.assertTrue((folder / "steamui/css/library.css").read_bytes().startswith(self.module.HEADER))
+            self.assertTrue((folder / "steamui/css" / self.SHEET).read_bytes().startswith(self.module.HEADER))
         self.assertEqual(said.getvalue().count("result=patched"), 2, said.getvalue())
         self.assertNotIn("unchanged", said.getvalue())
 
@@ -3206,7 +3278,7 @@ class TestSteamSheetPatch(SteamFolderCase):
         with contextlib.redirect_stderr(io.StringIO()) as said:
             self.module.patch_every_steam(None, {})
         for folder in (self.native, self.flatpak):
-            self.assertEqual((folder / "steamui/css/library.css").read_bytes(), self.STEAM_SHEET)
+            self.assertEqual((folder / "steamui/css" / self.SHEET).read_bytes(), self.STEAM_SHEET)
         self.assertEqual(said.getvalue().count("result=restored"), 2, said.getvalue())
 
     def test_a_failing_folder_is_logged_and_the_others_still_patched(self):
@@ -3218,7 +3290,7 @@ class TestSteamSheetPatch(SteamFolderCase):
             self.module.patch_every_steam(self.STYLE, {})
         self.assertIn("result=failed", said.getvalue())
         self.assertIn(json.dumps(str(self.native)), said.getvalue())
-        self.assertTrue((self.flatpak / "steamui/css/library.css").read_bytes().startswith(self.module.HEADER))
+        self.assertTrue((self.flatpak / "steamui/css" / self.SHEET).read_bytes().startswith(self.module.HEADER))
 
     def test_no_steam_gets_no_folder(self):
         self.module.patch_every_steam(self.STYLE, {})
@@ -3301,6 +3373,15 @@ class TestSteamButtonsWatcher(SteamFolderCase):
         self.wait_for(self.patched, "patching Steam's new sheet")
         self.assertEqual(self.original(self.native).read_bytes(), update)
         self.assertEqual(self.log.read_text().count("result=patched"), 2, self.log.read_text())
+
+    def test_a_sheet_steam_renames_is_patched(self):
+        self.start()
+        self.wait_for(self.patched, "the first patch")
+        self.sheet.unlink()
+        self.sheet = self.install(self.native, name="chunk~0a1b2c3d4e.css")
+        self.wait_for(self.patched, "patching the renamed sheet")
+        self.wait_for(lambda: not self.original(self.native).exists(), "dropping the old copy")
+        self.assertEqual(self.original(self.native, "chunk~0a1b2c3d4e.css").read_bytes(), self.STEAM_SHEET)
 
     def test_a_changed_style_reaches_steam(self):
         self.start()
