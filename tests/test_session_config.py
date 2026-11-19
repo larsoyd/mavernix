@@ -831,6 +831,15 @@ class TestSeaLionIcons(unittest.TestCase):
         self.taken = {path for files in installer_image.needed_files(LOOKS_DIR / "sea-lion").values()
                       for path in files}
 
+    def test_every_toolbar_picture_read_from_a_file_is_taken(self):
+        icons = self.make_icons
+        files = [source for source in [*icons.ACTION_TEMPLATES.values(), *icons.ACTION_PICTURES.values()]
+                 if isinstance(source, str)]
+        self.assertTrue(any(source.endswith(".pdf") for source in files))
+        for source in files:
+            with self.subTest(source=source):
+                self.assertIn(source, self.taken)
+
     def test_every_source_is_taken(self):
         icons = self.make_icons
         sources = [source for _, source in [*icons.ICONS.values(), *icons.SIDE_BAR_ICONS.values()]]

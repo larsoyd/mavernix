@@ -517,7 +517,8 @@ SIZES = [16, 32, 48, 64, 128, 256, 512]
 # Sizes from this one up are declared scalable.
 SMALLEST_SCALABLE_SIZE = 128
 
-# toolbar icons, by shared art entry: AppKit's black templates, painted as a toolbar paints them
+SCREEN_SHARING = "System/Library/CoreServices/Screen Sharing.app/Contents/Resources"
+# toolbar icons, by shared art entry or drawing: black templates, painted as a toolbar paints them
 ACTION_TEMPLATES = {
     "go-previous": 127, "go-next": 128, "go-up": 126, "view-refresh": 290,
     "view-list-icons": 353, "view-list-details": 351, "view-list-text": 351, "view-list-tree": 354,
@@ -525,6 +526,11 @@ ACTION_TEMPLATES = {
     "bookmarks": 138, "bookmark-new": 138, "folder-new": 188,
     "configure": 334, "application-menu": 169, "edit-find": 295,
     "dialog-ok": 145, "dialog-ok-apply": 145, "object-locked": 182, "object-unlocked": 183,
+    "dialog-cancel": 318,
+    "tab-new": "Applications/Safari.app/Contents/Resources/ToolbarNewTabTemplate.pdf",
+    # mavericks has no copy or paste glyph, these are screen sharing's clipboard pair
+    "edit-copy": f"{SCREEN_SHARING}/tb-getclipboard-Template.pdf",
+    "edit-paste": f"{SCREEN_SHARING}/tb-sendclipboard-Template.pdf",
 }
 IMAGE_KIT = "System/Library/Frameworks/Quartz.framework/Versions/A/Frameworks/ImageKit.framework/Versions/A/Resources"
 # drawn in their own colours: the search field's clear button and the zoom slider's ends
@@ -726,14 +732,32 @@ def shared_art(work, entry, density):
     return Image.open(path).convert("RGBA")
 
 
-def action_picture(work, source, density, painted):
-    """One toolbar picture at density 1 or 2, or None where the installer has no such size."""
-    if isinstance(source, str):
+def drawn_template(pdf, density, room):
+    """A vector template at its own size, or shrunk so its longer side is `room` pixels."""
+    def drawn(*scale):
+        result = subprocess.run(["pdftocairo", "-png", "-transp", "-singlefile", *scale, str(pdf), "-"],
+                                capture_output=True, timeout=30)
+        if result.returncode != 0:
+            fail(f"pdftocairo cannot draw {pdf}: {result.stderr.decode().strip()}")
+        return Image.open(io.BytesIO(result.stdout)).convert("RGBA")
+
+    shape = drawn("-r", str(72 * density))
+    return shape if max(shape.size) <= room else drawn("-scale-to", str(room))
+
+
+def action_picture(work, source, density, painted, square):
+    """One toolbar picture at density 1 or 2 for a square that many pixels wide, or None where
+    the installer has no such size."""
+    if isinstance(source, int):
+        shape = shared_art(work, source, density)
+    else:
         path = work / "root" / source
         if not path.is_file():
             fail(f"{path} is missing")
-        return Image.open(path).convert("RGBA") if density == 1 else None
-    shape = shared_art(work, source, density)
+        if path.suffix == ".pdf":
+            shape = drawn_template(path, density, square - 2 * density)
+        else:
+            shape = Image.open(path).convert("RGBA") if density == 1 else None
     if shape is None or not painted:
         return shape
     return make_theme.paint_glyph(shape, make_theme.TOOLBAR_GLYPH_TOP, make_theme.TOOLBAR_GLYPH_BOTTOM,
@@ -741,19 +765,17 @@ def action_picture(work, source, density, painted):
 
 
 def write_action_icons(work, theme_directory, templates, pictures):
-    """Writes toolbar icons unscaled in the middle of each square they fit, as a toolbar shows them.
-    Returns the (size, scale) folders written."""
+    """Writes toolbar icons in the middle of each square they fit, bitmaps unscaled as a toolbar
+    shows them and vector templates shrunk where they must be. Returns the (size, scale) folders written."""
     written = set()
     sources = [(name, source, True) for name, source in templates.items()]
     sources += [(name, source, False) for name, source in pictures.items()]
     for name, source, painted in sources:
         for scale in (1, 2):
-            picture = action_picture(work, source, scale, painted)
-            if picture is None:
-                continue
             for size in ACTION_SIZES:
                 square = size * scale
-                if picture.width > square or picture.height > square:
+                picture = action_picture(work, source, scale, painted, square)
+                if picture is None or picture.width > square or picture.height > square:
                     continue
                 target = theme_directory / folder_name(size, scale) / "actions" / f"{name}.png"
                 target.parent.mkdir(parents=True, exist_ok=True)

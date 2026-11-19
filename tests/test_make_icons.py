@@ -76,6 +76,49 @@ class ActionIconTests(unittest.TestCase):
         picture = Image.open(self.theme / "16x16" / "actions" / "edit-clear.png").convert("RGBA")
         self.assertEqual(picture.getpixel((8, 8)), (200, 20, 20, 180))
 
+    def drawing(self, source, width, height):
+        content = f"0 0 {width} {height} re f"
+        objects = ["<</Type/Catalog/Pages 2 0 R>>", "<</Type/Pages/Kids[3 0 R]/Count 1>>",
+                   f"<</Type/Page/Parent 2 0 R/MediaBox[0 0 {width} {height}]/Contents 4 0 R>>",
+                   f"<</Length {len(content)}>>stream\n{content}\nendstream"]
+        text, offsets = "%PDF-1.4\n", []
+        for number, body in enumerate(objects, 1):
+            offsets.append(len(text))
+            text += f"{number} 0 obj{body}endobj\n"
+        table = "".join(f"{offset:010d} 00000 n \n" for offset in offsets)
+        text += f"xref\n0 5\n0000000000 65535 f \n{table}trailer<</Size 5/Root 1 0 R>>\nstartxref\n{len(text)}\n%%EOF\n"
+        target = self.work / "root" / source
+        target.parent.mkdir(parents=True)
+        target.write_bytes(text.encode())
+
+    def test_vector_template_keeps_its_size_where_it_fits_and_shrinks_where_it_does_not(self):
+        self.drawing("Applications/Tabs.app/NewTab.pdf", 20, 16)
+        contexts = make_icons.write_action_icons(self.work, self.theme, {"tab-new": "Applications/Tabs.app/NewTab.pdf"}, {})
+        self.assertEqual(contexts, {(16, 1), (22, 1), (16, 2), (22, 2)})
+        # the page is all black, so the painted box is the page plus the emboss line under it
+        # shrunk to 14 wide the page is 11.2 high, and a part covered row still counts
+        for folder, square, glyph in (("22x22", 22, (20, 17)), ("22x22@2", 44, (40, 34)),
+                                      ("16x16", 16, (14, 13)), ("16x16@2", 32, (28, 25))):
+            with self.subTest(folder=folder):
+                picture = Image.open(self.theme / folder / "actions" / "tab-new.png").convert("RGBA")
+                self.assertEqual(picture.size, (square, square))
+                left, top, right, bottom = picture.getbbox()
+                self.assertEqual((right - left, bottom - top), glyph)
+                self.assertLessEqual(abs(left - (square - right)), 1)
+                self.assertEqual(picture.getpixel((left + 1, top))[:3], make_theme.TOOLBAR_GLYPH_TOP)
+                self.assertEqual(picture.getpixel((left + 1, bottom - 1))[:3], (255, 255, 255))
+
+    def test_missing_vector_template_is_refused(self):
+        with self.assertRaises(SystemExit):
+            make_icons.write_action_icons(self.work, self.theme, {"tab-new": "Applications/Tabs.app/NewTab.pdf"}, {})
+
+    def test_vector_template_that_cannot_be_drawn_is_refused(self):
+        target = self.work / "root" / "Applications/Tabs.app/NewTab.pdf"
+        target.parent.mkdir(parents=True)
+        target.write_bytes(b"not a drawing")
+        with self.assertRaises(SystemExit):
+            make_icons.write_action_icons(self.work, self.theme, {"tab-new": "Applications/Tabs.app/NewTab.pdf"}, {})
+
     def test_missing_shared_art_is_refused(self):
         with self.assertRaises(SystemExit):
             make_icons.write_action_icons(self.work, self.theme, {"go-next": 128}, {})
