@@ -363,11 +363,20 @@ test('reaper-menu-text', reaper_menu_test)
 
 fake_swell = shared_module('libSwell', 'fake-swell.c', name_prefix: '', name_suffix: 'so',
     gnu_symbol_visibility: 'hidden')
-reaper_plugin_host = executable('reaper-plugin-host', 'reaper-plugin-host.cpp',
-    dependencies: [dependency('glib-2.0')], export_dynamic: true, gnu_symbol_visibility: 'hidden')
+xdg_shell_xml = dependency('wayland-protocols').get_variable('pkgdatadir') / 'stable/xdg-shell/xdg-shell.xml'
+xdg_shell_header = custom_target('xdg-shell-header', input: xdg_shell_xml, output: 'xdg-shell-client-protocol.h',
+    command: [wayland_scanner, 'client-header', '@INPUT@', '@OUTPUT@'])
+xdg_shell_code = custom_target('xdg-shell-code', input: xdg_shell_xml, output: 'xdg-shell-protocol.c',
+    command: [wayland_scanner, 'private-code', '@INPUT@', '@OUTPUT@'])
+reaper_plugin_host = executable('reaper-plugin-host', 'reaper-plugin-host.cpp', xdg_shell_header, xdg_shell_code,
+    dependencies: [dependency('glib-2.0'), dependency('wayland-client')], export_dynamic: true,
+    gnu_symbol_visibility: 'hidden')
 test('reaper-menu-plugin', python,
     args: [files('test_reaper_menu_plugin.py'), reaper_plugin_host, meson.current_build_dir(), reaper_menu_plugin],
     depends: fake_swell, timeout: 45)
+test('reaper-menu-wayland', python,
+    args: [files('test_reaper_menu_wayland.py'), reaper_plugin_host, meson.current_build_dir(), reaper_menu_plugin],
+    depends: fake_swell, timeout: 100, is_parallel: false)
 reaper_save_panel_test = executable('test-reaper-save-panel', 'test-reaper-save-panel.cpp',
     qt.compile_moc(sources: 'test-reaper-save-panel.cpp', dependencies: [qt_test, kio_widgets]),
     include_directories: include_directories('../src/reaper-files'), link_with: save_panel_library,

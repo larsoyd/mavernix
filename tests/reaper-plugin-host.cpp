@@ -1,6 +1,12 @@
 // loads a reaper plugin as reaper does over a scripted swell, one command per stdin line
 #include <dlfcn.h>
+#include <glib-unix.h>
 #include <glib.h>
+#include <sys/mman.h>
+#include <unistd.h>
+#include <wayland-client.h>
+
+#include "xdg-shell-client-protocol.h"
 
 #include <cstdio>
 #include <cstdlib>
@@ -112,6 +118,22 @@ std::string resourceFolder;
 void (*timer)();
 int (*entry)(void*, PluginInfo*);
 GMainLoop* loop;
+
+// as swell's wayland backend: one xdg toplevel per shown window, events on the default queue
+struct Native
+{
+    wl_surface* surface = nullptr;
+    xdg_surface* shell = nullptr;
+    xdg_toplevel* toplevel = nullptr;
+    bool attach = true;
+};
+wl_display* display;
+wl_compositor* compositor;
+wl_shm* shm;
+xdg_wm_base* wmBase;
+wl_buffer* buffer;
+std::map<long, Native> natives;
+bool insidePlugin;
 
 HWND handle(long number)
 {
@@ -342,6 +364,117 @@ const char* resourcePath()
     return resourceFolder.c_str();
 }
 
+void attachBuffer(wl_surface* surface)
+{
+    wl_surface_attach(surface, buffer, 0, 0);
+    wl_surface_damage(surface, 0, 0, 64, 64);
+    wl_surface_commit(surface);
+}
+
+void configured(void* data, xdg_surface* shell, uint32_t serial)
+{
+    if (insidePlugin)
+        printf("[host] event dispatched inside the plugin\n");
+    xdg_surface_ack_configure(shell, serial);
+    const Native& native = natives[reinterpret_cast<long>(data)];
+    if (native.attach)
+        attachBuffer(native.surface);
+}
+const xdg_surface_listener shellListener = {configured};
+
+void pinged(void*, xdg_wm_base* base, uint32_t serial)
+{
+    xdg_wm_base_pong(base, serial);
+}
+const xdg_wm_base_listener baseListener = {pinged};
+
+void openNative(long number, bool attach)
+{
+    Native& native = natives[number];
+    native.attach = attach;
+    native.surface = wl_compositor_create_surface(compositor);
+    native.shell = xdg_wm_base_get_xdg_surface(wmBase, native.surface);
+    xdg_surface_add_listener(native.shell, &shellListener, reinterpret_cast<void*>(number));
+    native.toplevel = xdg_surface_get_toplevel(native.shell);
+    xdg_toplevel_set_title(native.toplevel, ("reaper-host " + std::to_string(number)).c_str());
+    wl_surface_commit(native.surface);
+}
+
+void closeNative(long number)
+{
+    Native& native = natives[number];
+    if (!native.surface)
+        return;
+    xdg_toplevel_destroy(native.toplevel);
+    xdg_surface_destroy(native.shell);
+    wl_surface_destroy(native.surface);
+    native = Native{};
+}
+
+void announced(void*, wl_registry* registry, uint32_t name, const char* interface, uint32_t)
+{
+    if (!strcmp(interface, wl_compositor_interface.name))
+        compositor = static_cast<wl_compositor*>(wl_registry_bind(registry, name, &wl_compositor_interface, 4));
+    else if (!strcmp(interface, wl_shm_interface.name))
+        shm = static_cast<wl_shm*>(wl_registry_bind(registry, name, &wl_shm_interface, 1));
+    else if (!strcmp(interface, xdg_wm_base_interface.name))
+        wmBase = static_cast<xdg_wm_base*>(wl_registry_bind(registry, name, &xdg_wm_base_interface, 1));
+}
+
+void withdrawn(void*, wl_registry*, uint32_t)
+{
+}
+const wl_registry_listener registryListener = {announced, withdrawn};
+
+bool connectDisplay()
+{
+    display = wl_display_connect(nullptr);
+    if (!display)
+        return false;
+    wl_registry* registry = wl_display_get_registry(display);
+    wl_registry_add_listener(registry, &registryListener, nullptr);
+    wl_display_roundtrip(display);
+    wl_registry_destroy(registry);
+    if (!compositor || !shm || !wmBase)
+        return false;
+    xdg_wm_base_add_listener(wmBase, &baseListener, nullptr);
+    const int size = 64 * 64 * 4;
+    const int file = memfd_create("reaper-host", MFD_CLOEXEC);
+    if (file < 0 || ftruncate(file, size) < 0)
+        return false;
+    wl_shm_pool* pool = wl_shm_create_pool(shm, file, size);
+    buffer = wl_shm_pool_create_buffer(pool, 0, 64, 64, 256, WL_SHM_FORMAT_XRGB8888);
+    wl_shm_pool_destroy(pool);
+    close(file);
+    return true;
+}
+
+void pump()
+{
+    if (!display)
+        return;
+    wl_display_dispatch_pending(display);
+    wl_display_flush(display);
+}
+
+gboolean displayReadable(gint, GIOCondition, gpointer)
+{
+    if (wl_display_dispatch(display) < 0)
+    {
+        printf("[host] display lost\n");
+        g_main_loop_quit(loop);
+        return G_SOURCE_REMOVE;
+    }
+    wl_display_flush(display);
+    return G_SOURCE_CONTINUE;
+}
+
+gboolean pumpTimer(gpointer)
+{
+    pump();
+    return G_SOURCE_CONTINUE;
+}
+
 int addHook(const char* name, void* function)
 {
     printf("[host] register name=%s\n", name);
@@ -372,6 +505,8 @@ void run(const std::string& line)
         Menu* file = newMenu({{"&New project\tCtrl+N", 40023}});
         Menu* help = newMenu({{"&About REAPER", 40007}});
         windows[1] = {101, newMenu({{"&File", 0, file}, {"&Help", 0, help}, {"", 40902}, {"", 50121}})};
+        if (display)
+            openNative(1, true);
     }
     else if (command == "status" || command == "undo")
     {
@@ -390,6 +525,10 @@ void run(const std::string& line)
             own = newMenu({{"&Edit", 0, newMenu({{"&Undo\tCtrl+Z", 40029}})},
                 {"[recording settings]", 0, newMenu({{"Audio device settings...", 40099}})}});
         windows[number] = {xid, own};
+        std::string mapping;
+        words >> mapping;
+        if (display)
+            openNative(number, mapping != "unmapped");
     }
     else if (command == "hide" || command == "show" || command == "disable" || command == "enable")
     {
@@ -399,12 +538,32 @@ void run(const std::string& line)
             window.visible = command == "show";
         else
             window.enabled = command == "enable";
+        if (display && command == "hide")
+            closeNative(number);
+        else if (display && command == "show")
+            openNative(number, true);
+    }
+    else if (command == "remap")
+    {
+        words >> number;
+        const wl_surface* before = natives[number].surface;
+        closeNative(number);
+        openNative(number, true);
+        printf("[host] remapped window=%ld same_surface=%d\n", number, natives[number].surface == before);
+    }
+    else if (command == "map")
+    {
+        words >> number;
+        natives[number].attach = true;
+        attachBuffer(natives[number].surface);
     }
     else if (command == "tick")
     {
         words >> number;
+        insidePlugin = true;
         for (long tick = 0; tick < number && timer; tick++)
             timer();
+        insidePlugin = false;
     }
     else if (command == "open" || command == "save" || command == "folder")
     {
@@ -432,7 +591,11 @@ void run(const std::string& line)
         nested.push_back(line);
     }
     else if (command == "unload")
+    {
+        insidePlugin = true;
         entry(nullptr, nullptr);
+        insidePlugin = false;
+    }
     else if (command == "quit")
         g_main_loop_quit(loop);
     else
@@ -454,6 +617,7 @@ gboolean readCommand(GIOChannel* channel, GIOCondition, gpointer)
     }
     run(std::string(line, length && line[length - 1] == '\n' ? length - 1 : length));
     g_free(line);
+    pump();
     fflush(stdout);
     return G_SOURCE_CONTINUE;
 }
@@ -698,6 +862,10 @@ __attribute__((visibility("default"))) int fake_PostMessage(HWND window, unsigne
 __attribute__((visibility("default"))) void* fake_SWELL_GetOSWindow(HWND window, const char* kind)
 {
     Window* found = windowOf(window);
+    if (display && !strcmp(kind, "wl_display"))
+        return display;
+    if (display)
+        return found && !strcmp(kind, "wl_surface") ? natives[reinterpret_cast<long>(window)].surface : nullptr;
     return found && !strcmp(kind, "GdkWindow") ? reinterpret_cast<void*>(uintptr_t(found->xid)) : nullptr;
 }
 
@@ -751,12 +919,34 @@ int main(int argc, char** argv)
         fprintf(stderr, "[host] refused: %s\n", dlerror());
         return 1;
     }
+    const char* backend = getenv("FAKE_SWELL_BACKEND");
+    if (backend && !strcmp(backend, "wayland") && !connectDisplay())
+    {
+        fprintf(stderr, "[host] refused: no wayland display with compositor, shm and xdg_wm_base\n");
+        return 1;
+    }
     run("main");
+    if (display)
+    {
+        // the first configure waits unread in the socket, so a plugin that dispatches our queue is caught
+        wl_display_flush(display);
+        GPollFD readable{wl_display_get_fd(display), G_IO_IN, 0};
+        g_poll(&readable, 1, 2000);
+    }
     foreground = handle(1);
     PluginInfo info{0x20e, handle(1), addHook, apiFunction};
-    printf("[host] loaded result=%d\n", entry(nullptr, &info));
+    insidePlugin = true;
+    const int loaded = entry(nullptr, &info);
+    insidePlugin = false;
+    printf("[host] loaded result=%d\n", loaded);
     fflush(stdout);
     loop = g_main_loop_new(nullptr, FALSE);
+    if (display)
+    {
+        g_unix_fd_add(wl_display_get_fd(display), G_IO_IN, displayReadable, nullptr);
+        g_timeout_add(20, pumpTimer, nullptr);
+        pump();
+    }
     GIOChannel* input = g_io_channel_unix_new(0);
     g_io_add_watch(input, GIOCondition(G_IO_IN | G_IO_HUP), readCommand, nullptr);
     g_main_loop_run(loop);

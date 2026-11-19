@@ -3,8 +3,13 @@
 #include <gio/gio.h>
 #include <libdbusmenu-glib/menuitem.h>
 #include <libdbusmenu-glib/server.h>
+#include <wayland-client.h>
 
+#include "appmenu-client-protocol.h"
+
+#include <algorithm>
 #include <cstdio>
+#include <cstring>
 #include <fstream>
 #include <map>
 #include <set>
@@ -88,6 +93,8 @@ struct Export
 struct Shown
 {
     guint32 xid = 0;
+    wl_surface* surface = nullptr;
+    org_kde_kwin_appmenu* appmenu = nullptr;
     std::string path;
 };
 
@@ -109,6 +116,11 @@ std::map<HWND, Export> exports;
 std::map<HWND, Shown> shownWindows;
 int nextExport;
 int ticks;
+wl_display* display;
+wl_event_queue* queue;
+org_kde_kwin_appmenu_manager* manager;
+// swell may make a new surface at a freed one's address, only a fresh one lacks our tag
+const char* const surfaceTag = "mavernix-reaper-menu";
 
 void fill(DbusmenuMenuitem* parent, HWND holder, HMENU menu, const std::vector<int>& route);
 
@@ -300,20 +312,92 @@ void unregisterWindow(guint32 xid)
         nullptr, G_DBUS_CALL_FLAGS_NO_AUTO_START, 1000, nullptr, nullptr, nullptr);
 }
 
-int collectWindow(HWND window, long windows)
+struct Windows
 {
-    if (swell.IsWindowVisible(window) && swell.SWELL_GetOSWindow(window, "GdkWindow"))
-        reinterpret_cast<std::vector<HWND>*>(windows)->push_back(window);
+    std::vector<HWND> visible;
+    std::set<HWND> existing;
+};
+
+wl_surface* surfaceOf(HWND window)
+{
+    return static_cast<wl_surface*>(swell.SWELL_GetOSWindow(window, "wl_surface"));
+}
+
+int collectWindow(HWND window, long data)
+{
+    auto* found = reinterpret_cast<Windows*>(data);
+    found->existing.insert(window);
+    if (swell.IsWindowVisible(window) && swell.SWELL_GetOSWindow(window, display ? "wl_surface" : "GdkWindow"))
+        found->visible.push_back(window);
     return 1;
+}
+
+Windows enumerate()
+{
+    Windows found;
+    swell.EnumWindows(collectWindow, reinterpret_cast<long>(&found));
+    return found;
+}
+
+bool stillShown(const Windows& found, HWND window, const Shown& shown)
+{
+    if (!found.existing.count(window))
+        return false;
+    wl_surface* surface = surfaceOf(window);
+    return surface && surface == shown.surface && wl_proxy_get_tag(reinterpret_cast<wl_proxy*>(surface));
+}
+
+// naming a destroyed surface to the compositor makes it read freed memory
+void withdraw(Shown& shown, bool alive)
+{
+    if (!display)
+    {
+        unregisterWindow(shown.xid);
+        return;
+    }
+    if (alive)
+        org_kde_kwin_appmenu_set_address(shown.appmenu, "", "");
+    org_kde_kwin_appmenu_release(shown.appmenu);
+    shown = Shown{};
+}
+
+void showOnSurface(HWND window, Shown& shown, const std::string& path)
+{
+    wl_surface* surface = surfaceOf(window);
+    auto* proxy = reinterpret_cast<wl_proxy*>(surface);
+    if (surface != shown.surface || !wl_proxy_get_tag(proxy))
+    {
+        if (shown.appmenu)
+            withdraw(shown, false);
+        shown.appmenu = org_kde_kwin_appmenu_manager_create(manager, surface);
+        shown.surface = surface;
+        if (!wl_proxy_get_tag(proxy))
+            wl_proxy_set_tag(proxy, &surfaceTag);
+    }
+    if (shown.path != path)
+    {
+        org_kde_kwin_appmenu_set_address(shown.appmenu, g_dbus_connection_get_unique_name(bus), path.c_str());
+        shown.path = path;
+    }
+}
+
+void showOnX11(HWND window, Shown& shown, const std::string& path)
+{
+    const guint32 xid = gdk_x11_window_get_xid(static_cast<GdkWindow*>(swell.SWELL_GetOSWindow(window, "GdkWindow")));
+    if (shown.xid && shown.xid != xid)
+        unregisterWindow(shown.xid);
+    if (shown.xid != xid || shown.path != path)
+        registerWindow(xid, path);
+    shown.xid = xid;
+    shown.path = path;
 }
 
 void checkWindows()
 {
-    std::vector<HWND> windows;
-    swell.EnumWindows(collectWindow, reinterpret_cast<long>(&windows));
+    const Windows found = enumerate();
     std::set<HWND> holders;
     std::set<HWND> present;
-    for (HWND window : windows)
+    for (HWND window : found.visible)
     {
         const HWND holder = swell.GetMenu(window) ? window : mainWindow;
         if (!swell.GetMenu(holder))
@@ -321,13 +405,10 @@ void checkWindows()
         holders.insert(holder);
         present.insert(window);
         const std::string path = exportOf(holder).path;
-        const guint32 xid = gdk_x11_window_get_xid(static_cast<GdkWindow*>(swell.SWELL_GetOSWindow(window, "GdkWindow")));
-        Shown& shown = shownWindows[window];
-        if (shown.xid && shown.xid != xid)
-            unregisterWindow(shown.xid);
-        if (shown.xid != xid || shown.path != path)
-            registerWindow(xid, path);
-        shown = {xid, path};
+        if (display)
+            showOnSurface(window, shownWindows[window], path);
+        else
+            showOnX11(window, shownWindows[window], path);
     }
     for (auto entry = shownWindows.begin(); entry != shownWindows.end();)
     {
@@ -335,7 +416,7 @@ void checkWindows()
             ++entry;
         else
         {
-            unregisterWindow(entry->second.xid);
+            withdraw(entry->second, display && stillShown(found, entry->first, entry->second));
             entry = shownWindows.erase(entry);
         }
     }
@@ -349,6 +430,56 @@ void checkWindows()
             entry = exports.erase(entry);
         }
     }
+}
+
+void withdrawAll()
+{
+    const Windows found = display ? enumerate() : Windows{};
+    for (auto& [window, shown] : shownWindows)
+        withdraw(shown, display && stillShown(found, window, shown));
+    shownWindows.clear();
+}
+
+void boundGlobal(void*, wl_registry* registry, uint32_t name, const char* interface, uint32_t version)
+{
+    if (!manager && !strcmp(interface, org_kde_kwin_appmenu_manager_interface.name))
+        manager = static_cast<org_kde_kwin_appmenu_manager*>(
+            wl_registry_bind(registry, name, &org_kde_kwin_appmenu_manager_interface, std::min(version, 2u)));
+}
+
+void lostGlobal(void*, wl_registry*, uint32_t)
+{
+}
+const wl_registry_listener registryListener = {boundGlobal, lostGlobal};
+
+// a queue of our own, so reaper's events are never dispatched from inside the plugin
+bool bindManager()
+{
+    display = static_cast<wl_display*>(swell.SWELL_GetOSWindow(nullptr, "wl_display"));
+    if (!display)
+        return true;
+    queue = wl_display_create_queue(display);
+    auto* wrapper = static_cast<wl_display*>(wl_proxy_create_wrapper(display));
+    wl_proxy_set_queue(reinterpret_cast<wl_proxy*>(wrapper), queue);
+    wl_registry* registry = wl_display_get_registry(wrapper);
+    wl_proxy_wrapper_destroy(wrapper);
+    wl_registry_add_listener(registry, &registryListener, nullptr);
+    wl_display_roundtrip_queue(display, queue);
+    wl_registry_destroy(registry);
+    return manager != nullptr;
+}
+
+void unbindManager()
+{
+    if (manager && wl_proxy_get_version(reinterpret_cast<wl_proxy*>(manager)) >= 2)
+        org_kde_kwin_appmenu_manager_release(manager);
+    else if (manager)
+        org_kde_kwin_appmenu_manager_destroy(manager);
+    manager = nullptr;
+    if (queue)
+        wl_event_queue_destroy(queue);
+    queue = nullptr;
+    display = nullptr;
 }
 
 // the bar is read at start and only the session puts it right again
@@ -403,6 +534,8 @@ void registrarVanished(GDBusConnection*, const gchar*, gpointer)
 {
     if (bus)
         fprintf(stderr, "[reaper-menu] registrar vanished windows=%zu\n", shownWindows.size());
+    if (display)
+        withdrawAll();
     bus = nullptr;
     shownWindows.clear();
 }
@@ -412,14 +545,14 @@ void unload()
     registerHook("-timer", reinterpret_cast<void*>(timer));
     if (overdueTimeout)
         g_source_remove(overdueTimeout);
-    for (const auto& [window, shown] : shownWindows)
-        unregisterWindow(shown.xid);
+    const size_t shown = shownWindows.size();
+    withdrawAll();
+    unbindManager();
     // the watcher may hold the last reference to the bus, the flush keeps it until the calls are out
     if (bus)
         g_dbus_connection_flush(bus, nullptr, nullptr, nullptr);
     g_bus_unwatch_name(registrarWatch);
-    fprintf(stderr, "[reaper-menu] unloaded windows=%zu menus=%zu\n", shownWindows.size(), exports.size());
-    shownWindows.clear();
+    fprintf(stderr, "[reaper-menu] unloaded windows=%zu menus=%zu\n", shown, exports.size());
     for (auto& [holder, entry] : exports)
         g_object_unref(entry.server);
     exports.clear();
@@ -461,12 +594,19 @@ extern "C" __attribute__((visibility("default"))) int ReaperPluginEntry(void*, P
         return 0;
     }
 #undef LOAD
+    if (!bindManager())
+    {
+        fprintf(stderr, "[reaper-menu] refused: no appmenu manager on the wayland display\n");
+        unbindManager();
+        restoreBarForNextStart();
+        return 0;
+    }
     mainWindow = info->mainWindow;
     registrarWatch = g_bus_watch_name(G_BUS_TYPE_SESSION, REGISTRAR, G_BUS_NAME_WATCHER_FLAGS_NONE, registrarAppeared,
         registrarVanished, nullptr, nullptr);
     overdueTimeout = g_timeout_add_seconds(SECONDS_TO_WAIT_FOR_REGISTRAR, registrarOverdue, nullptr);
     registerHook = info->add;
     registerHook("timer", reinterpret_cast<void*>(timer));
-    fprintf(stderr, "[reaper-menu] loaded main=%p\n", mainWindow);
+    fprintf(stderr, "[reaper-menu] loaded main=%p backend=%s\n", mainWindow, display ? "wayland" : "x11");
     return 1;
 }

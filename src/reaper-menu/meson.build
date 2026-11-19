@@ -1,9 +1,9 @@
 # Moves REAPER's menus into the desktop's menu bar.
 
-reaper_menu_plugin = shared_module('reaper_mavernix_menu', 'reaper-menu.cpp',
+reaper_menu_plugin = shared_module('reaper_mavernix_menu', 'reaper-menu.cpp', appmenu_header, appmenu_code,
     name_prefix: '',
     gnu_symbol_visibility: 'hidden',
-    dependencies: [gio, dependency('gdk-x11-3.0'), dependency('dbusmenu-glib-0.4')],
+    dependencies: [gio, dependency('gdk-x11-3.0'), dependency('dbusmenu-glib-0.4'), dependency('wayland-client')],
     install: true,
     install_dir: mavernix_libdir / 'reaper',
 )
