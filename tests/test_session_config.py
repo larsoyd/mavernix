@@ -105,6 +105,16 @@ class TestWrittenSettings(SessionTestCase):
                 self.assertIn("themed-decoration", settings["core"]["plugins"].split())
                 self.assertEqual(Path(settings["themed-decoration"]["theme"]).name, desktop)
 
+    def test_windows_that_leave_the_frame_to_the_desktop_get_its_frame(self):
+        for desktop in DESKTOPS:
+            with self.subTest(desktop=desktop):
+                written = self.home / f"{desktop}.ini"
+                self.run_script("make_wayfire_config.py", CONFIG_DIR / f"{desktop}.toml", written)
+                settings = configparser.ConfigParser(interpolation=None, strict=False)
+                settings.read(written)
+                self.assertEqual(settings["core"].get("preferred_decoration_mode"), "server")
+                self.assertNotEqual(settings["workarounds"].get("force_preferred_decoration_mode"), "true")
+
     def test_the_users_own_wayfire_settings_come_last(self):
         own = self.home / ".config" / "mavernix" / "wayfire.ini"
         own.parent.mkdir(parents=True)

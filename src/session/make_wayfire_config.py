@@ -779,6 +779,10 @@ def x11_settings_section(config):
             f"dpi = {yes_or_no(display_flag(config, 'sharp_x11', False))}"]
 
 
+# libdecor clients leave the frame to the desktop and draw a stand-in that never hides when maximized
+DECORATION_MODE_LINE = "preferred_decoration_mode = server"
+
+
 def xwayland_ready_line():
     return f"xwayland_startup_script = python3 {SESSION_DIR / 'compositor_call.py'} x11-settings/xwayland-ready"
 
@@ -1391,7 +1395,7 @@ def main():
     compositor_keys = compositor_key_sections(config)
     desktop_core, desktop_parts, desktop_plugins = desktop_sections(
         config, theme, compositor_keys.pop("vswitch", []))
-    compositor_keys.setdefault("core", []).extend(desktop_core + uncovered_color_lines(theme) + [xwayland_ready_line()])
+    compositor_keys.setdefault("core", []).extend(desktop_core + uncovered_color_lines(theme) + [xwayland_ready_line(), DECORATION_MODE_LINE])
     sections += desktop_parts
     plugins += desktop_plugins
     grid_section = next(section for section in sections if section[0] == "[grid]")
