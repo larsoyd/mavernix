@@ -66,6 +66,17 @@ tests = {
         'include': test_sources / 'shell/native',
         'dependencies': [],
     },
+    'window-games': {
+        'sources': [
+            test_sources / 'shell/native/window-games.cpp',
+            test_sources / 'shell/native/game-facts.cpp',
+            test_sources / 'shell/native/compositor-socket.cpp',
+            qt.compile_moc(headers: [test_sources / 'shell/native/window-games.hpp',
+                                    test_sources / 'shell/native/compositor-socket.hpp'], dependencies: qt_native),
+        ],
+        'include': test_sources / 'shell/native',
+        'dependencies': [qt_native],
+    },
     'icon-fit': {
         'sources': [test_sources / 'shell/native/icon-fit.cpp'],
         'include': test_sources / 'shell/native',

@@ -51,13 +51,10 @@ void WindowGames::startWatching()
 void WindowGames::takeWindow(const QJsonObject& description)
 {
     const QString appId = description.value("app-id").toString();
-    if (games.contains(appId))
-    {
-        return;
-    }
     const int pid = description.value("pid").toInt(-1);
     const ProcessGame game = gameOfEnvironment(contents(QString("/proc/%1/environ").arg(pid)));
-    if (game.steamId.isEmpty() && game.name.isEmpty())
+    const ProcessGame previous = games.value(appId);
+    if (game.steamId == previous.steamId && game.name == previous.name)
     {
         return;
     }
