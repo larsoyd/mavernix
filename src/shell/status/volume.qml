@@ -53,6 +53,19 @@ StatusItem {
     readonly property int settingsId: 3
     readonly property int outputBaseId: 1000
     readonly property int inputBaseId: 2000
+    readonly property int programBaseId: 3000
+
+    readonly property var programs: panel.programVolumes?.programs ?? []
+    // each program's level at opening or first sound, so a drag is not rebuilt away
+    property var programLevels: ({})
+    function levelsNow(kept) {
+        const levels = {}
+        for (const program of programs) {
+            levels[program.key] = kept[program.key] ?? (program.muted ? 0 : program.loudness)
+        }
+        return levels
+    }
+    onProgramsChanged: programLevels = levelsNow(programLevels)
 
     function entry(id, label, enabled, checked) {
         return { id: id, label: label, enabled: enabled, separator: false,
@@ -68,6 +81,7 @@ StatusItem {
     onOpening: {
         loudnessAtOpening = loudness
         mutedAtOpening = muted
+        programLevels = levelsNow({})
     }
 
     menuItems: {
@@ -75,6 +89,15 @@ StatusItem {
         slider.slider = mutedAtOpening ? 0 : loudnessAtOpening
         const items = [slider, separator]
 
+        programs.forEach((program, index) => {
+            const row = entry(programBaseId + index, program.name, false)
+            row.icon = program.icon
+            row.slider = programLevels[program.key] ?? 0
+            items.push(row)
+        })
+        if (programs.length > 0) {
+            items.push(separator)
+        }
         if (outputs.length > 0) {
             items.push(entry(0, words.output_label ?? "Output Device:", false))
             for (let index = 0; index < outputs.length; index++) {
@@ -100,7 +123,13 @@ StatusItem {
         return items
     }
 
-    onSlid: (id, value) => volume.setTo(value)
+    onSlid: (id, value) => {
+        if (id >= programBaseId) {
+            panel.programVolumes.setTo(programs[id - programBaseId].key, value)
+        } else {
+            volume.setTo(value)
+        }
+    }
 
     onChosen: id => {
         if (id === muteId) {

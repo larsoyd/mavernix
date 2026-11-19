@@ -212,6 +212,11 @@ ShellRoot {
         onChangedHere: volumeDisplay.show()
     }
 
+    ProgramVolumes {
+        id: programVolumes
+        choices: userChoices
+    }
+
     VolumeDisplay {
         id: volumeDisplay
         screen: shell.mainScreen
@@ -260,7 +265,7 @@ ShellRoot {
         ? Quickshell.screens : [mainScreen].filter(screen => screen !== null)
 
     // in a delegate a panel's own properties of these names hide the ids
-    readonly property var panelParts: ({ shell, applicationMenu, confirmDialog, outputVolume, extensions })
+    readonly property var panelParts: ({ shell, applicationMenu, confirmDialog, outputVolume, programVolumes, extensions })
 
     Variants {
         model: shell.panelScreens
@@ -273,6 +278,7 @@ ShellRoot {
             ownMenus: userChoices.value("panel", "menus_per_screen") ?? false
             confirmDialog: panelParts.confirmDialog
             outputVolume: panelParts.outputVolume
+            programVolumes: panelParts.programVolumes
             shell: panelParts.shell
             extensions: panelParts.extensions
             choices: userChoices

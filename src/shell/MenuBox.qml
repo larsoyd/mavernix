@@ -275,15 +275,20 @@ Item {
 
     // The widest row decides the menu's width.
     property real widestRow: 0
+    // room for the widest name before a slider, so those sliders line up
+    property real sliderNameRoom: 0
     function measureRows() {
         let widest = 0
+        let widestName = 0
         for (let index = 0; index < rowItems.count; index++) {
             const rowItem = rowItems.itemAt(index)
             if (rowItem !== null) {
                 widest = Math.max(widest, rowItem.neededWidth)
+                widestName = Math.max(widestName, rowItem.sliderNameWidth)
             }
         }
         widestRow = widest
+        sliderNameRoom = widestName
     }
 
     width: Math.ceil(widestRow)
@@ -417,12 +422,22 @@ Item {
                     readonly property bool hasIcon: (modelData.icon ?? "") !== ""
                     readonly property real iconRoom:
                         hasIcon ? (menu.looks.icon_size ?? 16) + (menu.looks.icon_gap ?? 4) : 0
+                    // a slider may follow an icon and a name, cut at slider_name_width
+                    readonly property bool namesSlider: isSlider && (hasIcon || modelData.label !== "")
+                    readonly property real sliderNameWidth:
+                        namesSlider ? Math.min(Math.ceil(label.implicitWidth), menu.looks.slider_name_width ?? 200) : 0
+                    readonly property real sliderStart:
+                        menu.looks.text_inset + iconRoom + menu.sliderNameRoom + (menu.looks.slider_name_gap ?? 12)
                     readonly property real neededWidth:
+                        namesSlider ? menu.looks.text_inset + iconRoom + sliderNameWidth
+                                      + (menu.looks.slider_name_gap ?? 12) + (menu.looks.slider_min_width ?? 180)
+                                      + (menu.looks.slider_inset ?? menu.looks.text_inset) :
                         isSlider ? (menu.looks.slider_min_width ?? 180) :
                         menu.looks.text_inset + iconRoom + label.implicitWidth
                         + (endWidth > 0 ? menu.looks.shortcut_gap + endWidth : 0)
                         + menu.looks.shortcut_end_inset
                     onNeededWidthChanged: menu.measureRows()
+                    onSliderNameWidthChanged: menu.measureRows()
 
                     width: rows.width
                     height: isSeparator ? menu.looks.separator_height
@@ -432,7 +447,8 @@ Item {
 
                     readonly property color textColor: ThemeValues.color(
                         selected ? menu.looks.highlight_text_color
-                                 : (modelData.enabled ? menu.looks.text_color : menu.looks.disabled_text_color))
+                                 : (modelData.enabled || isSlider ? menu.looks.text_color
+                                                                  : menu.looks.disabled_text_color))
 
                     // On the row the theme names (counted from 1).
                     Rectangle {
@@ -506,7 +522,12 @@ Item {
                     RowText {
                         id: label
                         x: menu.looks.text_inset + row.iconRoom
+                        // a slider's row is taller than the row the baseline is given for
+                        y: menu.looks.text_baseline_row - baselineOffset
+                           + (row.namesSlider ? Math.round((row.height - menu.looks.item_height) / 2) : 0)
                         text: row.modelData.label
+                        width: row.namesSlider ? menu.sliderNameRoom : implicitWidth
+                        elide: Text.ElideRight
                     }
 
                     RowText {
@@ -627,8 +648,8 @@ Item {
                         // Set from the item when the row is made, then by dragging. (Changing the
                         // items while dragging would make new rows and lose the drag.)
                         property real value: Math.max(0, Math.min(1, row.modelData.slider ?? 0))
-                        x: inset
-                        width: parent.width - 2 * inset
+                        x: row.namesSlider ? row.sliderStart : inset
+                        width: parent.width - x - inset
                         height: parent.height
                         // The knob's centre travels between points half a knob in from each end.
                         readonly property real knobSide: pictures !== null ? knob.implicitWidth : (menu.looks.slider_knob_size ?? 15)

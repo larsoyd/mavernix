@@ -19,6 +19,7 @@ PanelWindow {
     required property var settings
     property var confirmDialog: null
     property var outputVolume: null
+    property var programVolumes: null
     // The shell's root, which items can ask to `run(action)`.
     property var shell: null
     property var extensions: null
@@ -369,6 +370,8 @@ PanelWindow {
         menuX: panel.shownTitle ? panel.shownTitle.mapToItem(null, 0, 0).x - panel.shownTitle.boxOverhang : 0
         menuY: panel.atBottom ? screen.height - panel.height - menuHeight : panel.height
         squareTop: !panel.atBottom
+        // a menu longer than the room beside the panel scrolls
+        mostMenuHeight: screen.height - panel.height
 
         // The panel stays reachable, so hovering another title switches menus.
         passX: 0

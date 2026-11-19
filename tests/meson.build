@@ -204,6 +204,14 @@ menu_bar_clock_test = executable(
 )
 test('menu-bar-clock', menu_bar_clock_test, env: {'QT_QPA_PLATFORM': 'offscreen'})
 
+program_streams_test = executable(
+    'test-program-streams',
+    ['test-program-streams.cpp', qt.compile_moc(sources: 'test-program-streams.cpp', dependencies: qt_test)],
+    dependencies: [qt_test, dependency('qt6', modules: ['Core', 'Qml'])],
+    cpp_args: ['-DSHELL_DIR="' + (meson.project_source_root() / 'src' / 'shell') + '"'],
+)
+test('program-streams', program_streams_test, env: {'QT_QPA_PLATFORM': 'offscreen'})
+
 clipboard_stack_size_test = executable(
     'test-clipboard-stack-size',
     ['test-clipboard-stack-size.cpp', qt.compile_moc(sources: 'test-clipboard-stack-size.cpp', dependencies: qt_test)],

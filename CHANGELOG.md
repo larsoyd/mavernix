@@ -4,6 +4,7 @@
 
 ### Added
 
+- The volume menu has a slider for each program that is playing sound, with the program's icon and name, so one program can be turned down without the rest. Alert sounds are not in the list. A level you set is kept for the next time that program plays.
 - With several screens the dock is on one of them and comes to another when you push the pointer down against that screen's bottom edge, in one push or a few short ones, sliding out of the old screen and up on the new one as on OS X Mavericks. The same push brings it up over a full screen window. `[dock] follows_dig = false` keeps it on the screen it starts on (see docs/configuration.md).
 - The pointer can hide while you type and after the mouse has rested, by the rules of KWin's Hide Cursor effect: Settings, Mouse, Hide the pointer while typing and Hide the pointer after, or `[input] hide_pointer_when_typing` and `hide_pointer_after_seconds`. It comes back when the mouse is used.
 - An emoji menu: Super+. opens it at the pointer, with a search field, groups, the ones used last and skin tones, and puts the chosen emoji into the window you were typing in. Settings, Keyboard changes the key, `[emoji]` in the config the rest (see docs/configuration.md). It needs a colour emoji font.
@@ -25,6 +26,7 @@
 
 ### Fixed
 
+- A menu in the menu bar that is longer than the screen scrolls, with an arrow where there is more, instead of running off the bottom.
 - A window minimised on a screen the dock is not on flows across to its tile on the dock's screen, and comes back from there to its own screen, as on OS X. It used to aim at an empty spot on its own screen.
 - Unplugging the screen that was last clicked on and plugging a screen in again no longer stops the compositor.
 - Names of desktop icons have the soft dark shadow they have on OS X, so white text stays readable on any picture, and a picked name gets Mavericks' selection colour, shape and dark lower edge. It turns grey while a window is in front of the desktop.

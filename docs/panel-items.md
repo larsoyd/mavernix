@@ -12,7 +12,7 @@ right = ["tray", "bluetooth", "volume", "network", "battery", "clock"]
 | `tray` | the icons other programs put on the panel, in their own colours. Programs listed in `one_colour` under `[status.tray]` are drawn in the panel's colour instead, for an icon that is a plain light shape (Steam's, by default) | nothing; programs announce their icons themselves |
 | `clipboard` | searchable history of copied text, links, files and pictures. Choose a copy to reuse it, or pin it to keep it. Super+V opens the history. Option-click pauses recording. Password-manager entries are excluded. System Preferences, Clipboard, controls storage and limits. Add to Dock also makes the history available as a grid or list | a compositor with the data control protocol, such as Wayfire 0.11 |
 | `bluetooth` | whether Bluetooth is on or off. The menu switches it, and lists the paired devices, each with a submenu that shows its charge and connects or disconnects it. While the menu is open, it looks for devices nearby and pairs the one you choose | BlueZ |
-| `volume` | how loud the sound output is. The scroll wheel changes it. The menu has a slider for it, the output and input devices to choose from, Mute, and the sound settings | PipeWire |
+| `volume` | how loud the sound output is. The scroll wheel changes it. The menu has a slider for it, a slider for each program that is playing sound, the output and input devices to choose from, Mute, and the sound settings | PipeWire |
 | `network` | a cable, or the strength of the wireless signal. The menu turns Wi-Fi on and off and lists the networks in reach, with a lock on those that need a password and their signal strength; choosing one joins it, asking for the password if needed. A network program's tray icon (`tray_program` under `[status.network]`, NetworkManager's applet by default) is left out; with `menu = "program"` the menu is that program's whole menu instead | NetworkManager |
 | `battery` | the charge, optionally with the percentage as text. The menu says how long it will last and what's powering the machine | UPower |
 | `notifications` | opens and closes the list of past notifications | nothing |
@@ -83,7 +83,7 @@ What an item can set:
 | `iconName` | the icon, named the way Linux desktops name icons, without "-symbolic": `audio-volume-high`, `network-wired`, `weather-clear` |
 | `text` | a short text before the icon (or on its own, with no `iconName`) |
 | `shown` | `false` while there's nothing to show |
-| `menuItems` | a menu that opens when it's clicked. Each entry is `{ id, label, enabled, separator, checkable, checked, shortcut: [], children: [] }`. An entry with `slider: VALUE` (0 to 1, and `enabled: false`) is drawn as a slider. Don't change the items while the slider is being dragged (see `src/shell/status/volume.qml`) |
+| `menuItems` | a menu that opens when it's clicked. Each entry is `{ id, label, enabled, separator, checkable, checked, shortcut: [], children: [] }`. An entry with `slider: VALUE` (0 to 1, and `enabled: false`) is drawn as a slider, after its `icon` and `label` if it has them. Don't change the items while the slider is being dragged (see `src/shell/status/volume.qml`) |
 | `popover` | instead of a menu, a panel of its own in the menu's place: a component whose item sets its `implicitWidth` and `implicitHeight` ([extensions](extensions.md#a-panel-item)) |
 
 What it can react to:
