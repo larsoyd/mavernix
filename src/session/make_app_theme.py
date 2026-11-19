@@ -1271,6 +1271,9 @@ def write_kde_settings(theme, output_directory):
             (schemes_directory / f"{scheme}.colors").write_text(
                 "\n".join(["[General]", f"ColorScheme={scheme}", f"Name={name}", ""] + color_lines))
 
+    # the file dialog's own style reads this, its save and cancel then carry words alone
+    lines += ["[KDE]", "ShowIconsOnPushButtons=false", ""]
+
     settings_directory = output_directory / "xdg"
     settings_directory.mkdir(parents=True, exist_ok=True)
     (settings_directory / "kdeglobals").write_text("\n".join(lines))

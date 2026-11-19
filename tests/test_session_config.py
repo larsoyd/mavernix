@@ -1669,6 +1669,15 @@ class TestKdeColours(SessionTestCase):
         self.assertEqual(settings["Appearance"]["standard_dialogs"], "xdgdesktopportal")
         self.assertEqual(settings["Appearance"]["icon_theme"], "Adwaita")
 
+    def test_kde_push_buttons_carry_words_alone(self):
+        output = self.home / "app-theme"
+        self.run_script("make_app_theme.py", THEMES_DIR / "plain", output)
+        lines = (output / "xdg" / "kdeglobals").read_text().split("\n")
+        # unlocked group and key, a user who wants the icons back sets it in their own file
+        self.assertIn("[KDE]", lines)
+        self.assertEqual(lines[lines.index("[KDE]") + 1], "ShowIconsOnPushButtons=false")
+        self.assertFalse([line for line in lines if line.startswith("[KDE]") and line != "[KDE]"])
+
     def test_kdeglobals_carries_no_fonts(self):
         # nothing reads them without the kde platform theme, which recolours and rewires every program
         output = self.home / "app-theme"
