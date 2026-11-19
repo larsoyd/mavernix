@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="512" height="512" viewBox="0 0 512 512">
+  <defs>
+    <linearGradient id="linear-gradient-1" x1="120" y1="40" x2="340" y2="460" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#fff2aa"/>
+      <stop offset="0.3333" stop-color="#fdd16a"/>
+      <stop offset="0.6667" stop-color="#c38b25"/>
+      <stop offset="1" stop-color="#ffe194"/>
+    </linearGradient>
+    <linearGradient id="linear-gradient-2" x1="120" y1="40" x2="340" y2="460" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#535752"/>
+      <stop offset="0.5" stop-color="#252a26"/>
+      <stop offset="1" stop-color="#121813"/>
+    </linearGradient>
+    <linearGradient id="linear-gradient-3" x1="160" y1="100" x2="335" y2="430" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#fff29a"/>
+      <stop offset="0.3333" stop-color="#ffd34a"/>
+      <stop offset="0.6667" stop-color="#ffbc2e"/>
+      <stop offset="1" stop-color="#d98e15"/>
+    </linearGradient>
+    <linearGradient id="linear-gradient-4" x1="200" y1="130" x2="290" y2="350" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#353c31"/>
+      <stop offset="1" stop-color="#121b15"/>
+    </linearGradient>
+  </defs>
+  <title>Firewatch — yellow enamel</title>
+  <g id="Layer_1" data-name="Layer 1">
+    <path id="Badge_thickness" data-name="Badge thickness" d="M256 34 C181 94 111 119 42 124 C53 285 125 422 256 489 C387 422 459 285 470 124 C401 119 331 94 256 34 Z" fill="#644516" stroke="#4c3515" stroke-width="3" stroke-miterlimit="10"/>
+    <path id="Golden_perimeter" data-name="Golden perimeter" d="M256 28 C181 88 111 113 42 118 C53 279 125 416 256 483 C387 416 459 279 470 118 C401 113 331 88 256 28 Z" fill="url(#linear-gradient-1)" stroke="#ffe8a1" stroke-width="1.5" stroke-miterlimit="10"/>
+    <path id="Charcoal_enamel_border" data-name="Charcoal enamel border" d="M256 45 C183 102 117 126 58 131 C73 285 139 407 256 466 C373 407 439 285 454 131 C395 126 329 102 256 45 Z" fill="url(#linear-gradient-2)" stroke="#8c651f" stroke-width="2" stroke-miterlimit="10"/>
+    <path id="Yellow_enamel_face" data-name="Yellow enamel face" d="M256 93 C202 132 152 153 105 165 C125 283 174 373 256 425 C338 373 387 283 407 165 C360 153 310 132 256 93 Z" fill="url(#linear-gradient-3)" stroke="#ffe287" stroke-width="2" stroke-miterlimit="10"/>
+    <path id="Pine_recessed_lower_highlight" data-name="Pine recessed lower highlight" d="M256 135 L190 242 C198.667 242 207.333 240.667 216 238 L181 303 C201 303.667 219.333 302.333 236 299 L236 351 L276 351 L276 299 C292.667 302.333 311 303.667 331 303 L296 238 C304.667 240.667 313.333 242 322 242 Z" fill="#ffe38a"/>
+    <path id="Pine_emblem" data-name="Pine emblem" d="M256 132 L190 239 C198.667 239 207.333 237.667 216 235 L181 300 C201 300.667 219.333 299.333 236 296 L236 348 L276 348 L276 296 C292.667 299.333 311 300.667 331 300 L296 235 C304.667 237.667 313.333 239 322 239 Z" fill="url(#linear-gradient-4)" stroke="#9a6b19" stroke-miterlimit="10"/>
+    <path id="Top_rim_glint" data-name="Top rim glint" d="M256 31 C181 91 111 116 45 121" fill="none" stroke="#fff6c8" stroke-width="2.5" stroke-miterlimit="10" opacity="0.8"/>
+  </g>
+</svg>

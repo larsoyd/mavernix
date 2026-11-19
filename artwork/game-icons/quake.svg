@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="512" height="512" viewBox="0 0 512 512">
+  <defs>
+    <linearGradient id="linear-gradient-1" x1="120" y1="40" x2="340" y2="460" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#ffdda0"/>
+      <stop offset="0.25" stop-color="#b97b3d"/>
+      <stop offset="0.5" stop-color="#e0ac64"/>
+      <stop offset="0.75" stop-color="#87502a"/>
+      <stop offset="1" stop-color="#dba665"/>
+    </linearGradient>
+    <linearGradient id="linear-gradient-2" x1="120" y1="40" x2="340" y2="460" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#a56935"/>
+      <stop offset="1" stop-color="#4e2b1e"/>
+    </linearGradient>
+  </defs>
+  <title>Quake — bronze</title>
+  <g id="Layer_1" data-name="Layer 1">
+    <path id="Cast_bronze_edge" data-name="Cast bronze edge" d="M190 42 C120 79 86 144 89 214 C92 295 154 344 236 354 L244 434 L256 485 L268 434 L276 354 C358 344 420 295 423 214 C426 144 392 79 322 42 C380 88 402 146 393 206 C384 268 337 304 275 313 L275 255 C275 239 282 234 300 231 L212 231 C230 234 237 239 237 255 L237 313 C175 304 128 268 119 206 C110 146 132 88 190 42 Z" fill="#503023" stroke="#321d16" stroke-width="5" stroke-miterlimit="10"/>
+    <path id="Bronze_face" data-name="Bronze face" d="M190 37 C120 74 86 139 89 209 C92 290 154 339 236 349 L244 429 L256 480 L268 429 L276 349 C358 339 420 290 423 209 C426 139 392 74 322 37 C380 83 402 141 393 201 C384 263 337 299 275 308 L275 250 C275 234 282 229 300 226 L212 226 C230 229 237 234 237 250 L237 308 C175 299 128 263 119 201 C110 141 132 83 190 37 Z" fill="url(#linear-gradient-1)" stroke="#ecc98c" stroke-width="1.4" stroke-miterlimit="10"/>
+    <path id="Upper_edge_glint" data-name="Upper edge glint" d="M190 37 C120 74 86 139 89 209 C92 290 154 339 236 349 M322 37 C392 74 426 139 423 209" fill="none" stroke="#ffe5ac" stroke-width="2" stroke-miterlimit="10" opacity="0.7"/>
+    <path id="Lower_bevel_facet" data-name="Lower bevel facet" d="M256 240 L256 463 L268 429 L276 349 C358 339 420 290 423 209 C407 287 351 321 264 324 L264 240 Z" fill="url(#linear-gradient-2)" opacity="0.65"/>
+  </g>
+</svg>
