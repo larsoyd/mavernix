@@ -15,6 +15,7 @@ the nearest of those; other names fall back to INHERITS.
 """
 
 import argparse
+import base64
 import io
 import plistlib
 import re
@@ -32,6 +33,8 @@ ICON_THEME_NAME = "SeaLion"
 
 # Fallback themes, in order. Every application installs its icon into "hicolor".
 INHERITS = ["breeze", "Adwaita", "hicolor"]
+# lets kde's programs recolour drawings by the row they are on
+FOLLOWS_COLOURS = "FollowsColorScheme=true"
 
 SYSTEM_ICONS = "System/Library/CoreServices/CoreTypes.bundle/Contents/Resources"
 
@@ -716,6 +719,63 @@ def centred(drawing, square_size):
     return square
 
 
+# kde swaps the sheet's text colour for the highlighted text's on a selected row
+# the mask takes its light from that colour so the white copy shows only there
+SIDE_BAR_SVG = """<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" \
+width="{size}" height="{size}" viewBox="0 0 {size} {size}">
+<style type="text/css" id="current-color-scheme">.ColorScheme-Text{{color:#000000;}}</style>
+<defs><mask id="lit"><rect width="{size}" height="{size}" class="ColorScheme-Text" fill="currentColor"/></mask></defs>
+<image width="{size}" height="{size}" xlink:href="data:image/png;base64,{glyph}"/>
+<g mask="url(#lit)"><image width="{size}" height="{size}" xlink:href="data:image/png;base64,{white}"/></g>
+</svg>
+"""
+PICTURE_SVG = """<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" \
+width="{width}" height="{height}" viewBox="0 0 {width} {height}">
+<image width="{width}" height="{height}" xlink:href="data:image/png;base64,{picture}"/>
+</svg>
+"""
+
+
+def png_text(picture):
+    data = io.BytesIO()
+    picture.save(data, "PNG")
+    return base64.b64encode(data.getvalue()).decode()
+
+
+def side_bar_svg(glyph):
+    """A side bar glyph as a drawing, itself while text is dark and white where text is white."""
+    white = Image.new("RGBA", glyph.size, (255, 255, 255, 0))
+    white.putalpha(glyph.getchannel("A"))
+    return SIDE_BAR_SVG.format(size=glyph.width, glyph=png_text(glyph), white=png_text(white))
+
+
+def picture_svg(picture):
+    return PICTURE_SVG.format(width=picture.width, height=picture.height, picture=png_text(picture))
+
+
+def draw_side_bar_names(theme_directory):
+    """Every size of each name the side bar has a glyph for becomes a drawing, since kde
+    takes a picture of any size before a drawing. Returns how many files it changed."""
+    side_bar = {folder_name(SIDE_BAR_SIZE, scale) for scale in (1, 2)}
+    names = {picture.stem for folder in side_bar for context in ("places", "devices")
+             for picture in (theme_directory / folder / context).glob("*.png")
+             if not picture.stem.endswith("-symbolic")}
+    changed = 0
+    for picture in sorted(theme_directory.glob("*/*/*.png")):
+        if picture.stem not in names:
+            continue
+        image = Image.open(picture).convert("RGBA")
+        lit = picture.parent.parent.name in side_bar and picture.parent.name in ("places", "devices")
+        picture.with_suffix(".svg").write_text(side_bar_svg(image) if lit else picture_svg(image))
+        picture.unlink()
+        changed += 1
+    index_file = theme_directory / "index.theme"
+    index = index_file.read_text()
+    if FOLLOWS_COLOURS not in index:
+        index_file.write_text(index.replace("\nInherits=", f"\n{FOLLOWS_COLOURS}\nInherits=", 1))
+    return changed
+
+
 def write_centred(picture, square_size, target):
     """Writes a picture into the middle of a transparent square."""
     target.parent.mkdir(parents=True, exist_ok=True)
@@ -915,6 +975,7 @@ def index_text(contexts_by_size):
         "[Icon Theme]",
         f"Name={ICON_THEME_NAME}",
         "Comment=Sea Lion's icons, made by make_icons.py",
+        FOLLOWS_COLOURS,
         f"Inherits={','.join(INHERITS)}",
         f"Directories={','.join(directories)}",
     ])
@@ -994,6 +1055,7 @@ def main():
         contexts_by_size.setdefault((size, 1), set()).add("mimetypes")
 
     (theme_directory / "index.theme").write_text(index_text(contexts_by_size))
+    draw_side_bar_names(theme_directory)
     print(f"wrote {len(ICONS) + len(BUNDLES) + len(SIDE_BAR_ICONS)} icons from {len(converted)} of the installer's "
           f"icon files, {emblem_folders} emblem folders and "
           f"{len(ACTION_TEMPLATES) + len(ACTION_PICTURES)} toolbar icons into {theme_directory}")

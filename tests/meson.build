@@ -105,6 +105,15 @@ tests = {
         'include': test_sources / 'shell/native',
         'dependencies': [qt_native, librsvg],
     },
+    'theme-icon-files': {
+        'sources': [
+            test_sources / 'shell/native/icon-fit.cpp',
+            test_sources / 'shell/native/icon-files.cpp',
+            qt.compile_moc(headers: test_sources / 'shell/native/icon-files.hpp', dependencies: qt_native),
+        ],
+        'include': test_sources / 'shell/native',
+        'dependencies': [qt_native, librsvg],
+    },
     'folder-contents': {
         'sources': [
             test_sources / 'shell/native/folder-contents.cpp',

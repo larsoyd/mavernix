@@ -99,7 +99,8 @@ void remember_files(const QString& name, const QThemeIconInfo& info)
         {
             continue;
         }
-        const bool scalable = entry->dir.type == QIconDirInfo::Scalable || is_drawing(entry->filename);
+        // a drawing in a folder of one size was made for that size
+        const bool scalable = entry->dir.type == QIconDirInfo::Scalable;
         files.append({entry->filename, scalable ? 0 : entry->dir.size * entry->dir.scale});
     }
     const QMutexLocker locker(&files_lock);
@@ -246,7 +247,7 @@ QString IconFiles::sourceFor(const QString& name, int revision)
         return known.value();
     }
 
-    // If every size is an SVG, one file serves all sizes.
+    // when every size is a scalable svg one file serves them all
     QString drawing;
     bool has_icon = false;
     if (name.startsWith(QLatin1Char('/')))
@@ -261,7 +262,7 @@ QString IconFiles::sourceFor(const QString& name, int revision)
         remember_files(name, info);
         for (const auto& entry : info.entries)
         {
-            if (!is_drawing(entry->filename))
+            if (!is_drawing(entry->filename) || entry->dir.type != QIconDirInfo::Scalable)
             {
                 drawing.clear();
                 break;

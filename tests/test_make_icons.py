@@ -1,4 +1,6 @@
+import io
 import re
+import subprocess
 import sys
 import tempfile
 import unittest
@@ -254,6 +256,137 @@ class EmblemFolderTests(unittest.TestCase):
                 text = path.read_text()
                 self.assertIn('viewBox="0 0 512 512"', text)
                 self.assertIsNone(re.search(r"<(image|filter|clipPath|mask|text)\b", text))
+
+
+# what kde's icon loader puts in the sheet for a row, text colour first
+KDE_SHEET = (".ColorScheme-Text {{ color:{text}; }}.ColorScheme-Background{{ color:#ededed; }}"
+             ".ColorScheme-Highlight{{ color:#5199db; }}.ColorScheme-HighlightedText{{ color:#ffffff; }}")
+
+
+def drawn(svg_text, text_colour=None):
+    """What librsvg draws, with the colour sheet swapped as kde swaps it when a colour is given."""
+    if text_colour is not None:
+        svg_text, swaps = re.subn(r'(<style [^>]*id="current-color-scheme"[^>]*>)[^<]*(</style>)',
+                                  lambda found: found.group(1) + KDE_SHEET.format(text=text_colour) + found.group(2),
+                                  svg_text)
+        if swaps != 1:
+            raise AssertionError(f"the glyph holds {swaps} colour sheets")
+    run = subprocess.run(["rsvg-convert"], input=svg_text.encode(), capture_output=True, timeout=30)
+    if run.returncode != 0:
+        raise AssertionError(f"rsvg-convert rc={run.returncode} err={run.stderr[:200]!r}")
+    return Image.open(io.BytesIO(run.stdout)).convert("RGBA")
+
+
+def largest_difference(first, second):
+    return max(band.getextrema()[1] for band in ImageChops.difference(first, second).split())
+
+
+def glyph(size):
+    """A blue-grey shape with a soft edge and a lighter line, as the side bar's own are."""
+    picture = Image.new("RGBA", (size, size), (0, 0, 0, 0))
+    draw = ImageDraw.Draw(picture)
+    draw.ellipse((size // 8, size // 8, size * 7 // 8, size * 7 // 8), fill=(103, 114, 129, 255))
+    draw.line((size // 4, size // 2, size * 3 // 4, size // 2), fill=(150, 160, 172, 255))
+    draw.point((size // 8, size // 2), fill=(103, 114, 129, 90))
+    return picture
+
+
+class SideBarGlyphTests(unittest.TestCase):
+    def test_a_glyph_is_as_drawn_while_the_text_is_dark(self):
+        for size in (22, 44):
+            for colour in (None, "#000000"):
+                with self.subTest(size=size, colour=colour):
+                    picture = drawn(make_icons.side_bar_svg(glyph(size)), colour)
+                    self.assertEqual(picture.size, (size, size))
+                    self.assertLessEqual(largest_difference(picture, glyph(size)), 2)
+
+    def test_a_glyph_turns_white_on_a_selected_row_and_keeps_its_shape(self):
+        picture = drawn(make_icons.side_bar_svg(glyph(22)), "#ffffff")
+        solid = [pixel for pixel, was in zip(picture.getdata(), glyph(22).getdata()) if was[3] == 255]
+        self.assertGreater(len(solid), 100)
+        self.assertGreaterEqual(min(min(pixel[:3]) for pixel in solid), 250)
+        self.assertEqual(min(pixel[3] for pixel in solid), 255)
+        clear = [pixel[3] for pixel, was in zip(picture.getdata(), glyph(22).getdata()) if was[3] == 0]
+        self.assertEqual(max(clear), 0)
+
+    def test_light_text_of_a_dark_look_lightens_the_glyph(self):
+        picture = drawn(make_icons.side_bar_svg(glyph(22)), "#d0d0d0")
+        solid = [pixel for pixel, was in zip(picture.getdata(), glyph(22).getdata()) if was[3] == 255]
+        self.assertGreaterEqual(min(min(pixel[:3]) for pixel in solid), 200)
+
+    def test_the_colour_sheet_holds_only_the_text_colour(self):
+        text = make_icons.side_bar_svg(glyph(22))
+        self.assertEqual(re.findall(r"<style\b[^>]*>([^<]*)</style>", text), [".ColorScheme-Text{color:#000000;}"])
+        self.assertIn('<style type="text/css" id="current-color-scheme">', text)
+
+    def test_a_picture_kept_as_a_drawing_has_no_colour_sheet_and_draws_the_same(self):
+        picture = glyph(64)
+        text = make_icons.picture_svg(picture)
+        self.assertNotIn("<style", text)
+        self.assertLessEqual(largest_difference(drawn(text), picture), 2)
+
+    def test_index_lets_kde_recolour_and_the_dark_theme_does_not(self):
+        text = make_icons.index_text({(22, 1): {"places"}})
+        self.assertIn("\nFollowsColorScheme=true\n", text.split("\n\n")[0] + "\n")
+        with tempfile.TemporaryDirectory() as folder:
+            light = Path(folder) / "sea-lion"
+            icons = light / "share" / "icons" / "SeaLion"
+            (icons / "22x22/places").mkdir(parents=True)
+            (light / "share" / "sounds").mkdir()
+            (icons / "index.theme").write_text(text)
+            make_dark_theme.make_icon_theme(light, Path(folder) / "sea-lion-dark")
+            dark = (Path(folder) / "sea-lion-dark/share/icons/SeaLionDark/index.theme").read_text()
+            self.assertIn("22x22/places", dark)
+            self.assertNotIn("FollowsColorScheme", dark)
+
+    def theme(self, folder):
+        """A theme holding user-home as the side bar has it and at two other sizes, and two names it lacks there."""
+        theme = Path(folder)
+        for place, size in (("22x22", 22), ("22x22@2", 44), ("16x16", 16), ("128x128", 128)):
+            for context in ("places", "devices", "mimetypes"):
+                (theme / place / context).mkdir(parents=True)
+            glyph(size).save(theme / place / "places" / "user-home.png")
+            glyph(size).save(theme / place / "places" / "folder-symbolic.png")
+        glyph(22).save(theme / "22x22" / "devices" / "computer.png")
+        glyph(64).save(theme / "128x128" / "devices" / "computer.png")
+        glyph(16).save(theme / "16x16" / "mimetypes" / "user-home.png")
+        glyph(16).save(theme / "16x16" / "places" / "folder.png")
+        (theme / "22x22" / "actions").mkdir()
+        glyph(22).save(theme / "22x22" / "actions" / "go-next.png")
+        glyph(22).save(theme / "22x22" / "actions" / "user-home.png")
+        (theme / "index.theme").write_text("[Icon Theme]\nName=SeaLion\nInherits=breeze\nDirectories=22x22/places\n"
+                                           "\n[22x22/places]\nSize=22\n")
+        return theme
+
+    def test_every_size_of_a_side_bar_name_becomes_a_drawing_and_only_its_glyph_recolours(self):
+        with tempfile.TemporaryDirectory() as folder:
+            theme = self.theme(folder)
+            self.assertEqual(make_icons.draw_side_bar_names(theme), 8)
+            self.assertEqual(sorted(str(path.relative_to(theme)) for path in theme.rglob("*.png")),
+                             ["128x128/places/folder-symbolic.png", "16x16/places/folder-symbolic.png",
+                              "16x16/places/folder.png", "22x22/actions/go-next.png",
+                              "22x22/places/folder-symbolic.png", "22x22@2/places/folder-symbolic.png"])
+            for place, size in (("22x22", 22), ("22x22@2", 44), ("16x16", 16), ("128x128", 128)):
+                with self.subTest(place=place):
+                    text = (theme / place / "places" / "user-home.svg").read_text()
+                    self.assertEqual("<style" in text, place.startswith("22x22"))
+                    self.assertLessEqual(largest_difference(drawn(text), glyph(size)), 2)
+            self.assertNotIn("<style", (theme / "16x16" / "mimetypes" / "user-home.svg").read_text())
+            self.assertNotIn("<style", (theme / "22x22" / "actions" / "user-home.svg").read_text())
+            self.assertNotIn("<style", (theme / "128x128" / "devices" / "computer.svg").read_text())
+            self.assertIn("<style", (theme / "22x22" / "devices" / "computer.svg").read_text())
+
+    def test_an_older_theme_is_marked_once_and_a_second_run_changes_nothing(self):
+        with tempfile.TemporaryDirectory() as folder:
+            theme = self.theme(folder)
+            make_icons.draw_side_bar_names(theme)
+            index = (theme / "index.theme").read_text()
+            self.assertEqual(index.count("FollowsColorScheme=true"), 1)
+            self.assertTrue(index.startswith("[Icon Theme]\nName=SeaLion\n"))
+            self.assertIn("\n\n[22x22/places]\nSize=22\n", index)
+            before = {path: path.read_bytes() for path in theme.rglob("*") if path.is_file()}
+            self.assertEqual(make_icons.draw_side_bar_names(theme), 0)
+            self.assertEqual({path: path.read_bytes() for path in theme.rglob("*") if path.is_file()}, before)
 
 
 if __name__ == "__main__":

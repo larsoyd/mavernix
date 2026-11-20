@@ -1009,6 +1009,8 @@ def make_icon_theme(light_dir, output_dir):
     index = re.sub(r"^Comment=.*$", "Comment=Sea Lion's icons, with Breeze's dark set for the "
                    "one-colour ones; made by make_dark_theme.py", index, count=1, flags=re.M)
     index = re.sub(r"^Inherits=.*$", f"Inherits={ICON_PARENTS}", index, count=1, flags=re.M)
+    # its side bar keeps the blue grey on a selected row
+    index = re.sub(r"^FollowsColorScheme=.*\n", "", index, count=1, flags=re.M)
     (icon_dir / "index.theme").write_text(index)
 
 
