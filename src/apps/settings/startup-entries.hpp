@@ -17,6 +17,8 @@ struct StartupEntry
     QString name;
     QIcon icon;
     bool on = true;
+    // ticked Hide, it opens with its window minimized
+    bool hide = false;
     // Only the user's folder has it, so it can be removed rather than
     // switched off.
     bool users_own = false;
@@ -28,6 +30,7 @@ QList<StartupEntry> startup_entries();
 
 // Each returns what went wrong, else empty.
 QString switch_startup_entry(const QString& file_name, bool on);
+QString set_startup_entry_hide(const QString& file_name, bool hide);
 // Starts an installed program ("org.kde.kate.desktop") at login. Its entry
 // is copied, or the one already there switched on.
 QString add_startup_program(const QString& program_id);

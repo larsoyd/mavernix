@@ -8,7 +8,7 @@
 
 class Choices;
 class QLabel;
-class QListWidget;
+class QTreeWidget;
 class QPushButton;
 
 class StartupPane : public QWidget
@@ -26,7 +26,7 @@ class StartupPane : public QWidget
     QString word(const char* key, const char* fallback) const;
 
     QVariantMap words;
-    QListWidget* list;
+    QTreeWidget* list;
     QPushButton* remove;
     QLabel* empty_label;
     QLabel* problem_label;

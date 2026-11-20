@@ -171,6 +171,18 @@ tests = {
         'include': test_sources / 'apps/settings',
         'dependencies': [qt_widgets, dependency('qt6', modules: ['Concurrent'])],
     },
+    'startup-pane': {
+        'sources': [
+            test_sources / 'apps/settings/startup-pane.cpp',
+            test_sources / 'apps/settings/startup-entries.cpp',
+            test_sources / 'apps/settings/installed-programs.cpp',
+            test_sources / 'apps/settings/pane-parts.cpp',
+            test_sources / 'apps/settings/choices.cpp',
+            qt.compile_moc(headers: test_sources / 'apps/settings/startup-pane.hpp', dependencies: qt_widgets),
+        ],
+        'include': test_sources / 'apps/settings',
+        'dependencies': [qt_widgets, gio],
+    },
     'overview': {
         'sources': [
             test_sources / 'apps/settings/overview.cpp',
@@ -183,6 +195,11 @@ tests = {
         'sources': [test_sources / 'apps/settings/menu-bar-box.cpp', test_sources / 'apps/settings/choices.cpp'],
         'include': test_sources / 'apps/settings',
         'dependencies': [qt_widgets],
+    },
+    'startup-entries': {
+        'sources': [test_sources / 'apps/settings/startup-entries.cpp'],
+        'include': test_sources / 'apps/settings',
+        'dependencies': [qt_widgets, gio],
     },
     'pane-layout': {
         'sources': [test_sources / 'apps/settings/pane-parts.cpp'],

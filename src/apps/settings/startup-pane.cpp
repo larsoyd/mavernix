@@ -4,6 +4,7 @@
 #include <QCoreApplication>
 #include <QDialogButtonBox>
 #include <QHBoxLayout>
+#include <QHeaderView>
 #include <QKeyEvent>
 #include <QLabel>
 #include <QLineEdit>
@@ -11,6 +12,7 @@
 #include <QPushButton>
 #include <QStandardPaths>
 #include <QTimer>
+#include <QTreeWidget>
 #include <QVBoxLayout>
 
 #include "choices.hpp"
@@ -54,6 +56,21 @@ class KeysToList : public QObject
     QListWidget* list;
 };
 
+// left and right move between an item's own tick and its Hide tick
+class StartupList : public QTreeWidget
+{
+  protected:
+    QModelIndex moveCursor(CursorAction action, Qt::KeyboardModifiers modifiers) override
+    {
+        const QModelIndex now = currentIndex();
+        if (now.isValid() && (action == MoveLeft || action == MoveRight))
+        {
+            return now.siblingAtColumn(action == MoveRight ? 1 : 0);
+        }
+        return QTreeWidget::moveCursor(action, modifiers);
+    }
+};
+
 StartupPane::StartupPane(Choices& choices, QWidget* parent) : QWidget(parent)
 {
     words = choices.configTable(QStringLiteral("settings")).value(QStringLiteral("words")).toMap();
@@ -68,10 +85,24 @@ StartupPane::StartupPane(Choices& choices, QWidget* parent) : QWidget(parent)
     intro->setFixedWidth(intro_width_px);
     rows->addWidget(intro);
 
-    list = new QListWidget;
+    list = new StartupList;
     list->setFixedSize(intro_width_px, list_height_px);
     list->setIconSize(QSize(icon_size_px, icon_size_px));
+    list->setColumnCount(2);
+    list->setHeaderLabels({word("startup_item", "Item"), word("startup_hide", "Hide")});
+    list->setRootIsDecorated(false);
+    list->setUniformRowHeights(true);
+    list->setTextElideMode(Qt::ElideRight);
+    list->header()->setStretchLastSection(false);
+    list->header()->setSectionResizeMode(0, QHeaderView::Stretch);
+    list->header()->setSectionResizeMode(1, QHeaderView::ResizeToContents);
+    list->header()->setSectionsMovable(false);
     rows->addWidget(list);
+
+    auto* hint = new QLabel(word("startup_hide_hint", "To hide a program when you log in, tick Hide next to it."));
+    hint->setWordWrap(true);
+    hint->setFixedWidth(intro_width_px);
+    rows->addWidget(hint);
 
     // In the empty list, instead of nothing.
     empty_label = new QLabel(word("startup_none", "No programs open at login."));
@@ -130,23 +161,24 @@ StartupPane::StartupPane(Choices& choices, QWidget* parent) : QWidget(parent)
         rows->addWidget(turn_on, 0, Qt::AlignLeft);
     }
 
-    connect(list, &QListWidget::itemChanged, this, [this](QListWidgetItem* item) {
-        const QString file_name = item->data(FileNameRole).toString();
-        showProblem(switch_startup_entry(file_name, item->checkState() == Qt::Checked));
+    connect(list, &QTreeWidget::itemChanged, this, [this](QTreeWidgetItem* item, int column) {
+        const QString file_name = item->data(0, FileNameRole).toString();
+        const bool ticked = item->checkState(column) == Qt::Checked;
+        showProblem(column == 0 ? switch_startup_entry(file_name, ticked) : set_startup_entry_hide(file_name, ticked));
         // The box shows what the folders now say, also when the change
         // failed; read after this signal, as reading clears the list.
         QTimer::singleShot(0, this, [this, file_name]() { fill(file_name); });
     });
-    connect(list, &QListWidget::currentItemChanged, this, [this](QListWidgetItem* current) {
+    connect(list, &QTreeWidget::currentItemChanged, this, [this](QTreeWidgetItem* current) {
         // One only the system has is switched off instead.
-        remove->setEnabled(current != nullptr && current->data(UsersOwnRole).toBool());
+        remove->setEnabled(current != nullptr && current->data(0, UsersOwnRole).toBool());
     });
     connect(add, &QPushButton::clicked, this, &StartupPane::addProgram);
     connect(remove, &QPushButton::clicked, this, [this]() {
-        const QListWidgetItem* current = list->currentItem();
+        const QTreeWidgetItem* current = list->currentItem();
         if (current != nullptr)
         {
-            showProblem(remove_startup_entry(current->data(FileNameRole).toString()));
+            showProblem(remove_startup_entry(current->data(0, FileNameRole).toString()));
             fill();
         }
     });
@@ -160,19 +192,21 @@ void StartupPane::fill(const QString& chosen)
     list->clear();
     for (const StartupEntry& entry : startup_entries())
     {
-        auto* item = new QListWidgetItem(entry.icon, entry.name, list);
+        auto* item = new QTreeWidgetItem(list, {entry.name});
+        item->setIcon(0, entry.icon);
         item->setFlags(item->flags() | Qt::ItemIsUserCheckable);
-        item->setCheckState(entry.on ? Qt::Checked : Qt::Unchecked);
-        item->setData(FileNameRole, entry.file_name);
-        item->setData(UsersOwnRole, entry.users_own);
+        item->setCheckState(0, entry.on ? Qt::Checked : Qt::Unchecked);
+        item->setCheckState(1, entry.hide ? Qt::Checked : Qt::Unchecked);
+        item->setData(0, FileNameRole, entry.file_name);
+        item->setData(0, UsersOwnRole, entry.users_own);
         if (entry.file_name == chosen)
         {
             list->setCurrentItem(item);
         }
     }
-    empty_label->setVisible(list->count() == 0);
-    const QListWidgetItem* current = list->currentItem();
-    remove->setEnabled(current != nullptr && current->data(UsersOwnRole).toBool());
+    empty_label->setVisible(list->topLevelItemCount() == 0);
+    const QTreeWidgetItem* current = list->currentItem();
+    remove->setEnabled(current != nullptr && current->data(0, UsersOwnRole).toBool());
 }
 
 void StartupPane::addProgram()
