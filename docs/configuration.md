@@ -196,6 +196,8 @@ The programs in the config's `[session] autostart` start together with the deskt
 
 Settings, Startup lists them all. Unticking one writes a copy into `~/.config/autostart` that says `Hidden=true`. Add… copies an installed program's entry there.
 
+Ticking Hide beside one makes it open minimized at login, as Hide does in OS X's Login Items: its first window goes straight to the Dock, without being drawn and without taking the keyboard from what you are doing. The entry then says `X-Mavernix-HideAtLogin=true`. This is for programs with no way of their own to start hidden, such as Lutris, and Thunderbird on Linux. Only the program's first window is hidden, and only if it opens within a minute of login, so opening the program later, from the Dock or anywhere else, shows its window as usual. Until the window has been shown once, its Dock tile shows the program's icon instead of a picture of the window.
+
 ## The panel's items
 
 The icons at the right end of the panel show what your computer's own services report. If a service isn't running, its icon simply takes up no room.
