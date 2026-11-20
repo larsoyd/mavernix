@@ -154,6 +154,19 @@ class TestWrittenSettings(SessionTestCase):
                 settings.read(written)
                 self.assertEqual("closed-programs" in settings["core"]["plugins"].split(), note)
 
+    def test_login_items_can_open_hidden_while_they_start(self):
+        for start in (True, False):
+            with self.subTest(start=start):
+                text = (CONFIG_DIR / "plain.toml").read_text()
+                self.home.mkdir(parents=True, exist_ok=True)
+                desktop = self.home / "plain.toml"
+                desktop.write_text(text.replace("users_autostart = true", f"users_autostart = {str(start).lower()}"))
+                written = self.home / "plain.ini"
+                self.run_script("make_wayfire_config.py", desktop, written)
+                settings = configparser.ConfigParser(interpolation=None, strict=False)
+                settings.read(written)
+                self.assertEqual("hide-at-login" in settings["core"]["plugins"].split(), start)
+
     def test_shell_settings(self):
         for desktop in DESKTOPS:
             with self.subTest(desktop=desktop):
@@ -2707,6 +2720,172 @@ class TestAutostartWaitsForTray(unittest.TestCase):
         build = (SESSION_SOURCE_DIR / "meson.build").read_text()
         self.assertIn("plasma-xdg-desktop-portal-kde.service.d", build)
         self.assertIn("'portals' / 'plasma-xdg-desktop-portal-kde.conf'", build)
+
+
+class TestHideAtLogin(unittest.TestCase):
+    def setUp(self):
+        folder = tempfile.TemporaryDirectory()
+        self.addCleanup(folder.cleanup)
+        self.folder = Path(folder.name)
+        (self.folder / "paths.py").write_text("from pathlib import Path\nLIBRARY_DIR = Path('/nowhere')\n")
+        sys.path[:0] = [folder.name, str(SESSION_SOURCE_DIR)]
+        sys.modules.pop("paths", None)
+        try:
+            import at_login
+        finally:
+            del sys.path[:2]
+            sys.modules.pop("paths", None)
+        self.addCleanup(sys.modules.pop, "at_login", None)
+        self.addCleanup(sys.modules.pop, "compositor_call", None)
+        self.at_login = at_login
+        self.users = self.folder / "config" / "autostart"
+        self.system = self.folder / "xdg" / "autostart"
+        self.users.mkdir(parents=True)
+        self.system.mkdir(parents=True)
+        environment = unittest.mock.patch.dict(os.environ, {"XDG_CONFIG_HOME": str(self.folder / "config"),
+                                                           "XDG_CONFIG_DIRS": str(self.folder / "xdg")})
+        environment.start()
+        self.addCleanup(environment.stop)
+
+    @staticmethod
+    def entry(folder, name, *lines):
+        (folder / name).write_text("[Desktop Entry]\nType=Application\nName=X\nExec=x\n" + "".join(f"{line}\n" for line in lines))
+
+    def test_marked_programs_are_named_by_entry_and_window_class(self):
+        self.entry(self.users, "org.mozilla.Thunderbird.desktop", "StartupWMClass=thunderbird", "X-Mavernix-HideAtLogin=true")
+        self.entry(self.users, "net.lutris.Lutris.desktop", "StartupWMClass=net.lutris.Lutris", "X-Mavernix-HideAtLogin=true")
+        self.entry(self.users, "steam.desktop", "StartupWMClass=steam")
+        self.assertEqual(self.at_login.programs_to_hide(),
+                         [["net.lutris.Lutris"], ["org.mozilla.Thunderbird", "thunderbird"]])
+
+    def test_only_a_true_mark_counts(self):
+        self.entry(self.users, "a.desktop", "X-Mavernix-HideAtLogin=false")
+        self.entry(self.users, "b.desktop", "X-Mavernix-HideAtLogin=yes")
+        self.entry(self.users, "c.desktop")
+        self.assertEqual(self.at_login.programs_to_hide(), [])
+
+    def test_a_program_switched_off_is_not_waited_for(self):
+        self.entry(self.users, "a.desktop", "Hidden=true", "X-Mavernix-HideAtLogin=true")
+        self.assertEqual(self.at_login.programs_to_hide(), [])
+
+    def test_the_users_entry_counts_over_the_systems(self):
+        self.entry(self.system, "shadowed.desktop", "X-Mavernix-HideAtLogin=true")
+        self.entry(self.users, "shadowed.desktop")
+        self.entry(self.system, "kept.desktop")
+        self.entry(self.users, "kept.desktop", "X-Mavernix-HideAtLogin=true")
+        self.entry(self.system, "system-only.desktop", "X-Mavernix-HideAtLogin=true")
+        self.assertEqual(self.at_login.programs_to_hide(), [["kept"], ["system-only"]])
+
+    def test_an_unreadable_entry_is_skipped(self):
+        (self.users / "broken.desktop").write_bytes(b"\xff\xfe not an entry")
+        self.entry(self.users, "fine.desktop", "X-Mavernix-HideAtLogin=true")
+        self.assertEqual(self.at_login.programs_to_hide(), [["fine"]])
+
+    def started(self, call):
+        order = []
+        with unittest.mock.patch("at_login.shutil.which", lambda name: "/usr/bin/" + name), \
+                unittest.mock.patch("at_login.start", lambda command: order.append(("start", command))), \
+                unittest.mock.patch("at_login.say") as say, \
+                unittest.mock.patch("at_login.compositor_call.call", side_effect=lambda *args: (order.append(("call", args)), call(*args))[1]):
+            self.at_login.start_users_programs()
+        return order, say
+
+    def test_the_compositor_is_told_before_the_programs_start(self):
+        self.entry(self.users, "net.lutris.Lutris.desktop", "X-Mavernix-HideAtLogin=true")
+        order, say = self.started(lambda *args: {"result": "ok", "waiting": 1})
+        self.assertEqual(order[0], ("call", ("hide-at-login/expect", {"programs": [["net.lutris.Lutris"]],
+                                                                     "seconds": self.at_login.HIDE_AT_LOGIN_SECONDS})))
+        self.assertEqual(order[1][0], "start")
+        self.assertIn("hide_at_login result=ok", say.call_args.args[0])
+
+    def test_nothing_is_asked_with_nothing_marked(self):
+        self.entry(self.users, "net.lutris.Lutris.desktop")
+        order, _ = self.started(lambda *args: {"result": "ok"})
+        self.assertEqual([kind for kind, _ in order], ["start"])
+
+    def test_programs_still_start_when_the_compositor_does_not_answer(self):
+        self.entry(self.users, "net.lutris.Lutris.desktop", "X-Mavernix-HideAtLogin=true")
+        for failure in (OSError("no socket"), TimeoutError("timed out"), ValueError("not json")):
+            def refuse(*args, failure=failure):
+                raise failure
+            order, say = self.started(refuse)
+            self.assertEqual([kind for kind, _ in order], ["call", "start"])
+            self.assertIn("hide_at_login result=failed", say.call_args_list[0].args[0])
+
+    def test_programs_still_start_when_the_compositor_refuses(self):
+        self.entry(self.users, "net.lutris.Lutris.desktop", "X-Mavernix-HideAtLogin=true")
+        order, say = self.started(lambda *args: {"error": "No such method found!"})
+        self.assertEqual([kind for kind, _ in order], ["call", "start"])
+        self.assertIn("No such method found!", say.call_args_list[0].args[0])
+
+
+class TestCompositorCall(unittest.TestCase):
+    def setUp(self):
+        sys.path.insert(0, str(SESSION_SOURCE_DIR))
+        try:
+            import compositor_call
+        finally:
+            del sys.path[0]
+        self.addCleanup(sys.modules.pop, "compositor_call", None)
+        self.compositor_call = compositor_call
+        folder = tempfile.TemporaryDirectory()
+        self.addCleanup(folder.cleanup)
+        self.path = os.path.join(folder.name, "wf.sock")
+
+    def serve(self, reply):
+        import socket, threading
+        server = socket.socket(socket.AF_UNIX)
+        server.bind(self.path)
+        server.listen(1)
+        heard = []
+
+        def answer():
+            connection, _ = server.accept()
+            with connection:
+                (length,) = struct.unpack("<I", connection.recv(4, socket.MSG_WAITALL))
+                heard.append(json.loads(connection.recv(length, socket.MSG_WAITALL)))
+                if reply == "hang up":
+                    connection.shutdown(socket.SHUT_RDWR)
+                elif reply is not None:
+                    body = json.dumps(reply).encode()
+                    connection.sendall(struct.pack("<I", len(body)) + body)
+                    connection.shutdown(socket.SHUT_RDWR)
+                else:
+                    time.sleep(1.5)
+
+        thread = threading.Thread(target=answer)
+        thread.start()
+        self.addCleanup(server.close)
+        self.addCleanup(thread.join, 5)
+        return heard
+
+    def test_sends_the_method_and_data_and_reads_the_answer(self):
+        heard = self.serve({"result": "ok", "waiting": 2})
+        with unittest.mock.patch.dict(os.environ, {"WAYFIRE_SOCKET": self.path}):
+            answer = self.compositor_call.call("hide-at-login/expect", {"programs": [["a"]], "seconds": 60})
+        self.assertEqual(answer, {"result": "ok", "waiting": 2})
+        self.assertEqual(heard, [{"method": "hide-at-login/expect", "data": {"programs": [["a"]], "seconds": 60}}])
+
+    def test_a_silent_compositor_times_out(self):
+        self.serve(None)
+        started = time.monotonic()
+        with unittest.mock.patch.dict(os.environ, {"WAYFIRE_SOCKET": self.path}), \
+                unittest.mock.patch.object(self.compositor_call, "ANSWER_SECONDS", 0.3):
+            with self.assertRaises(OSError):
+                self.compositor_call.call("hide-at-login/expect", {})
+        self.assertLess(time.monotonic() - started, 1.2)
+
+    def test_hanging_up_without_an_answer_is_an_error(self):
+        self.serve("hang up")
+        with unittest.mock.patch.dict(os.environ, {"WAYFIRE_SOCKET": self.path}):
+            with self.assertRaises(ValueError):
+                self.compositor_call.call("hide-at-login/expect", {})
+
+    def test_no_socket_is_an_error(self):
+        with unittest.mock.patch.dict(os.environ, {}, clear=False):
+            os.environ.pop("WAYFIRE_SOCKET", None)
+            with self.assertRaises(OSError):
+                self.compositor_call.call("hide-at-login/expect", {})
 
 
 class TestPointerSize(SessionTestCase):

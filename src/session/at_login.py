@@ -11,6 +11,7 @@ per user, and lets the Theme Installer offer a new import of a look when this
 version brings it something. Does nothing when nested in another desktop.
 """
 
+import configparser
 import json
 import os
 import shutil
@@ -18,6 +19,7 @@ import subprocess
 import sys
 import time
 
+import compositor_call
 from paths import LIBRARY_DIR
 from steam_window_buttons import patch_every_steam, read_style, take_back_debugging
 
@@ -52,6 +54,10 @@ TRAY_HOST_QUESTION = ["busctl", "--user", "get-property", "org.kde.StatusNotifie
                       "/StatusNotifierWatcher", "org.kde.StatusNotifierWatcher",
                       "IsStatusNotifierHostRegistered"]
 TRAY_HOST_SECONDS = 10
+
+# login items ticked Hide in Settings open with their first window minimized
+HIDE_AT_LOGIN_KEY = "X-Mavernix-HideAtLogin"
+HIDE_AT_LOGIN_SECONDS = 60
 
 PORTAL_SERVICE = "xdg-desktop-portal.service"
 PORTAL_HELPERS = ["xdg-desktop-portal-gtk.service", "xdg-desktop-portal-wlr.service"]
@@ -254,12 +260,64 @@ def wait_for_tray(config):
     say(f"tray_host result=up waited_s={time.monotonic() - start_time:.2f}")
 
 
+def autostart_folders():
+    """The folders dex reads, the user's first."""
+    config_home = os.environ.get("XDG_CONFIG_HOME") or os.path.expanduser("~/.config")
+    system = (os.environ.get("XDG_CONFIG_DIRS") or "/etc/xdg").split(":")
+    return [os.path.join(folder, "autostart") for folder in [config_home] + system if folder]
+
+
+def programs_to_hide():
+    """The ids of each login item ticked Hide: its entry name and window class.
+    An entry in an earlier folder takes the place of one of the same name."""
+    seen = set()
+    programs = []
+    for folder in autostart_folders():
+        try:
+            names = sorted(name for name in os.listdir(folder) if name.endswith(".desktop"))
+        except OSError:
+            continue
+        for name in names:
+            if name in seen:
+                continue
+            seen.add(name)
+            entry = configparser.ConfigParser(interpolation=None, strict=False)
+            entry.optionxform = str
+            try:
+                entry.read(os.path.join(folder, name), encoding="utf-8")
+                fields = entry["Desktop Entry"]
+            except (configparser.Error, UnicodeDecodeError, KeyError):
+                continue
+            if fields.get("Hidden") == "true" or fields.get(HIDE_AT_LOGIN_KEY) != "true":
+                continue
+            ids = [name[:-len(".desktop")], fields.get("StartupWMClass", "")]
+            programs.append([part for index, part in enumerate(ids) if part and part not in ids[:index]])
+    return sorted(programs)
+
+
+def tell_compositor_to_hide():
+    programs = programs_to_hide()
+    if not programs:
+        return
+    names = ",".join(ids[0] for ids in programs)
+    try:
+        answer = compositor_call.call("hide-at-login/expect", {"programs": programs, "seconds": HIDE_AT_LOGIN_SECONDS})
+    except (OSError, ValueError) as error:
+        say(f"hide_at_login result=failed programs={names} reason={error}")
+        return
+    if "error" in answer:
+        say(f"hide_at_login result=failed programs={names} reason={answer['error']}")
+        return
+    say(f"hide_at_login result=ok programs={names} waiting={answer.get('waiting')}")
+
+
 def start_users_programs():
     dex = next((name for name in DEX_NAMES if shutil.which(name)), None)
     if dex is None:
         say("dex is not installed, so the programs in ~/.config/autostart are not started "
             "(install dex; on Arch: sudo pacman -S --needed dex)")
         return
+    tell_compositor_to_hide()
     # Honours OnlyShowIn/NotShowIn.
     desktop = os.environ.get("XDG_CURRENT_DESKTOP", "")
     start([dex, "--autostart", "--environment", desktop])

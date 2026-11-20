@@ -1415,6 +1415,9 @@ def main():
     # with a window loses its connection (the closed-programs plugin).
     if config.get("session", {}).get("note_closed_programs", True):
         plugins.append("closed-programs")
+    # at_login names the login items ticked Hide to it
+    if config.get("session", {}).get("users_autostart", True):
+        plugins.append("hide-at-login")
 
     extension_sections, extension_plugins = extension_plugin_sections(config, theme_dir.name)
     sections += extension_sections
