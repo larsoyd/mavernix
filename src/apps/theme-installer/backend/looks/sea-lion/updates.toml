@@ -474,3 +474,18 @@ name_fade_ms = 100
 
 [update.settings.fonts]
 zone_picker = { family = ".Lucida Grande UI", size = 14, bold = true }
+
+# With translucency off the menu bar is opaque.
+[[update]]
+revision = 22
+themes = ["sea-lion"]
+
+[update.settings.panel]
+opaque_background = { gradient = ["#f9f9f9", "#c3c3c3"] }
+
+[[update]]
+revision = 23
+themes = ["sea-lion-dark"]
+
+[update.settings.panel]
+opaque_background = { image = "images/panel-background.png" }

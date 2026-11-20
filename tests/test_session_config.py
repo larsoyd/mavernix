@@ -721,6 +721,46 @@ class TestSeaLionUpdates(unittest.TestCase):
             with self.subTest(start=start):
                 self.assertEqual(edge, [self.make_theme.PANEL_EDGE])
 
+    def test_older_light_themes_get_an_opaque_menu_bar(self):
+        self.assertIn(22, self.updates)
+        self.assertTrue(hasattr(self.make_theme, "PANEL_OPAQUE_STAND_IN"))
+        update = self.updates[22]
+        self.assertEqual(update["themes"], ["sea-lion"])
+        self.assertEqual(update["settings"]["panel"]["opaque_background"],
+                         {"gradient": self.make_theme.PANEL_OPAQUE_STAND_IN})
+        self.assertNotIn("import_brings", update)
+
+    def test_older_dark_themes_keep_their_own_bar_when_opaque(self):
+        self.assertIn(23, self.updates)
+        update = self.updates[23]
+        self.assertEqual(update["themes"], ["sea-lion-dark"])
+        self.assertEqual(update["settings"]["panel"]["opaque_background"], {"image": "images/panel-background.png"})
+
+    def test_the_dark_generator_keeps_its_own_bar_when_opaque(self):
+        import make_dark_theme
+        self.assertTrue(hasattr(self.make_theme, "PANEL_OPAQUE_PICTURE"))
+
+        class Prokit:
+            def colour(self, name):
+                return "#202020ff"
+        light = "\n".join(["[panel]", 'background = { image = "images/panel-background.png" }',
+                           f'opaque_background = {{ image = "images/{self.make_theme.PANEL_OPAQUE_PICTURE}.png" }}',
+                           'separator = ["#00000080"]', 'highlight = ["#ffffff"]', 'text_color = "#000000"',
+                           'title_highlight_text_color = "#ffffff"'])
+        theme = make_dark_theme.ThemeText(light)
+        make_dark_theme.change_panel(theme, Prokit())
+        panel = tomllib.loads(theme.text())["panel"]
+        self.assertEqual(panel["opaque_background"], panel["background"])
+
+    def test_the_opaque_stand_in_runs_light_to_dark_and_lets_nothing_through(self):
+        self.assertTrue(hasattr(self.make_theme, "PANEL_OPAQUE_STAND_IN"))
+        stops = self.make_theme.PANEL_OPAQUE_STAND_IN
+        self.assertEqual(len(stops), 2)
+        greys = [int(stop[1:3], 16) for stop in stops]
+        for stop in stops:
+            self.assertRegex(stop, r"^#([0-9a-f]{2})\1\1$")
+        self.assertGreater(greys[0], greys[1])
+
     def test_the_panel_edge_lets_a_little_through(self):
         alpha = int(self.make_theme.PANEL_EDGE[7:9] or "ff", 16)
         self.assertTrue(0x60 <= alpha <= 0xa0, self.make_theme.PANEL_EDGE)

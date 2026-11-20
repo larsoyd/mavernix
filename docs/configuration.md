@@ -425,11 +425,10 @@ Services that start on demand learn about all of this at login. When the session
 
 The Desktop pane has a **Translucent menu bar** checkbox, and the Dock & Menu
 Bar pane has **Blur menu bar** and **Blur behind the Dock**, all off at first:
-the menu bar then shows the theme's picture of it as it is. Both blurs are
-extras Mavericks didn't have (`blur.menu_bar`, `blur.dock_shelf`). The menu
-bar's blur only shows while it is translucent; turning translucency off
-restores the original material and keeps the blur choice for later. The
-Dock's blur doesn't depend on the menu bar's translucency.
+the menu bar is then opaque, as on Mavericks. Both blurs are extras
+Mavericks didn't have (`blur.menu_bar`, `blur.dock_shelf`). The menu bar's
+blur only shows while it is translucent, and the choice is kept for later.
+The Dock's blur doesn't depend on the menu bar's translucency.
 `blur.panel` and `blur.dock` only say that a surface can blur; on their own
 they blur nothing, so older imports that set them stay unblurred.
 It uses Wayfire's `blur` plugin with an explicit matcher for `desktop-panel`

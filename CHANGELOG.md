@@ -17,6 +17,7 @@
 
 ### Changed
 
+- Unticking Translucent menu bar makes the menu bar opaque, as on Mavericks, instead of leaving Sea Lion's see-through picture of it. Sea Lion takes Mavericks' own opaque picture at its next import and a close stand-in until then.
 - Holding the resize binding (Super and the right button) over a tiled window moves its shared edge and the windows beside it, as dragging that edge does, and a corner moves both edges. A tile alone keeps its tiling when its free edge is dragged.
 - A window tiled to a side takes the room the tiles beside it leave, by keys, by a drop on the screen's edge and in its preview, instead of a plain half that covers them.
 - An application's menus that would run into the items at the right end of the menu bar are left out from the last one, and come back when there is room.

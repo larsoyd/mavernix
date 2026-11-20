@@ -386,6 +386,11 @@ PANEL_FONT_SIZE = 14
 # Shared art: the strip behind an open menu's title, and the logo in white.
 PANEL_TITLE_HIGHLIGHT_ENTRY = 49
 PANEL_LOGO_HIGHLIGHTED_ENTRY = 12
+# shared art, the opaque strip a menu bar gets with translucency off
+# older themes get its ends as a gradient, within 2 of it at 1x
+PANEL_OPAQUE_ENTRY = 109
+PANEL_OPAQUE_PICTURE = "panel-background-opaque"
+PANEL_OPAQUE_STAND_IN = ["#f9f9f9", "#c3c3c3"]
 
 
 # --- Menus ---------------------------------------------------------------------
@@ -1372,6 +1377,7 @@ offset_inactive = [0, 5]
 height = {PANEL_HEIGHT}
 
 background = {{ image = "images/panel-background.png" }}
+opaque_background = {{ image = "images/{PANEL_OPAQUE_PICTURE}.png" }}
 
 separator = ["{PANEL_EDGE}"]
 
@@ -2177,6 +2183,7 @@ def main():
     picture_size = copy_button_pictures(artwork_dir, images_dir)
     copy_noise_picture(artwork_dir, images_dir)
     copy_shared_art(artwork_dir, images_dir, PANEL_BACKGROUND_ENTRY, "panel-background")
+    copy_shared_art(artwork_dir, images_dir, PANEL_OPAQUE_ENTRY, PANEL_OPAQUE_PICTURE)
     copy_shared_art(artwork_dir, images_dir, PANEL_LOGO_ENTRY, "panel-logo")
     copy_shared_art(artwork_dir, images_dir, PANEL_TITLE_HIGHLIGHT_ENTRY, "panel-title-highlight")
     copy_shared_art(artwork_dir, images_dir, PANEL_LOGO_HIGHLIGHTED_ENTRY, "panel-logo-highlighted")

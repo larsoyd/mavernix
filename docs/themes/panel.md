@@ -9,6 +9,7 @@ panel = { family = "DejaVu Sans", size = 13 }
 [panel]
 height = 28                           # including the separator lines
 background = { color = "#e8e8e8" }    # any fill
+opaque_background = { color = "#e8e8e8" }  # optional: the fill with Translucent menu bar off
 # Optional one-pixel lines along the panel's inner edge, the one facing the
 # desktop. The first colour is the outermost line. The background fill
 # covers the rest of the height.
@@ -24,7 +25,7 @@ logo = "images/logo.png"              # optional picture for the "logo" item
 logo_spacing = 8                      # optional: gap after the logo, if it should differ from item_spacing
 ```
 
-If the fill's opacity is below 1 (a translucent picture, say), the desktop shows through the panel.
+If the fill's opacity is below 1 (a translucent picture, say), the desktop shows through the panel. Give such a theme an `opaque_background` that lets nothing through: the panel draws it while Translucent menu bar is off, and `background` without it.
 
 ## Status items
 
@@ -74,9 +75,10 @@ panel background and Dock shelf; foreground text and icons keep their opacity.
 `inactive_opacity` sets how far a panel fades when each screen has its own menus and another screen is the active one, 0.6 by default.
 
 The Desktop pane exposes `panel.translucent_menu_bar` (default false). Turning
-it off restores the original theme material at its original opacity and excludes
-the menu bar from compositor blur. Existing transparency in the theme artwork
-is retained. The Dock and the stored blur strength are unaffected.
+it off draws the theme's `opaque_background` instead of `background`, at full
+opacity, and excludes the menu bar from compositor blur. A theme without
+`opaque_background` keeps its `background`, transparency and all. The Dock and
+the stored blur strength are unaffected.
 
 The optional Dock & Menu Bar checkbox **Blur menu bar** (`blur.menu_bar`, off at
 first) blurs the menu bar where `blur.panel` allows it, independently of
