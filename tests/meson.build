@@ -391,3 +391,14 @@ test('gtk-global-menu', python, args: [files('test_gtk_global_menu.py'), gtk_men
     depends: borderless_maximized_plugin, timeout: 65, is_parallel: false)
 test('menu-routes', python, args: [files('test_gtk_global_menu.py'), gtk_menu_module, '--routes', menu_probe],
     depends: menu_discovery_plugin, timeout: 65, is_parallel: false)
+
+wine_menu_apps = []
+foreach arch : [['x86_64-w64-mingw32-gcc', '64'], ['i686-w64-mingw32-gcc', '32']]
+    wine_menu_apps += custom_target('wine-menu-app' + arch[1], input: 'wine-menu-app.c',
+        output: 'wine-menu-app' + arch[1] + '.exe',
+        command: [find_program(arch[0]), '-O2', '-Wall', '-Wextra', '-Werror', '-o', '@OUTPUT@', '@INPUT@'])
+endforeach
+test('wine-global-menu', find_program('dbus-run-session'),
+    args: ['--', python.full_path(), files('test_wine_global_menu.py'), wine_menu_bridge,
+        meson.current_build_dir() / '../src/wine-menu', wine_menu_apps],
+    depends: [wine_menu_windows, wine_menu_apps], timeout: 240, is_parallel: false)

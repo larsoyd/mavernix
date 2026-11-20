@@ -4,7 +4,8 @@
 
 Run by the compositor once it is up. Opens KDE's wallet with the login,
 tells on-demand services (D-Bus, systemd) about the session's display and
-settings (after-session takes them back later), starts the config's and the
+settings (after-session takes them back later), starts the bridge that moves
+Wine programs' menu bars into the panel, starts the config's and the
 user's autostart programs once the tray is up, places [desktop_files] place_once launchers once
 per user, and lets the Theme Installer offer a new import of a look when this
 version brings it something. Does nothing when nested in another desktop.
@@ -200,6 +201,17 @@ def start_xsettings(settings_path):
             start([sys.executable, script, config])
 
 
+def start_wine_menu():
+    """Moves the menu bars of Windows programs under Wine into the desktop's menu bar."""
+    if os.environ.get("MAVERNIX_GLOBAL_MENU") == "0":
+        return
+    bridge = LIBRARY_DIR / "wine-menu" / "mavernix-wine-menu"
+    if not os.access(bridge, os.X_OK):
+        say(f"not moving wine menu bars: {bridge} is missing")
+        return
+    start([str(bridge)])
+
+
 def set_up_steam_buttons(config, settings_path):
     """Steam's window buttons in the theme's look, patched in before Steam can start."""
     here = os.path.dirname(os.path.abspath(__file__))
@@ -338,6 +350,7 @@ def main():
     hand_login_to_wallet()
     tell_services(config, os.path.dirname(os.path.abspath(sys.argv[1])))
     start_xsettings(sys.argv[1])
+    start_wine_menu()
     set_up_steam_buttons(config, sys.argv[1])
     start_listed_programs(config)
     if config.get("session", {}).get("users_autostart", True):

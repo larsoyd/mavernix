@@ -11,7 +11,7 @@ depends=(
   'wayfire>=0.11.0' 'wayfire<0.12'
   'quickshell'
   'qt6-base' 'qt6-declarative' 'qt6-multimedia' 'qt6-wayland' 'qt6-svg' 'qt6-imageformats'
-  'librsvg' 'glib2' 'tomlplusplus' 'libxcb' 'libdbusmenu-gtk3' 'kguiaddons' 'kio'
+  'librsvg' 'glib2' 'tomlplusplus' 'libxcb' 'libdbusmenu-gtk3' 'libdbusmenu-glib' 'kguiaddons' 'kio'
   'python' 'python-pillow' 'python-pefile'
   'kvantum' 'qt6ct'
   'gsettings-desktop-schemas'
@@ -20,8 +20,8 @@ depends=(
   'adwaita-icon-theme' 'adwaita-icon-theme-legacy' 'adwaita-cursors' 'ttf-dejavu'
   '7zip' 'cpio' 'bzip2' 'lbzip2' 'libicns' 'ffmpeg' 'poppler' 'bubblewrap'
 )
-makedepends=('meson' 'ninja' 'glm' 'vulkan-headers' 'qt6-shadertools')
-checkdepends=('python-gobject' 'xorg-xwayland' 'dbus' 'libxkbcommon')
+makedepends=('meson' 'ninja' 'glm' 'vulkan-headers' 'qt6-shadertools' 'mingw-w64-gcc')
+checkdepends=('python-gobject' 'xorg-xwayland' 'dbus' 'libxkbcommon' 'wine' 'xorg-server-xvfb' 'xorg-xwininfo')
 optdepends=(
   'foot: the terminal the dock and Super+Enter open'
   "pipewire: sound, and the panel's volume item"

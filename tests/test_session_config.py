@@ -2490,6 +2490,66 @@ print(answers.get(" ".join(sys.argv[1:]), ""))
         self.assertFalse(self.record.exists())
 
 
+class TestWineMenuBridge(unittest.TestCase):
+    def setUp(self):
+        folder = tempfile.TemporaryDirectory()
+        self.addCleanup(folder.cleanup)
+        self.library = Path(folder.name) / "lib"
+        (Path(folder.name) / "paths.py").write_text(f"from pathlib import Path\nLIBRARY_DIR = Path({str(self.library)!r})\n")
+        sys.path[:0] = [folder.name, str(SESSION_SOURCE_DIR)]
+        sys.modules.pop("paths", None)
+        try:
+            import at_login
+        finally:
+            del sys.path[:2]
+            sys.modules.pop("paths", None)
+        self.addCleanup(sys.modules.pop, "at_login", None)
+        self.at_login = at_login
+        self.bridge = self.library / "wine-menu" / "mavernix-wine-menu"
+        self.bridge.parent.mkdir(parents=True)
+        self.bridge.write_text("#!/bin/sh\n")
+        self.bridge.chmod(0o755)
+
+    def started(self, environment):
+        with unittest.mock.patch.dict(os.environ, environment, clear=False), \
+                unittest.mock.patch("at_login.start") as start, unittest.mock.patch("at_login.say") as say:
+            if "MAVERNIX_GLOBAL_MENU" not in environment:
+                os.environ.pop("MAVERNIX_GLOBAL_MENU", None)
+            self.at_login.start_wine_menu()
+        return start, say
+
+    def test_starts_the_bridge(self):
+        start, _ = self.started({})
+        start.assert_called_once_with([str(self.bridge)])
+
+    def test_global_menu_off_leaves_it(self):
+        start, say = self.started({"MAVERNIX_GLOBAL_MENU": "0"})
+        start.assert_not_called()
+        say.assert_not_called()
+
+    def test_a_missing_bridge_is_said(self):
+        self.bridge.unlink()
+        start, say = self.started({})
+        start.assert_not_called()
+        self.assertIn("wine", say.call_args.args[0])
+
+    def test_login_starts_it(self):
+        settings = Path(tempfile.mkdtemp()) / "shell.json"
+        self.addCleanup(shutil.rmtree, settings.parent)
+        settings.write_text(json.dumps({"config": {"session": {"users_autostart": False}}}))
+        names = ["place_launchers_once", "hand_login_to_wallet", "tell_services", "start_xsettings",
+                 "set_up_steam_buttons", "start_listed_programs", "offer_new_theme_imports", "start_wine_menu"]
+        patchers = [unittest.mock.patch(f"at_login.{name}") for name in names]
+        mocks = [patcher.start() for patcher in patchers]
+        for patcher in patchers:
+            self.addCleanup(patcher.stop)
+        with unittest.mock.patch.object(sys, "argv", ["at_login.py", str(settings)]), \
+                unittest.mock.patch.dict(os.environ, {}, clear=False):
+            os.environ.pop("DESKTOP_NESTED", None)
+            self.at_login.main()
+        mocks[-1].assert_called_once_with()
+
+
 class TestAutostartWaitsForTray(unittest.TestCase):
     def setUp(self):
         folder = tempfile.TemporaryDirectory()

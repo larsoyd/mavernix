@@ -42,6 +42,11 @@ BuildRequires:  qt6-qtbase-devel
 BuildRequires:  qt6-qtbase-private-devel
 BuildRequires:  qt6-qtdeclarative-devel
 BuildRequires:  qt6-qtshadertools-devel
+BuildRequires:  mingw64-gcc
+BuildRequires:  mingw32-gcc
+BuildRequires:  wine
+BuildRequires:  xorg-x11-server-Xvfb
+BuildRequires:  xwininfo
 
 Requires:       wayfire%{?_isa} = %{wayfire_version}
 Requires:       quickshell >= 0.3.2

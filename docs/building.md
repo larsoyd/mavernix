@@ -43,6 +43,8 @@ Fedora 44 and 45 have an older Wayfire and Quickshell than Mavernix needs, so `p
 | foot (optional) | | `foot` | the terminal that the dock and Super+Enter open. Prefer another terminal? Name it in the config instead. |
 | A colour emoji font (optional) | | `noto-fonts-emoji` | the pictures in the emoji menu |
 | 7-Zip, cpio, bzip2 and lbzip2, libicns, FFmpeg, Poppler, bubblewrap | | `7zip` `cpio` `bzip2` `lbzip2` `libicns` `ffmpeg` `poppler` `bubblewrap` | the Theme Installer: reading the installer, converting icons, sounds and drawings, and its sandbox |
+| libdbusmenu-glib | 18.10.20180917 | `libdbusmenu-glib` | handing REAPER's and Wine programs' menus to the menu bar |
+| MinGW-w64 GCC | 16.2.0 | `mingw-w64-gcc` | building the small Windows part that reads a Wine program's menu bar from inside Wine |
 | Meson, Ninja, a C++17 compiler, GLM, Vulkan headers, Qt Shader Tools | Meson 1.12.1, Qt 6.12.0 | `base-devel` `meson` `ninja` `glm` `vulkan-headers` `qt6-shadertools` | building (Wayfire's own headers need GLM and the Vulkan headers, and the dock's shader is compiled with `qsb`) |
 
 On Arch, you can grab all of it at once:
@@ -50,7 +52,8 @@ On Arch, you can grab all of it at once:
 ```sh
 # to build
 sudo pacman -S --needed base-devel meson ninja wayfire glm vulkan-headers qt6-shadertools tomlplusplus \
-    qt6-base qt6-declarative qt6-multimedia qt6-wayland librsvg glib2 kguiaddons kio
+    qt6-base qt6-declarative qt6-multimedia qt6-wayland librsvg glib2 kguiaddons kio \
+    libdbusmenu-glib mingw-w64-gcc
 
 # to run
 sudo pacman -S --needed quickshell python python-pillow qt6-svg kvantum qt6ct \
@@ -78,6 +81,8 @@ meson compile -C build
 meson test -C build
 sudo meson install -C build
 ```
+
+The tests run Windows programs in a throwaway Wine prefix on a private X server, so `meson test` also needs `wine`, `xorg-server-xvfb` and `xorg-xwininfo`.
 
 By default this installs into `/usr/local`. Use `meson setup build --prefix=/usr` if you want `/usr` instead.
 
