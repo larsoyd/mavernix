@@ -2762,7 +2762,9 @@ class TestHideAtLogin(unittest.TestCase):
         self.entry(self.users, "a.desktop", "X-Mavernix-HideAtLogin=false")
         self.entry(self.users, "b.desktop", "X-Mavernix-HideAtLogin=yes")
         self.entry(self.users, "c.desktop")
-        self.assertEqual(self.at_login.programs_to_hide(), [])
+        self.entry(self.users, "d.desktop", "X-Mavernix-HideAtLogin=1")
+        self.entry(self.users, "e.desktop", "X-Mavernix-HideAtLogin=true", "Hidden=1")
+        self.assertEqual(self.at_login.programs_to_hide(), [["d"]])
 
     def test_a_program_switched_off_is_not_waited_for(self):
         self.entry(self.users, "a.desktop", "Hidden=true", "X-Mavernix-HideAtLogin=true")

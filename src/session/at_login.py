@@ -58,6 +58,8 @@ TRAY_HOST_SECONDS = 10
 # login items ticked Hide in Settings open with their first window minimized
 HIDE_AT_LOGIN_KEY = "X-Mavernix-HideAtLogin"
 HIDE_AT_LOGIN_SECONDS = 60
+# what the settings app, through GLib, reads as true
+GLIB_TRUE = ("true", "1")
 
 PORTAL_SERVICE = "xdg-desktop-portal.service"
 PORTAL_HELPERS = ["xdg-desktop-portal-gtk.service", "xdg-desktop-portal-wlr.service"]
@@ -288,7 +290,7 @@ def programs_to_hide():
                 fields = entry["Desktop Entry"]
             except (configparser.Error, UnicodeDecodeError, KeyError):
                 continue
-            if fields.get("Hidden") == "true" or fields.get(HIDE_AT_LOGIN_KEY) != "true":
+            if fields.get("Hidden") in GLIB_TRUE or fields.get(HIDE_AT_LOGIN_KEY) not in GLIB_TRUE:
                 continue
             ids = [name[:-len(".desktop")], fields.get("StartupWMClass", "")]
             programs.append([part for index, part in enumerate(ids) if part and part not in ids[:index]])
