@@ -63,6 +63,14 @@ TOP_LINE = "#ffffff4d"
 TITLE_COLOR = "#000000"
 TITLE_INACTIVE_OPACITY = 0.63
 
+# as 10.9.5 draws them, 0.18 to 0.30 white over a white copy at 0.55 one pixel lower
+# behind another window the letters are at 0.585 and the copy at 0.30
+TITLE_LETTERS_LINES = """title_gradient          = ["#2e2e2e", "#4d4d4d"]
+title_gradient_inactive = ["#2e2e2e95", "#4d4d4d95"]
+title_shadow_color          = "#ffffff8c"
+title_shadow_color_inactive = "#ffffff4d"
+"""
+
 # The system's interface face in LucidaGrande.ttc.
 TITLE_FONT_FAMILY = ".Lucida Grande UI"
 
@@ -1335,7 +1343,7 @@ separator_joined_inactive = ["#00000000"]
 
 title_color          = "{TITLE_COLOR}"
 title_color_inactive = "{inactive_title_color}"
-
+{TITLE_LETTERS_LINES}
 title_align = "center"
 title_padding = 8
 

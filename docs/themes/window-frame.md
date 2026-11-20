@@ -24,6 +24,17 @@ separator_joined           = ["#00000000"]     # no line between bar and tool ba
 separator_joined_inactive  = ["#00000000"]
 title_color          = "#404040"
 title_color_inactive = "#a0a0a0"
+# Optional: letters that change colour from their top to their bottom, in
+# place of title_color. Two colours, the top one first. An inactive window
+# gets the active one's if its own is left out.
+title_gradient          = ["#303030", "#505050"]
+title_gradient_inactive = ["#30303090", "#50505090"]
+# Optional: a copy of the letters under them, title_shadow_drop lower (1 if
+# left out), which makes them look engraved. The inactive one falls back the
+# same way.
+title_shadow_color          = "#ffffff90"
+title_shadow_color_inactive = "#ffffff50"
+title_shadow_drop = 1
 title_align = "center"                 # "left", "center" or "right"
 title_padding = 8                      # space kept free at both ends of the title
 

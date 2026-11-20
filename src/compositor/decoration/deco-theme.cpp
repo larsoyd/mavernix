@@ -8,6 +8,7 @@
 #include <wayfire/debug.hpp>
 
 #include "fill-painter.hpp"
+#include "title-text.hpp"
 
 namespace wf
 {
@@ -404,62 +405,7 @@ cairo_surface_t*decoration_theme_t::render_titlebar(int width, int height, doubl
 cairo_surface_t*decoration_theme_t::render_text(std::string text, int width, int height,
     double scale, bool active, double preferred_center) const
 {
-    auto surface = cairo_image_surface_create(CAIRO_FORMAT_ARGB32, width, height);
-    if ((width <= 0) || (height <= 0))
-    {
-        return surface;
-    }
-
-    auto cr = cairo_create(surface);
-
-    // The theme gives the font size in logical pixels, not points.
-    const double font_pixels = theme->title_font_size * scale;
-
-    PangoFontDescription *font = pango_font_description_from_string(
-        theme->title_font_family.c_str());
-    pango_font_description_set_absolute_size(font, font_pixels * PANGO_SCALE);
-
-    PangoLayout *layout = pango_cairo_create_layout(cr);
-    pango_layout_set_font_description(layout, font);
-    pango_layout_set_text(layout, text.c_str(), text.size());
-
-    pango_layout_set_width(layout, width * PANGO_SCALE);
-    pango_layout_set_ellipsize(layout, PANGO_ELLIPSIZE_END);
-    pango_layout_set_single_paragraph_mode(layout, TRUE);
-
-    int text_width, text_height;
-    pango_layout_get_pixel_size(layout, &text_width, &text_height);
-
-    double x = 0;
-    switch (theme->title_align)
-    {
-      case themed::title_align_t::LEFT:
-        x = 0;
-        break;
-
-      case themed::title_align_t::RIGHT:
-        x = width - text_width;
-        break;
-
-      case themed::title_align_t::CENTER:
-        // Centre on the window, but stay inside the space given.
-        x = preferred_center - text_width / 2.0;
-        x = std::clamp(x, 0.0, std::max(0.0, (double)(width - text_width)));
-        break;
-    }
-
-    const double y = (height - text_height) / 2.0;
-
-    themed::set_source_color(cr, active ? theme->title_color : theme->title_color_inactive);
-    // Whole pixels, so the text is not blurred.
-    cairo_move_to(cr, std::round(x), std::round(y));
-    pango_cairo_show_layout(cr, layout);
-
-    pango_font_description_free(font);
-    g_object_unref(layout);
-    cairo_destroy(cr);
-
-    return surface;
+    return themed::render_title(*theme, text, width, height, scale, active, preferred_center);
 }
 
 cairo_surface_t*decoration_theme_t::render_button(button_type_t button,

@@ -766,6 +766,40 @@ class TestSeaLionUpdates(unittest.TestCase):
             self.assertTrue(updates.refresh_theme(theme_file, [update]))
             self.assertEqual(tomllib.loads(theme_file.read_text())["desktop"]["icons"]["band"], made)
 
+    def test_older_light_themes_get_the_imports_title_letters(self):
+        made = tomllib.loads(self.make_theme.TITLE_LETTERS_LINES)
+        # measured on os x 10.9.5: 46 to 77 over white at 140, behind 149 of 255 over 77
+        self.assertEqual(made, {"title_gradient": ["#2e2e2e", "#4d4d4d"],
+                                "title_gradient_inactive": ["#2e2e2e95", "#4d4d4d95"],
+                                "title_shadow_color": "#ffffff8c",
+                                "title_shadow_color_inactive": "#ffffff4d"})
+        self.assertIn(25, self.updates)
+        update = self.updates[25]
+        self.assertEqual(update["themes"], ["sea-lion"])
+        self.assertNotIn("import_brings", update)
+        self.assertEqual(update["settings"], {"window.titlebar": made})
+
+    def test_the_dark_generator_keeps_its_letters_one_colour(self):
+        import make_dark_theme
+
+        class Prokit:
+            def colour(self, name):
+                return "#d0d0d0ff"
+        light = "\n".join(["[window.titlebar]",
+                           'background = { gradient = ["#e8e8e8", "#d1d1d1"], positions = [0, 1] }',
+                           'background_inactive = { gradient = ["#f8f8f8", "#eeeeee"] }',
+                           'background_joined = { gradient = ["#e8e8e8", "#d1d1d1"], positions = [0, 1] }',
+                           'background_joined_inactive = { gradient = ["#f8f8f8", "#eeeeee"], positions = [0, 1] }',
+                           'separator = ["#000000"]', 'separator_inactive = ["#000000"]',
+                           'highlight = ["#ffffff4d"]', 'highlight_inactive = ["#ffffff4d"]',
+                           'title_color = "#000000"', 'title_color_inactive = "#000000a1"',
+                           self.make_theme.TITLE_LETTERS_LINES.rstrip("\n")])
+        theme = make_dark_theme.ThemeText(light)
+        make_dark_theme.change_window(theme, Prokit())
+        bar = tomllib.loads(theme.text())["window"]["titlebar"]
+        self.assertEqual(bar["title_color"], "#d0d0d0ff")
+        self.assertEqual([key for key in bar if key.startswith(("title_gradient", "title_shadow"))], [])
+
     def test_the_dark_generator_keeps_its_own_bar_when_opaque(self):
         import make_dark_theme
         self.assertTrue(hasattr(self.make_theme, "PANEL_OPAQUE_PICTURE"))

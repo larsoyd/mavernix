@@ -48,6 +48,15 @@ tests = {
         'include': test_sources / 'compositor/decoration',
         'dependencies': [tomlplusplus],
     },
+    'title-text': {
+        'sources': [
+            test_sources / 'compositor/decoration/title-text.cpp',
+            test_sources / 'compositor/decoration/fill-painter.cpp',
+            test_sources / 'compositor/decoration/theme-file.cpp',
+        ],
+        'include': test_sources / 'compositor/decoration',
+        'dependencies': [tomlplusplus, dependency('pangocairo')],
+    },
     'keyboard': {
         'sources': [
             test_sources / 'apps/settings/shortcut-keys.cpp',

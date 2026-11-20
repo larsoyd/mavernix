@@ -139,6 +139,13 @@ struct window_theme_t
     /* Title text */
     rgba_t title_color;
     rgba_t title_color_inactive;
+    // two colours, the letters' top and bottom, in place of title_color, empty for none
+    std::vector<rgba_t> title_gradient;
+    std::vector<rgba_t> title_gradient_inactive;
+    // a copy of the letters under them, title_shadow_drop lower, clear for none
+    rgba_t title_shadow_color{0.0, 0.0, 0.0, 0.0};
+    rgba_t title_shadow_color_inactive{0.0, 0.0, 0.0, 0.0};
+    int title_shadow_drop = 1;
     title_align_t title_align = title_align_t::CENTER;
     int title_padding = 0;
     std::string title_font_family;

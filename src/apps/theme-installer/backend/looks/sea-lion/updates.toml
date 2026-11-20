@@ -499,3 +499,15 @@ table = "desktop.icons"
 key = "band"
 was = { color = "#ffffff26", border_color = "#ffffff91", border_width = 1 }
 now = { color = "#ffffff26", border_color = "#ffffff91", border_width = 1, fade_ms = 200 }
+
+# Title letters as on 10.9.5: dark grey that lightens towards their feet, over
+# a white copy one pixel lower, both fainter on a window behind another.
+[[update]]
+revision = 25
+themes = ["sea-lion"]
+
+[update.settings."window.titlebar"]
+title_gradient = ["#2e2e2e", "#4d4d4d"]
+title_gradient_inactive = ["#2e2e2e95", "#4d4d4d95"]
+title_shadow_color = "#ffffff8c"
+title_shadow_color_inactive = "#ffffff4d"

@@ -659,6 +659,8 @@ def change_window(theme, prokit):
               "PROKIT, windowFrameTextColor.")
     theme.set(table, "title_color_inactive", f'"{prokit.colour("windowFrameInactiveTextColor")}"',
               "PROKIT, windowFrameInactiveTextColor.")
+    for key in ("title_gradient", "title_gradient_inactive", "title_shadow_color", "title_shadow_color_inactive"):
+        theme.remove(table, key, "light letters are one colour, with no white copy under them.")
 
 
 def change_panel(theme, prokit):

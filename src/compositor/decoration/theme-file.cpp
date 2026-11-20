@@ -109,6 +109,7 @@ const toml::table& require_table(const toml::table& parent, std::string_view nam
 }
 
 const int64_t MAX_SHADOW_FADE_MS = 10000;
+const int64_t MAX_TITLE_SHADOW_DROP = 16;
 
 double require_number(const toml::table& table, const std::string& name,
     const std::string& table_name)
@@ -335,6 +336,24 @@ std::vector<rgba_t> read_color_list(const toml::table& table, const std::string&
     return colors;
 }
 
+// no colours when the key is absent, else exactly two
+std::vector<rgba_t> read_color_pair(const toml::table& table, const std::string& name,
+    const std::string& table_name)
+{
+    if (!table.contains(name))
+    {
+        return {};
+    }
+
+    std::vector<rgba_t> colors = read_color_list(table, name, table_name);
+    if (colors.size() != 2)
+    {
+        throw problem(table_name + "." + name, "must be a list of two colours: top and bottom");
+    }
+
+    return colors;
+}
+
 button_theme_t read_button(const toml::table& buttons, const std::string& name,
     const std::string& theme_directory)
 {
@@ -441,7 +460,9 @@ window_theme_t load_window_theme(const std::string& theme_directory)
             "separator_inactive", "highlight", "highlight_inactive",
             "background_joined", "background_joined_inactive", "separator_joined",
             "separator_joined_inactive", "title_color",
-            "title_color_inactive", "title_align", "title_padding"});
+            "title_color_inactive", "title_align", "title_padding",
+            "title_gradient", "title_gradient_inactive", "title_shadow_color",
+            "title_shadow_color_inactive", "title_shadow_drop"});
     theme.titlebar_height = require_number(titlebar, "height", "window.titlebar");
     theme.titlebar_background =
         read_fill(titlebar, "background", "window.titlebar", theme_directory);
@@ -470,6 +491,29 @@ window_theme_t load_window_theme(const std::string& theme_directory)
     theme.title_color = require_color(titlebar, "title_color", "window.titlebar");
     theme.title_color_inactive =
         require_color(titlebar, "title_color_inactive", "window.titlebar");
+    // optional, an inactive window without its own takes the active one's
+    theme.title_gradient = read_color_pair(titlebar, "title_gradient", "window.titlebar");
+    theme.title_gradient_inactive = titlebar.contains("title_gradient_inactive") ?
+        read_color_pair(titlebar, "title_gradient_inactive", "window.titlebar") :
+        theme.title_gradient;
+    if (titlebar.contains("title_shadow_color"))
+    {
+        theme.title_shadow_color = require_color(titlebar, "title_shadow_color", "window.titlebar");
+    }
+    theme.title_shadow_color_inactive = titlebar.contains("title_shadow_color_inactive") ?
+        require_color(titlebar, "title_shadow_color_inactive", "window.titlebar") :
+        theme.title_shadow_color;
+    if (titlebar.contains("title_shadow_drop"))
+    {
+        const auto drop = titlebar["title_shadow_drop"].value_exact<int64_t>();
+        if (!drop || (*drop < 0) || (*drop > MAX_TITLE_SHADOW_DROP))
+        {
+            throw problem("window.titlebar.title_shadow_drop",
+                "must be a whole number from 0 to " + std::to_string(MAX_TITLE_SHADOW_DROP));
+        }
+
+        theme.title_shadow_drop = (int)*drop;
+    }
     theme.title_align =
         parse_align(require_string(titlebar, "title_align", "window.titlebar"));
     theme.title_padding = require_number(titlebar, "title_padding", "window.titlebar");

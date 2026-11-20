@@ -121,6 +121,109 @@ class TestThemeFile : public QObject
         }
     }
 
+    void a_title_is_one_colour_with_no_copy_unless_the_theme_says_otherwise()
+    {
+        const themed::window_theme_t read =
+            themed::load_window_theme(QStringLiteral(THEMES_DIR "/plain").toStdString());
+        QVERIFY(read.title_gradient.empty());
+        QVERIFY(read.title_gradient_inactive.empty());
+        QCOMPARE(read.title_shadow_color.alpha, 0.0);
+        QCOMPARE(read.title_shadow_color_inactive.alpha, 0.0);
+        QCOMPARE(read.title_shadow_drop, 1);
+    }
+
+    static QString with_title_keys(QTemporaryDir& folder, const QString& keys)
+    {
+        return changed_plain_theme(folder, QStringLiteral("title_align = \"left\"\n"),
+            QStringLiteral("title_align = \"left\"\n") + keys);
+    }
+
+    static QString hex(const themed::rgba_t& color)
+    {
+        return QStringLiteral("%1 %2 %3 %4")
+            .arg(qRound(color.red * 255)).arg(qRound(color.green * 255))
+            .arg(qRound(color.blue * 255)).arg(qRound(color.alpha * 255));
+    }
+
+    void a_titles_gradient_and_copy_come_from_the_theme()
+    {
+        QTemporaryDir folder;
+        const QString theme = with_title_keys(folder, QStringLiteral(
+            "title_gradient = [\"#2e3f50\", \"#4d5e6f\"]\n"
+            "title_gradient_inactive = [\"#10203095\", \"#40506096\"]\n"
+            "title_shadow_color = \"#fffefd8c\"\n"
+            "title_shadow_color_inactive = \"#0102034d\"\n"
+            "title_shadow_drop = 2\n"));
+        const themed::window_theme_t read = themed::load_window_theme(theme.toStdString());
+        QCOMPARE(read.title_gradient.size(), size_t(2));
+        QCOMPARE(hex(read.title_gradient[0]), QStringLiteral("46 63 80 255"));
+        QCOMPARE(hex(read.title_gradient[1]), QStringLiteral("77 94 111 255"));
+        QCOMPARE(read.title_gradient_inactive.size(), size_t(2));
+        QCOMPARE(hex(read.title_gradient_inactive[0]), QStringLiteral("16 32 48 149"));
+        QCOMPARE(hex(read.title_gradient_inactive[1]), QStringLiteral("64 80 96 150"));
+        QCOMPARE(hex(read.title_shadow_color), QStringLiteral("255 254 253 140"));
+        QCOMPARE(hex(read.title_shadow_color_inactive), QStringLiteral("1 2 3 77"));
+        QCOMPARE(read.title_shadow_drop, 2);
+    }
+
+    void an_inactive_title_without_its_own_looks_takes_the_active_ones()
+    {
+        QTemporaryDir folder;
+        const QString theme = with_title_keys(folder, QStringLiteral(
+            "title_gradient = [\"#2e3f50\", \"#4d5e6f\"]\ntitle_shadow_color = \"#fffefd8c\"\n"));
+        const themed::window_theme_t read = themed::load_window_theme(theme.toStdString());
+        QCOMPARE(read.title_gradient_inactive.size(), size_t(2));
+        QCOMPARE(hex(read.title_gradient_inactive[0]), QStringLiteral("46 63 80 255"));
+        QCOMPARE(hex(read.title_gradient_inactive[1]), QStringLiteral("77 94 111 255"));
+        QCOMPARE(hex(read.title_shadow_color_inactive), QStringLiteral("255 254 253 140"));
+        QCOMPARE(read.title_shadow_drop, 1);
+    }
+
+    void a_bad_title_look_is_refused_by_name_data()
+    {
+        QTest::addColumn<QString>("keys");
+        QTest::addColumn<QString>("named");
+        QTest::newRow("one colour") << QStringLiteral("title_gradient = [\"#2e2e2e\"]\n")
+                                    << QStringLiteral("title_gradient\"");
+        QTest::newRow("three colours") << QStringLiteral("title_gradient = [\"#000000\", \"#111111\", \"#222222\"]\n")
+                                       << QStringLiteral("title_gradient\"");
+        QTest::newRow("not a list") << QStringLiteral("title_gradient = \"#2e2e2e\"\n")
+                                    << QStringLiteral("title_gradient\"");
+        QTest::newRow("not colours") << QStringLiteral("title_gradient = [1, 2]\n")
+                                     << QStringLiteral("title_gradient\"");
+        QTest::newRow("inactive one colour") << QStringLiteral("title_gradient_inactive = [\"#2e2e2e\"]\n")
+                                             << QStringLiteral("title_gradient_inactive\"");
+        QTest::newRow("copy not a colour") << QStringLiteral("title_shadow_color = 3\n")
+                                           << QStringLiteral("title_shadow_color\"");
+        QTest::newRow("inactive copy not a colour") << QStringLiteral("title_shadow_color_inactive = \"white\"\n")
+                                                    << QStringLiteral("title_shadow_color_inactive\"");
+        QTest::newRow("drop fraction") << QStringLiteral("title_shadow_drop = 1.5\n")
+                                       << QStringLiteral("title_shadow_drop\"");
+        QTest::newRow("drop below zero") << QStringLiteral("title_shadow_drop = -1\n")
+                                         << QStringLiteral("title_shadow_drop\"");
+        QTest::newRow("drop too deep") << QStringLiteral("title_shadow_drop = 17\n")
+                                       << QStringLiteral("title_shadow_drop\"");
+        QTest::newRow("drop text") << QStringLiteral("title_shadow_drop = \"low\"\n")
+                                   << QStringLiteral("title_shadow_drop\"");
+    }
+
+    void a_bad_title_look_is_refused_by_name()
+    {
+        QFETCH(QString, keys);
+        QFETCH(QString, named);
+        QTemporaryDir folder;
+        const QString theme = with_title_keys(folder, keys);
+        try
+        {
+            themed::load_window_theme(theme.toStdString());
+            QFAIL("a theme with a bad title look was accepted");
+        }
+        catch (const std::exception& error)
+        {
+            QVERIFY2(QString::fromUtf8(error.what()).contains(named), error.what());
+        }
+    }
+
     void a_missing_theme_is_refused()
     {
         QVERIFY_THROWS_EXCEPTION(std::exception, themed::load_window_theme("/nonexistent"));
