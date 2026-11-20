@@ -119,6 +119,20 @@ PanelWindow {
         }
     }
 
+    // an opaque bar puts its own edge row under the lines so no desktop shows through
+    Item {
+        visible: !panel.translucentMenuBar
+        clip: true
+        anchors.fill: separator
+        Fill {
+            fill: background.fill
+            themeDirectory: panel.themeDirectory
+            width: parent.width
+            height: background.height
+            y: panel.atBottom ? 0 : parent.height - height
+        }
+    }
+
     Column {
         id: separator
         anchors {

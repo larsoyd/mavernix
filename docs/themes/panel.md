@@ -25,7 +25,7 @@ logo = "images/logo.png"              # optional picture for the "logo" item
 logo_spacing = 8                      # optional: gap after the logo, if it should differ from item_spacing
 ```
 
-If the fill's opacity is below 1 (a translucent picture, say), the desktop shows through the panel. Give such a theme an `opaque_background` that lets nothing through: the panel draws it while Translucent menu bar is off, and `background` without it.
+If the fill's opacity is below 1 (a translucent picture, say), the desktop shows through the panel. Give such a theme an `opaque_background` that lets nothing through: the panel draws it while Translucent menu bar is off, and `background` without it. It also lies under the separator lines then, so a see-through line shows the fill's edge row and not the desktop.
 
 ## Status items
 
