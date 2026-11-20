@@ -43,6 +43,13 @@ class TestWindowGames : public QObject
             process.setProcessEnvironment(environment);
             process.start("sleep", {"2"});
             QVERIFY(process.waitForStarted(1000));
+            // started only means forked, the name is there once sleep runs
+            auto named = [&process] {
+                QFile environ(QStringLiteral("/proc/%1/environ").arg(process.processId()));
+                return environ.open(QIODevice::ReadOnly) &&
+                       ('\0' + environ.readAll()).contains(QByteArray("\0GAME_NAME=", 11));
+            };
+            QTRY_VERIFY_WITH_TIMEOUT(named(), 2000);
             mapped(process.processId());
             QTest::qWait(100);
             const QString actual = games.gameName("steam_app_default", games.revision());
