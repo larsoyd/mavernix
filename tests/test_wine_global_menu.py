@@ -228,6 +228,24 @@ def run(bridge_path, agents, app_path, narrow_app_path, home):
         before = wine(environment, "reg", "query", r"HKCU\Environment", "/v", "QT_QPA_PLATFORM")
         check("menus=native" not in before.stdout, "a fresh prefix already asks Qt for native menus")
 
+        # a read that fails, as on the environ of a server that is exiting, must not end the bridge
+        broken = os.path.join(home, "broken-agents")
+        shutil.copytree(agents, broken, ignore=shutil.ignore_patterns("*.dll"))
+        os.mkdir(os.path.join(broken, "mavernix-wine-menu64.dll"))
+        server = subprocess.run(["wineserver", "-p"], env=environment, timeout=15)
+        check(server.returncode == 0, f"wineserver -p failed rc={server.returncode}")
+        broken_bridge = subprocess.Popen([bridge_path, "--agents", broken, "--only-prefix", environment["WINEPREFIX"]],
+                                         env=environment, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, text=True,
+                                         start_new_session=True)
+        broken_lines = Lines("broken", broken_bridge.stderr)
+        wait(lambda: broken_lines.last(r"refused: no mavernix-wine-menu64\.dll") or broken_bridge.poll() is not None,
+             "the bridge to refuse an agent it cannot read")
+        check(broken_bridge.poll() is None, f"the bridge died on an unreadable agent rc={broken_bridge.returncode} "
+              f"log={broken_lines.drain()[-3:]}")
+        stop(broken_bridge)
+        subprocess.run(["wineserver", "-k"], env=environment, timeout=15)
+        print("[wine-menu] PASS a file that fails to read is refused and the bridge lives on")
+
         own_registrar(True)
         bridge = subprocess.Popen([bridge_path, "--agents", agents, "--only-prefix", environment["WINEPREFIX"]],
                                   env=environment, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, text=True,

@@ -11,7 +11,6 @@
 #include <cerrno>
 #include <cstdio>
 #include <cstring>
-#include <fstream>
 #include <map>
 #include <memory>
 #include <set>
@@ -634,10 +633,16 @@ void registrarVanished(GDBusConnection*, const gchar*, gpointer)
         }
 }
 
+// libstdc++ throws on a failed read whatever the stream's mask, and a process can exit mid-read
 std::string readFile(const std::string& path)
 {
-    std::ifstream file(path, std::ios::binary);
-    return std::string(std::istreambuf_iterator<char>(file), {});
+    gchar* contents = nullptr;
+    gsize size = 0;
+    if (!g_file_get_contents(path.c_str(), &contents, &size, nullptr))
+        return "";
+    std::string data(contents, size);
+    g_free(contents);
+    return data;
 }
 
 // a sandboxed wine sees the home folder but not the system's library folder
