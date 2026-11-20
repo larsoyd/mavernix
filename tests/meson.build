@@ -15,6 +15,11 @@ tests = {
         'include': test_sources / 'compositor/shared-edges',
         'dependencies': [],
     },
+    'hide-at-login': {
+        'sources': [test_sources / 'compositor/hide-at-login/expectations.cpp'],
+        'include': test_sources / 'compositor/hide-at-login',
+        'dependencies': [],
+    },
     'hide-pointer': {
         'sources': [test_sources / 'compositor/hide-pointer/typing-key.cpp'],
         'include': test_sources / 'compositor/hide-pointer',

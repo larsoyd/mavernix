@@ -1,0 +1,8 @@
+<?xml version="1.0"?>
+<wayfire>
+	<plugin name="hide-at-login">
+		<_short>Hide at Login</_short>
+		<_long>Opens the first window of each program named through the control socket (method "hide-at-login/expect") minimized, without drawing or focusing it. The session names the login items marked Hide right before starting them, and the wait ends by itself.</_long>
+		<category>Utility</category>
+	</plugin>
+</wayfire>
