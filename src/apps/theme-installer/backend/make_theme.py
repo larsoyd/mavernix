@@ -392,6 +392,9 @@ PANEL_OPAQUE_ENTRY = 109
 PANEL_OPAQUE_PICTURE = "panel-background-opaque"
 PANEL_OPAQUE_STAND_IN = ["#f9f9f9", "#c3c3c3"]
 
+# white at 15 % with a 50 % edge, gone 0.2 s after the drag ends
+DESKTOP_BAND_LINE = 'band = { color = "#ffffff26", border_color = "#ffffff91", border_width = 1, fade_ms = 200 }\n'
+
 
 # --- Menus ---------------------------------------------------------------------
 # Shared art: the strip behind the selected item.
@@ -2163,8 +2166,7 @@ picked = {{ color = "#0000004d", radius = 4, border = {{ color = "#96969682", wi
 picked_reach = 4
 name = {{ color = "#ffffff", shadow_color = "#000000", shadow_blur = 2.5, shadow_drop = 1, shadow_passes = 3, height = 17, padding = 5, gap = 5, most_width = 110, picked_background = {{ color = "#3875d7", radius = 8.5 }}, picked_edge = {{ color = "#0000004d", drop = 1 }}, away_background = {{ color = "#d0d0d0", radius = 8.5 }}, away_color = "#666666" }}
 preview_frame = {{ color = "#ffffff", width = 3, share = 0.86, shadow_color = "#00000080", shadow_blur = 4, shadow_drop = 1 }}
-band = {{ color = "#ffffff26", border_color = "#ffffff91", border_width = 1 }}
-"""
+{DESKTOP_BAND_LINE}"""
 
 
 def main():

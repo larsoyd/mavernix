@@ -269,6 +269,14 @@ desktop_places_test = executable(
 )
 test('desktop-places', desktop_places_test, env: {'QT_QPA_PLATFORM': 'offscreen'})
 
+desktop_band_test = executable(
+    'test-desktop-band',
+    ['test-desktop-band.cpp', qt.compile_moc(sources: 'test-desktop-band.cpp', dependencies: qt_test)],
+    dependencies: [qt_test, dependency('qt6', modules: ['Core', 'Qml', 'Quick'])],
+    cpp_args: ['-DSHELL_DIR="' + (meson.project_source_root() / 'src' / 'shell') + '"'],
+)
+test('desktop-band', desktop_band_test, env: {'QT_QPA_PLATFORM': 'offscreen'})
+
 dock_screen_test = executable(
     'test-dock-screen',
     ['test-dock-screen.cpp', qt.compile_moc(sources: 'test-dock-screen.cpp', dependencies: qt_test)],

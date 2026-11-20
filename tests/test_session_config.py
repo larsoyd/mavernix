@@ -749,6 +749,23 @@ class TestSeaLionUpdates(unittest.TestCase):
         self.assertEqual(update["themes"], ["sea-lion-dark"])
         self.assertEqual(update["settings"]["panel"]["opaque_background"], {"image": "images/panel-background.png"})
 
+    def test_older_themes_get_the_imports_fading_band(self):
+        made = tomllib.loads(self.make_theme.DESKTOP_BAND_LINE)["band"]
+        self.assertEqual(made["fade_ms"], 200)
+        self.assertIn(24, self.updates)
+        update = self.updates[24]
+        self.assertNotIn("themes", update)
+        self.assertNotIn("import_brings", update)
+        # the band line of a theme imported on 2026-11-06
+        old = 'band = { color = "#ffffff26", border_color = "#ffffff91", border_width = 1 }\n'
+        with tempfile.TemporaryDirectory() as folder:
+            theme_file = Path(folder) / "sea-lion" / "theme.toml"
+            theme_file.parent.mkdir()
+            theme_file.write_text('[theme]\nname = "Sea Lion"\nrevision = 19\n\n[desktop.icons]\nicon_size = 64\n' + old)
+            import updates
+            self.assertTrue(updates.refresh_theme(theme_file, [update]))
+            self.assertEqual(tomllib.loads(theme_file.read_text())["desktop"]["icons"]["band"], made)
+
     def test_the_dark_generator_keeps_its_own_bar_when_opaque(self):
         import make_dark_theme
         self.assertTrue(hasattr(self.make_theme, "PANEL_OPAQUE_PICTURE"))

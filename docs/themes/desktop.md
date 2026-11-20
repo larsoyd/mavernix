@@ -58,6 +58,8 @@ name = { color = "#ffffff", shadow_color = "#000000c0", height = 18, padding = 5
 # much of the icon's square the framed picture may take. Without it, the
 # bare picture fills the square.
 preview_frame = { color = "#ffffff", width = 3, share = 0.86, shadow_color = "#00000080", shadow_blur = 4, shadow_drop = 1 }
-# The band you drag over the empty desktop to pick files.
-band = { color = "#3a6ea540", border_color = "#3a6ea5", border_width = 1 }
+# The band you drag over the empty desktop to pick files. Optional: fade_ms,
+# how long it takes to fade away where you let it go (it's gone at once if
+# left out).
+band = { color = "#3a6ea540", border_color = "#3a6ea5", border_width = 1, fade_ms = 200 }
 ```

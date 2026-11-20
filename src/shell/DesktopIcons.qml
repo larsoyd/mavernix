@@ -538,15 +538,10 @@ Item {
         }
     }
 
-    Rectangle {
-        visible: icons.banding && (icons.band.width > 0 || icons.band.height > 0)
-        x: icons.band.x
-        y: icons.band.y
-        width: icons.band.width
-        height: icons.band.height
-        color: ThemeValues.color(icons.looks?.band?.color ?? "#ffffff30")
-        border.width: icons.looks?.band?.border_width ?? 1
-        border.color: ThemeValues.color(icons.looks?.band?.border_color ?? "#ffffff90")
+    DesktopBand {
+        dragging: icons.banding
+        span: icons.band
+        look: icons.looks?.band
     }
 
     // --- Typing a new name ----------------------------------------------------------------

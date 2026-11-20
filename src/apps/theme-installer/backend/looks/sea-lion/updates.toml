@@ -489,3 +489,13 @@ themes = ["sea-lion-dark"]
 
 [update.settings.panel]
 opaque_background = { image = "images/panel-background.png" }
+
+# The band dragged over the desktop fades when it is let go, as Finder's does.
+[[update]]
+revision = 24
+
+[[update.corrections]]
+table = "desktop.icons"
+key = "band"
+was = { color = "#ffffff26", border_color = "#ffffff91", border_width = 1 }
+now = { color = "#ffffff26", border_color = "#ffffff91", border_width = 1, fade_ms = 200 }
