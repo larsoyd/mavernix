@@ -16,8 +16,9 @@
 #define RETRY_MS 2000
 #define SUBCLASS_ID 0x6d656e75
 #define WATCHED L"MavernixWineMenuWatched"
+#define ADDRESS L"__wine_appmenu_address"
 
-enum { HIDE = 1, SHOW = 2 };
+enum { HIDE = 1, SHOW = 2, ATTACH = 3, DETACH = 4 };
 enum { POPUP = 1, GRAYED = 2, CHECKED = 4, SEPARATOR = 8, RADIO = 16 };
 
 struct text
@@ -32,6 +33,8 @@ static struct
     char *sent;
     BOOL hidden;
     BOOL settled;
+    ATOM address;
+    BOOL attached;
 } shown[MOST_WINDOWS];
 static int shown_count;
 static UINT order_message;
@@ -103,6 +106,17 @@ static LRESULT CALLBACK bar_proc(HWND window, UINT message, WPARAM wparam, LPARA
             SetWindowPos(window, NULL, 0, 0, 0, 0, SWP_FRAMECHANGED | SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER |
                          SWP_NOACTIVATE | SWP_NOOWNERZORDER);
         }
+        return 1;
+    }
+    // on wayland the driver hands the address to the compositor when the window moves
+    if (message == order_message && (wparam == ATTACH || wparam == DETACH))
+    {
+        if (wparam == ATTACH)
+            SetPropW(window, ADDRESS, (HANDLE)lparam);
+        else
+            RemovePropW(window, ADDRESS);
+        SetWindowPos(window, NULL, 0, 0, 0, 0, SWP_FRAMECHANGED | SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER |
+                     SWP_NOACTIVATE | SWP_NOOWNERZORDER);
         return 1;
     }
     if (hidden && message == WM_NCCALCSIZE)
@@ -238,10 +252,18 @@ static BOOL connect_bridge(void)
 }
 
 // only the subclass answers, a window whose thread is not hooked yet says no and is asked again
-static BOOL order(HWND window, int what)
+static BOOL order(HWND window, int what, ATOM address)
 {
     DWORD_PTR answer = 0;
-    return SendMessageTimeoutW(window, order_message, what, 0, SMTO_ABORTIFHUNG, ANSWER_MS, &answer) && answer;
+    return SendMessageTimeoutW(window, order_message, what, address, SMTO_ABORTIFHUNG, ANSWER_MS, &answer) && answer;
+}
+
+static void forget_address(int at)
+{
+    if (shown[at].address)
+        GlobalDeleteAtom(shown[at].address);
+    shown[at].address = 0;
+    shown[at].attached = FALSE;
 }
 
 static void drop_bridge(void)
@@ -249,8 +271,11 @@ static void drop_bridge(void)
     hang_up();
     for (int at = 0; at < shown_count; at++)
     {
+        if (shown[at].address && IsWindow(shown[at].window))
+            order(shown[at].window, DETACH, 0);
+        forget_address(at);
         if (shown[at].hidden && IsWindow(shown[at].window))
-            order(shown[at].window, SHOW);
+            order(shown[at].window, SHOW, 0);
         free(shown[at].sent);
     }
     shown_count = 0;
@@ -297,10 +322,11 @@ static int shown_index(HWND window)
 
 static void report(HWND window, BOOL always)
 {
+    // a window of wine's wayland driver has no x11 window, its menu goes out with xid 0
     ULONG_PTR xid = (ULONG_PTR)GetPropW(window, L"__wine_x11_whole_window");
     struct text items = {0}, message = {0};
     int at = shown_index(window);
-    if (!xid || (at < 0 && shown_count == MOST_WINDOWS))
+    if ((!xid && !GetPropW(window, L"__wine_appmenu_supported")) || (at < 0 && shown_count == MOST_WINDOWS))
         return;
     int lines = describe(&items, GetMenu(window), 0, 0);
     if (!items.used)
@@ -312,6 +338,8 @@ static void report(HWND window, BOOL always)
         shown[at].sent = NULL;
         shown[at].hidden = FALSE;
         shown[at].settled = TRUE;
+        shown[at].address = 0;
+        shown[at].attached = FALSE;
     }
     if (always || !shown[at].sent || strcmp(shown[at].sent, items.data))
     {
@@ -349,8 +377,12 @@ static void scan(void)
     for (int at = 0; at < MOST_WINDOWS && found[at]; at++)
         report(found[at], FALSE);
     for (int at = 0; at < shown_count; at++)
+    {
+        if (shown[at].address && !shown[at].attached)
+            shown[at].attached = order(shown[at].window, ATTACH, shown[at].address);
         if (!shown[at].settled)
-            shown[at].settled = order(shown[at].window, shown[at].hidden ? HIDE : SHOW);
+            shown[at].settled = order(shown[at].window, shown[at].hidden ? HIDE : SHOW, 0);
+    }
     for (int at = 0; at < shown_count;)
     {
         BOOL present = FALSE;
@@ -362,6 +394,10 @@ static void scan(void)
             continue;
         }
         tell("gone %lx", (unsigned long)(ULONG_PTR)shown[at].window);
+        // a hidden window keeps its properties, a freed atom there could name someone else's menu later
+        if (shown[at].address && IsWindow(shown[at].window))
+            order(shown[at].window, DETACH, 0);
+        forget_address(at);
         free(shown[at].sent);
         shown[at] = shown[--shown_count];
     }
@@ -442,7 +478,23 @@ static void obey(char *line)
     if ((!strcmp(verb, "hide") || !strcmp(verb, "show")) && at >= 0)
     {
         shown[at].hidden = verb[0] == 'h';
-        shown[at].settled = order(window, shown[at].hidden ? HIDE : SHOW) || !shown[at].hidden;
+        shown[at].settled = order(window, shown[at].hidden ? HIDE : SHOW, 0) || !shown[at].hidden;
+    }
+    else if (!strcmp(verb, "attach") && fields == 4 && at >= 0)
+    {
+        WCHAR wide[160];
+        if (shown[at].address)
+            order(window, DETACH, 0);
+        forget_address(at);
+        if (_snwprintf(wide, ARRAYSIZE(wide), L"%hs %hs", first, second) < 0 || !(shown[at].address = GlobalAddAtomW(wide)))
+            return tell("note attach refused window=%lx reason=no_atom", handle);
+        // a thread not hooked yet says no, the scan asks again
+        shown[at].attached = order(window, ATTACH, shown[at].address);
+    }
+    else if (!strcmp(verb, "detach") && at >= 0 && shown[at].address)
+    {
+        order(window, DETACH, 0);
+        forget_address(at);
     }
     else if (!strcmp(verb, "activate") && fields == 4)
         activate(window, first, atoi(second));

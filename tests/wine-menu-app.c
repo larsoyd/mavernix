@@ -4,7 +4,8 @@
 #include <string.h>
 
 enum { NEW = 101, OPEN = 102, STATUS_BAR = 201, RUN = 301, RENAME = 1001, DROP_MENU = 1002, QUIT = 1003, DISABLE = 1004,
-       ENABLE = 1005, BY_POSITION = 1006, KEY_MENU = 1007, CHILD_PROC = 1008, REUSE = 1009 };
+       ENABLE = 1005, BY_POSITION = 1006, KEY_MENU = 1007, CHILD_PROC = 1008, REUSE = 1009, FLASH = 1010,
+       HIDE_MAIN = 1011, SHOW_MAIN = 1012, ADDRESS = 1013, STALL = 1014 };
 
 static HWND main_window, twin_window, child_window;
 static LONG_PTR child_proc;
@@ -65,6 +66,19 @@ static DWORD WINAPI menu_thread(void *title)
     }
     for (;;)
         pump(1000);
+}
+
+// shown and then deaf for longer than the client waits for an answer
+static DWORD WINAPI stalled_thread(void *unused)
+{
+    (void)unused;
+    HWND window = CreateWindowW(L"MenuTestApp", L"Menu Test Stalled", WS_OVERLAPPEDWINDOW, 120, 120, 400, 300, 0,
+                                make_side_bar(), 0, 0);
+    ShowWindow(window, SW_SHOWNOACTIVATE);
+    Sleep(4000);
+    while (IsWindow(window))
+        pump(1000);
+    return 0;
 }
 
 // wine hands out a freed thread id again once enough are free, the oldest first
@@ -144,6 +158,17 @@ static LRESULT CALLBACK window_proc(HWND window, UINT message, WPARAM wparam, LP
             EnableWindow(main_window, wparam == ENABLE);
         else if (wparam == KEY_MENU)
             SendMessageW(main_window, WM_SYSCOMMAND, SC_KEYMENU, 0);
+        else if (wparam == FLASH)
+        {
+            ShowWindow(main_window, SW_HIDE);
+            ShowWindow(main_window, SW_SHOW);
+        }
+        else if (wparam == HIDE_MAIN || wparam == SHOW_MAIN)
+            ShowWindow(main_window, wparam == SHOW_MAIN ? SW_SHOW : SW_HIDE);
+        else if (wparam == ADDRESS)
+            say("[app] address=%lu\n", (unsigned long)(ULONG_PTR)GetPropW(main_window, L"__wine_appmenu_address"));
+        else if (wparam == STALL)
+            CloseHandle(CreateThread(NULL, 0, stalled_thread, NULL, 0, NULL));
         else if (wparam == REUSE)
             CloseHandle(CreateThread(NULL, 0, reuse_thread_id, NULL, 0, NULL));
         else if (wparam == CHILD_PROC && SendMessageW(child_window, WM_GETTEXTLENGTH, 0, 0) >= 0)
@@ -188,7 +213,9 @@ static DWORD WINAPI read_orders(void *unused)
                        : !strncmp(line, "quit", 4) ? QUIT : !strncmp(line, "disable", 7) ? DISABLE
                        : !strncmp(line, "enable", 6) ? ENABLE : !strncmp(line, "byposition", 10) ? BY_POSITION
                        : !strncmp(line, "keymenu", 7) ? KEY_MENU : !strncmp(line, "childproc", 9) ? CHILD_PROC
-                       : !strncmp(line, "reuse", 5) ? REUSE : 0;
+                       : !strncmp(line, "reuse", 5) ? REUSE : !strncmp(line, "flash", 5) ? FLASH
+                       : !strncmp(line, "hidewindow", 10) ? HIDE_MAIN : !strncmp(line, "showwindow", 10) ? SHOW_MAIN
+                       : !strncmp(line, "address", 7) ? ADDRESS : !strncmp(line, "stall", 5) ? STALL : 0;
         if (order)
             PostMessageW(main_window, WM_APP, order, 0);
     }

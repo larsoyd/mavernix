@@ -402,3 +402,9 @@ test('wine-global-menu', find_program('dbus-run-session'),
     args: ['--', python.full_path(), files('test_wine_global_menu.py'), wine_menu_bridge,
         meson.current_build_dir() / '../src/wine-menu', wine_menu_apps],
     depends: [wine_menu_windows, wine_menu_apps], timeout: 240, is_parallel: false)
+if get_option('wayland_wine') != ''
+    test('wine-wayland-menu', find_program('dbus-run-session'),
+        args: ['--', python.full_path(), files('test_wine_wayland_menu.py'), wine_menu_bridge,
+            meson.current_build_dir() / '../src/wine-menu', wine_menu_apps[0], get_option('wayland_wine')],
+        depends: [wine_menu_windows, wine_menu_apps], timeout: 200, is_parallel: false)
+endif

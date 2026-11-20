@@ -1,0 +1,2 @@
+option('wayland_wine', type: 'string', value: '',
+    description: 'A wine whose Wayland driver publishes window menus, runs the wine-wayland-menu test')

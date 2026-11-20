@@ -54,6 +54,7 @@ struct Entry
     std::vector<Entry> children;
 };
 
+// xid 0 is a window of wine's wayland driver, its address goes to the compositor through the program
 struct Window
 {
     guint32 xid = 0;
@@ -108,6 +109,7 @@ std::string agentsDir;
 std::string onlyPrefix;
 std::map<unsigned, std::unique_ptr<Client>> clients;
 std::map<int, std::string> servers;
+std::set<std::pair<dev_t, ino_t>> ownDisplays;
 unsigned nextClient = 1;
 unsigned nextExport = 1;
 unsigned nextOpen = 1;
@@ -229,6 +231,14 @@ void registerWindow(Client& client, const std::string& name, Window& window)
 {
     if (!registrarUp || window.registered)
         return;
+    if (!window.xid)
+    {
+        window.registered = true;
+        say("shown window=%s wayland path=%s", name.c_str(), window.path.c_str());
+        send(client, "attach " + name + " " + g_dbus_connection_get_unique_name(bus) + " " + window.path);
+        send(client, "hide " + name);
+        return;
+    }
     callRegistrar("RegisterWindow", g_variant_new("(uo)", window.xid, window.path.c_str()), registered,
         new Pending{client.serial, name, window.xid});
 }
@@ -419,7 +429,10 @@ void showMenu(Client& client)
     client.menuItems.clear();
     if (window.registered && window.xid != client.menuXid)
     {
-        unregisterXid(window.xid);
+        if (window.xid)
+            unregisterXid(window.xid);
+        else
+            send(client, "detach " + name);
         window.registered = false;
     }
     window.xid = client.menuXid;
@@ -440,7 +453,7 @@ void showMenu(Client& client)
 
 void forgetWindow(Window& window)
 {
-    if (window.registered)
+    if (window.registered && window.xid)
         unregisterXid(window.xid);
     if (window.root)
         g_object_unref(window.root);
@@ -612,8 +625,13 @@ void registrarVanished(GDBusConnection*, const gchar*, gpointer)
     registrarUp = false;
     for (auto& [serial, client] : clients)
         for (auto& [name, window] : client->windows)
-            if (std::exchange(window.registered, false))
-                send(*client, "show " + name);
+        {
+            if (!std::exchange(window.registered, false))
+                continue;
+            if (!window.xid)
+                send(*client, "detach " + name);
+            send(*client, "show " + name);
+        }
 }
 
 std::string readFile(const std::string& path)
@@ -674,6 +692,37 @@ std::string realPath(const std::string& path)
     return result;
 }
 
+std::string xSocket(const std::string& display)
+{
+    const size_t colon = display.rfind(':');
+    if (colon == std::string::npos || (colon && display.compare(0, colon, "unix")))
+        return "";
+    const std::string number = display.substr(colon + 1, display.find('.', colon) - colon - 1);
+    return number.empty() || number.find_first_not_of("0123456789") != std::string::npos ? ""
+                                                                                          : "/tmp/.X11-unix/X" + number;
+}
+
+std::string waylandSocket(const std::string& display, const std::string& runtime)
+{
+    if (display.empty() || display[0] == '/')
+        return display;
+    return runtime.empty() ? "" : runtime + "/" + display;
+}
+
+// sockets are compared by inode, so a program in a container that shares them still counts
+std::set<std::pair<dev_t, ino_t>> displaysOf(const std::string& root, const std::vector<std::string>& environment)
+{
+    std::set<std::pair<dev_t, ino_t>> found;
+    for (const std::string& path : {xSocket(valueIn(environment, "DISPLAY")),
+             waylandSocket(valueIn(environment, "WAYLAND_DISPLAY"), valueIn(environment, "XDG_RUNTIME_DIR"))})
+    {
+        struct stat info;
+        if (!path.empty() && !stat((root + path).c_str(), &info) && S_ISSOCK(info.st_mode))
+            found.insert({info.st_dev, info.st_ino});
+    }
+    return found;
+}
+
 void agentEnded(GPid pid, gint status, gpointer data)
 {
     say("agent pid=%d for %s ended status=%d", pid, static_cast<char*>(data), status);
@@ -690,6 +739,12 @@ void startAgents(int serverPid)
     prefix = realPath(prefix.empty() ? std::string(g_get_home_dir()) + "/.wine" : prefix);
     if (!onlyPrefix.empty() && prefix != onlyPrefix)
         return;
+    // a program on another display, such as a test's, is not this desktop's to serve
+    bool shared = false;
+    for (const auto& display : displaysOf("/proc/" + std::to_string(serverPid) + "/root", serverEnvironment))
+        shared |= ownDisplays.count(display) > 0;
+    if (!shared)
+        return say("skipped server=%d prefix=%s, its programs show on another display", serverPid, prefix.c_str());
     const std::string wine = serverExe.substr(0, serverExe.rfind('/') + 1) + "wine";
     if (prefix.empty() || access(wine.c_str(), X_OK))
         return say("refused: no wine beside server=%d exe=%s prefix=%s", serverPid, serverExe.c_str(), prefix.c_str());
@@ -812,6 +867,12 @@ int main(int argc, char** argv)
         return fprintf(stderr, "usage: %s [--agents DIR] [--only-prefix PREFIX]\n", argv[0]), 2;
     if (const char* off = getenv("MAVERNIX_GLOBAL_MENU"); off && !strcmp(off, "0"))
         return say("off, MAVERNIX_GLOBAL_MENU=0"), 0;
+    std::vector<std::string> ownEnvironment;
+    for (char** entry = environ; *entry; entry++)
+        ownEnvironment.push_back(*entry);
+    ownDisplays = displaysOf("", ownEnvironment);
+    if (ownDisplays.empty())
+        return say("refused: no display of its own, DISPLAY and WAYLAND_DISPLAY name no socket"), 1;
     GError* error = nullptr;
     bus = g_bus_get_sync(G_BUS_TYPE_SESSION, nullptr, &error);
     if (!bus)
