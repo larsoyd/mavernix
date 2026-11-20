@@ -398,13 +398,14 @@ foreach arch : [['x86_64-w64-mingw32-gcc', '64'], ['i686-w64-mingw32-gcc', '32']
         output: 'wine-menu-app' + arch[1] + '.exe',
         command: [find_program(arch[0]), '-O2', '-Wall', '-Wextra', '-Werror', '-o', '@OUTPUT@', '@INPUT@'])
 endforeach
+private_bus = '--config-file=' + (meson.current_source_dir() / 'private-bus.conf')
 test('wine-global-menu', find_program('dbus-run-session'),
-    args: ['--', python.full_path(), files('test_wine_global_menu.py'), wine_menu_bridge,
+    args: [private_bus, '--', python.full_path(), files('test_wine_global_menu.py'), wine_menu_bridge,
         meson.current_build_dir() / '../src/wine-menu', wine_menu_apps],
     depends: [wine_menu_windows, wine_menu_apps], timeout: 240, is_parallel: false)
 if get_option('wayland_wine') != ''
     test('wine-wayland-menu', find_program('dbus-run-session'),
-        args: ['--', python.full_path(), files('test_wine_wayland_menu.py'), wine_menu_bridge,
+        args: [private_bus, '--', python.full_path(), files('test_wine_wayland_menu.py'), wine_menu_bridge,
             meson.current_build_dir() / '../src/wine-menu', wine_menu_apps[0], get_option('wayland_wine')],
         depends: [wine_menu_windows, wine_menu_apps], timeout: 200, is_parallel: false)
 endif
