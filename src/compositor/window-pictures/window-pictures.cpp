@@ -136,6 +136,14 @@ class plugin_t : public wf::plugin_interface_t, public wf::per_output_tracker_mi
         capture_t* capture = view->get_data<capture_t>().get();
         if (!capture)
         {
+            // minimized with no request, so it was hidden before it was ever drawn
+            auto toplevel = wf::toplevel_cast(view);
+            if (toplevel && toplevel->minimized)
+            {
+                auto refusal = wf::ipc::json_error("no picture, the window was minimized without being shown");
+                refusal["never_shown"] = true;
+                return refusal;
+            }
             capture = &now.emplace(view);
         }
 

@@ -105,7 +105,8 @@ void WindowPictures::askForPicture(int id)
         }
 
         const bool written = answer.value("result").toString() == "ok";
-        if (!written)
+        // a window hidden before it was ever drawn has no picture and its tile shows the icon
+        if (!written && !answer.value("never_shown").toBool())
         {
             qWarning().noquote() << "Shell.Native: the compositor wrote no picture of window" << id << "-"
                                  << answer.value("error").toString()
