@@ -71,6 +71,10 @@ title_shadow_color          = "#ffffff8c"
 title_shadow_color_inactive = "#ffffff4d"
 """
 
+# letters grown, spread over the subpixels and mixed in gamma 2, as 10.9.5 builds window text
+TITLE_SMOOTHING_LINES = """title_smoothing = "subpixel"
+"""
+
 # The system's interface face in LucidaGrande.ttc.
 TITLE_FONT_FAMILY = ".Lucida Grande UI"
 
@@ -1346,8 +1350,7 @@ separator_joined_inactive = ["#00000000"]
 
 title_color          = "{TITLE_COLOR}"
 title_color_inactive = "{inactive_title_color}"
-{TITLE_LETTERS_LINES}
-title_align = "center"
+{TITLE_LETTERS_LINES}{TITLE_SMOOTHING_LINES}title_align = "center"
 title_padding = 8
 
 [window.buttons]

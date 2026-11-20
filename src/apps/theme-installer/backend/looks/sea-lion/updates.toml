@@ -519,3 +519,12 @@ revision = 26
 
 [update.settings."controls.selected_item"]
 source_lists = ["KFilePlacesView", "KateFileTree"]
+
+# Title letters built as 10.9.5 builds window text: grown a little, filtered
+# across the screen's subpixels and mixed in gamma 2 with the bar under them.
+[[update]]
+revision = 27
+themes = ["sea-lion", "sea-lion-dark"]
+
+[update.settings."window.titlebar"]
+title_smoothing = "subpixel"

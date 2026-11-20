@@ -779,6 +779,15 @@ class TestSeaLionUpdates(unittest.TestCase):
         self.assertNotIn("import_brings", update)
         self.assertEqual(update["settings"], {"window.titlebar": made})
 
+    def test_titles_are_built_as_os_x_builds_its_letters_in_both_looks(self):
+        made = tomllib.loads(self.make_theme.TITLE_SMOOTHING_LINES)
+        self.assertEqual(made, {"title_smoothing": "subpixel"})
+        self.assertIn(27, self.updates)
+        update = self.updates[27]
+        self.assertEqual(update["themes"], ["sea-lion", "sea-lion-dark"])
+        self.assertNotIn("import_brings", update)
+        self.assertEqual(update["settings"], {"window.titlebar": made})
+
     def test_the_dark_generator_keeps_its_letters_one_colour(self):
         import make_dark_theme
 
@@ -793,12 +802,14 @@ class TestSeaLionUpdates(unittest.TestCase):
                            'separator = ["#000000"]', 'separator_inactive = ["#000000"]',
                            'highlight = ["#ffffff4d"]', 'highlight_inactive = ["#ffffff4d"]',
                            'title_color = "#000000"', 'title_color_inactive = "#000000a1"',
-                           self.make_theme.TITLE_LETTERS_LINES.rstrip("\n")])
+                           self.make_theme.TITLE_LETTERS_LINES.rstrip("\n"),
+                           self.make_theme.TITLE_SMOOTHING_LINES.rstrip("\n")])
         theme = make_dark_theme.ThemeText(light)
         make_dark_theme.change_window(theme, Prokit())
         bar = tomllib.loads(theme.text())["window"]["titlebar"]
         self.assertEqual(bar["title_color"], "#d0d0d0ff")
         self.assertEqual([key for key in bar if key.startswith(("title_gradient", "title_shadow"))], [])
+        self.assertEqual(bar["title_smoothing"], "subpixel")
 
     def test_the_dark_generator_keeps_its_own_bar_when_opaque(self):
         import make_dark_theme

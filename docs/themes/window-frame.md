@@ -35,6 +35,13 @@ title_gradient_inactive = ["#30303090", "#50505090"]
 title_shadow_color          = "#ffffff90"
 title_shadow_color_inactive = "#ffffff50"
 title_shadow_drop = 1
+# Optional: how the letters are made. "plain" (the default) leaves them to
+# the toolkit. "subpixel" grows them a little, spreads their edges over the
+# screen's red, green and blue and mixes them with the bar in gamma 2, which
+# gives darker, crisper letters with coloured edges up close. "grayscale" does
+# the same without colour. A screen whose subpixels are not side by side, a
+# turned screen and a scale that is not a whole number get grayscale either way.
+title_smoothing = "plain"
 title_align = "center"                 # "left", "center" or "right"
 title_padding = 8                      # space kept free at both ends of the title
 
