@@ -403,6 +403,27 @@ title_align_t parse_align(const std::string& text)
     throw problem("window.titlebar.title_align",
         "\"" + text + "\" is not one of \"left\", \"center\", \"right\"");
 }
+
+title_smoothing_t parse_smoothing(const std::string& text)
+{
+    if (text == "plain")
+    {
+        return title_smoothing_t::PLAIN;
+    }
+
+    if (text == "subpixel")
+    {
+        return title_smoothing_t::SUBPIXEL;
+    }
+
+    if (text == "grayscale")
+    {
+        return title_smoothing_t::GRAYSCALE;
+    }
+
+    throw problem("window.titlebar.title_smoothing",
+        "\"" + text + "\" is not one of \"plain\", \"subpixel\", \"grayscale\"");
+}
 } // anonymous namespace
 
 const fill_t& button_theme_t::look_for(button_state_t state) const
@@ -462,7 +483,7 @@ window_theme_t load_window_theme(const std::string& theme_directory)
             "separator_joined_inactive", "title_color",
             "title_color_inactive", "title_align", "title_padding",
             "title_gradient", "title_gradient_inactive", "title_shadow_color",
-            "title_shadow_color_inactive", "title_shadow_drop"});
+            "title_shadow_color_inactive", "title_shadow_drop", "title_smoothing"});
     theme.titlebar_height = require_number(titlebar, "height", "window.titlebar");
     theme.titlebar_background =
         read_fill(titlebar, "background", "window.titlebar", theme_directory);
@@ -516,6 +537,11 @@ window_theme_t load_window_theme(const std::string& theme_directory)
     }
     theme.title_align =
         parse_align(require_string(titlebar, "title_align", "window.titlebar"));
+    if (titlebar.contains("title_smoothing"))
+    {
+        theme.title_smoothing =
+            parse_smoothing(require_string(titlebar, "title_smoothing", "window.titlebar"));
+    }
     theme.title_padding = require_number(titlebar, "title_padding", "window.titlebar");
 
     /* [window.buttons] */

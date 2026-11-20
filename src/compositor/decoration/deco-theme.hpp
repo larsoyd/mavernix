@@ -7,6 +7,7 @@
 
 #include "deco-button.hpp"
 #include "theme-file.hpp"
+#include "title-text.hpp"
 
 namespace wf
 {
@@ -95,12 +96,9 @@ class decoration_theme_t
     /** The title bar's fill, clipped to rounded top corners, with its frame line. */
     cairo_surface_t *render_titlebar(int width, int height, double scale, bool active) const;
 
-    /**
-     * @param preferred_center Where a centred title's middle should be: the
-     *   window's middle, not the middle of the space beside the buttons.
-     */
-    cairo_surface_t *render_text(std::string text, int width, int height, double scale,
-        bool active, double preferred_center) const;
+    // draws the title onto its bar, centred on the window's middle as seen from the box
+    void draw_text(cairo_surface_t *bar, const std::string& text, const cairo_rectangle_int_t& box,
+        double scale, bool active, double preferred_center, themed::subpixel_t order) const;
 
     cairo_surface_t *render_button(button_type_t button, themed::button_state_t state,
         double scale) const;

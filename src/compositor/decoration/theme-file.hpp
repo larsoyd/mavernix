@@ -105,6 +105,14 @@ enum class title_align_t
     RIGHT,
 };
 
+// plain is the toolkit's own text, the others build the letters as os x 10.9 does
+enum class title_smoothing_t
+{
+    PLAIN,
+    SUBPIXEL,
+    GRAYSCALE,
+};
+
 struct shadow_t
 {
     rgba_t color;
@@ -147,6 +155,7 @@ struct window_theme_t
     rgba_t title_shadow_color_inactive{0.0, 0.0, 0.0, 0.0};
     int title_shadow_drop = 1;
     title_align_t title_align = title_align_t::CENTER;
+    title_smoothing_t title_smoothing = title_smoothing_t::PLAIN;
     int title_padding = 0;
     std::string title_font_family;
     double title_font_size = 0.0;

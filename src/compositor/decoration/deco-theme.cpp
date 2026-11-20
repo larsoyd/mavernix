@@ -402,10 +402,11 @@ cairo_surface_t*decoration_theme_t::render_titlebar(int width, int height, doubl
     return surface;
 }
 
-cairo_surface_t*decoration_theme_t::render_text(std::string text, int width, int height,
-    double scale, bool active, double preferred_center) const
+void decoration_theme_t::draw_text(cairo_surface_t *bar, const std::string& text,
+    const cairo_rectangle_int_t& box, double scale, bool active, double preferred_center,
+    themed::subpixel_t order) const
 {
-    return themed::render_title(*theme, text, width, height, scale, active, preferred_center);
+    themed::draw_title(bar, *theme, text, box, scale, active, preferred_center, order);
 }
 
 cairo_surface_t*decoration_theme_t::render_button(button_type_t button,

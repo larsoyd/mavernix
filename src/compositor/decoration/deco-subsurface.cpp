@@ -57,42 +57,53 @@ class simple_decoration_node_t : public wf::scene::node_t, public wf::pointer_in
     };
 
     /** Redraw the title text if anything it depends on changed. Logical pixels. */
-    void update_title(int width, int height, double scale, bool active,
-        double preferred_center)
+    // what the bar's picture shows of the title, so a change in any of it draws the bar again
+    struct title_place_t
     {
-        if (auto view = _view.lock())
+        std::string text;
+        cairo_rectangle_int_t box{0, 0, 0, 0};
+        double center = 0;
+        themed::subpixel_t order = themed::subpixel_t::RGB;
+
+        bool operator ==(const title_place_t& other) const
         {
-            wf::dimensions_t target_size = {
-                static_cast<int32_t>(width * scale),
-                static_cast<int32_t>(height * scale)
-            };
-
-            const bool unchanged =
-                (title_texture.tex.get_size() == target_size) &&
-                (title_texture.current_text == view->get_title()) &&
-                (title_texture.drawn_active == active);
-            if (unchanged)
-            {
-                return;
-            }
-
-            auto surface = theme.render_text(view->get_title(), target_size.width,
-                target_size.height, scale, active, preferred_center * scale);
-            title_texture.tex = wf::owned_texture_t{surface};
-            cairo_surface_destroy(surface);
-            title_texture.current_text = view->get_title();
-            title_texture.drawn_active = active;
+            return (text == other.text) && (box.x == other.box.x) && (box.y == other.box.y) &&
+                   (box.width == other.box.width) && (box.height == other.box.height) &&
+                   (center == other.center) && (order == other.order);
         }
+    };
+
+    title_place_t place_title(double scale)
+    {
+        title_place_t place;
+        auto view = _view.lock();
+        if (!view)
+        {
+            return place;
+        }
+
+        place.text  = view->get_title();
+        if (wf::output_t *output = view->get_output())
+        {
+            place.order = themed::subpixel_order(output->handle->subpixel, output->handle->transform);
+        }
+        for (auto item : layout.get_renderable_areas())
+        {
+            if (item->get_type() == wf::decor::DECORATION_AREA_TITLE)
+            {
+                const wf::geometry_t area = item->get_geometry();
+                const int left = std::round(area.x * scale), top = std::round(area.y * scale);
+                place.box = {left, top, int(std::round((area.x + area.width) * scale)) - left,
+                    int(std::round((area.y + area.height) * scale)) - top};
+                // the middle of the window, seen from the title area's left edge
+                place.center = (size.width / 2.0 - area.x) * scale;
+            }
+        }
+
+        return place;
     }
 
-    struct
-    {
-        wf::owned_texture_t tex;
-        std::string current_text = "";
-        bool drawn_active = false;
-    } title_texture;
-
-    void update_titlebar(int width, int height, double scale, bool active)
+    void update_titlebar(int width, int height, double scale, bool active, const title_place_t& title)
     {
         wf::dimensions_t target_size = {
             static_cast<int32_t>(width * scale),
@@ -101,22 +112,27 @@ class simple_decoration_node_t : public wf::scene::node_t, public wf::pointer_in
 
         const bool unchanged =
             (titlebar_texture.tex.get_size() == target_size) &&
-            (titlebar_texture.drawn_active == active);
+            (titlebar_texture.drawn_active == active) &&
+            (titlebar_texture.title == title);
         if (unchanged)
         {
             return;
         }
 
         auto surface = theme.render_titlebar(target_size.width, target_size.height, scale, active);
+        // the letters are drawn onto the bar itself, as their smoothing mixes with what lies under them
+        theme.draw_text(surface, title.text, title.box, scale, active, title.center, title.order);
         titlebar_texture.tex = wf::owned_texture_t{surface};
         cairo_surface_destroy(surface);
         titlebar_texture.drawn_active = active;
+        titlebar_texture.title = title;
     }
 
     struct
     {
         wf::owned_texture_t tex;
         bool drawn_active = false;
+        title_place_t title;
     } titlebar_texture;
 
     struct shadow_piece_t
@@ -485,11 +501,12 @@ class simple_decoration_node_t : public wf::scene::node_t, public wf::pointer_in
             return;
         }
 
+        layout.set_window_active(activated);
         if (current_titlebar > 0)
         {
             wf::geometry_t titlebar_geometry{origin.x, origin.y,
                 (double)size.width, (double)current_titlebar};
-            update_titlebar(size.width, current_titlebar, scale, activated);
+            update_titlebar(size.width, current_titlebar, scale, activated, place_title(scale));
             data.pass->add_texture(titlebar_texture.tex.get_texture(), data.target,
                 titlebar_geometry, data.damage);
         }
@@ -519,24 +536,10 @@ class simple_decoration_node_t : public wf::scene::node_t, public wf::pointer_in
             render_rim(data, origin, activated);
         }
 
-        /* Draw title & buttons */
-        layout.set_window_active(activated);
-        auto renderables = layout.get_renderable_areas();
-        for (auto item : renderables)
+        /* The title is part of the bar's picture, the buttons go on top */
+        for (auto item : layout.get_renderable_areas())
         {
-            if (item->get_type() == wf::decor::DECORATION_AREA_TITLE)
-            {
-                wf::geometry_t title_geometry = item->get_geometry() + origin;
-                // The middle of the window, seen from the title area's left edge.
-                const double window_center = size.width / 2.0 - item->get_geometry().x;
-                update_title(title_geometry.width, title_geometry.height, scale, activated,
-                    window_center);
-                if (title_texture.tex.get_texture() != NULL)
-                {
-                    data.pass->add_texture(title_texture.tex.get_texture(), data.target,
-                        title_geometry, data.damage);
-                }
-            } else // button
+            if (item->get_type() != wf::decor::DECORATION_AREA_TITLE)
             {
                 item->as_button().render(data, item->get_geometry() + origin);
             }

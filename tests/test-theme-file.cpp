@@ -130,6 +130,25 @@ class TestThemeFile : public QObject
         QCOMPARE(read.title_shadow_color.alpha, 0.0);
         QCOMPARE(read.title_shadow_color_inactive.alpha, 0.0);
         QCOMPARE(read.title_shadow_drop, 1);
+        QVERIFY(read.title_smoothing == themed::title_smoothing_t::PLAIN);
+    }
+
+    void a_title_is_smoothed_as_the_theme_says_data()
+    {
+        QTest::addColumn<QString>("value");
+        QTest::addColumn<int>("smoothing");
+        QTest::newRow("plain") << QStringLiteral("plain") << int(themed::title_smoothing_t::PLAIN);
+        QTest::newRow("subpixel") << QStringLiteral("subpixel") << int(themed::title_smoothing_t::SUBPIXEL);
+        QTest::newRow("grayscale") << QStringLiteral("grayscale") << int(themed::title_smoothing_t::GRAYSCALE);
+    }
+
+    void a_title_is_smoothed_as_the_theme_says()
+    {
+        QFETCH(QString, value);
+        QFETCH(int, smoothing);
+        QTemporaryDir folder;
+        const QString theme = with_title_keys(folder, QStringLiteral("title_smoothing = \"%1\"\n").arg(value));
+        QCOMPARE(int(themed::load_window_theme(theme.toStdString()).title_smoothing), smoothing);
     }
 
     static QString with_title_keys(QTemporaryDir& folder, const QString& keys)
@@ -205,6 +224,10 @@ class TestThemeFile : public QObject
                                        << QStringLiteral("title_shadow_drop\"");
         QTest::newRow("drop text") << QStringLiteral("title_shadow_drop = \"low\"\n")
                                    << QStringLiteral("title_shadow_drop\"");
+        QTest::newRow("unknown smoothing") << QStringLiteral("title_smoothing = \"lcd\"\n")
+                                           << QStringLiteral("title_smoothing\"");
+        QTest::newRow("smoothing not text") << QStringLiteral("title_smoothing = 1\n")
+                                            << QStringLiteral("title_smoothing\"");
     }
 
     void a_bad_title_look_is_refused_by_name()

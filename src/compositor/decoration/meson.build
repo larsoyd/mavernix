@@ -4,8 +4,8 @@
 # name in metadata/themed-decoration.xml.
 shared_module(
     'themed-decoration',
-    ['decoration.cpp', 'deco-subsurface.cpp', 'deco-button.cpp', 'deco-layout.cpp', 'deco-theme.cpp', 'title-text.cpp', 'theme-file.cpp', 'fill-painter.cpp', 'corner-clip.cpp'],
-    dependencies: [wayfire, tomlplusplus],
+    ['decoration.cpp', 'deco-subsurface.cpp', 'deco-button.cpp', 'deco-layout.cpp', 'deco-theme.cpp', 'title-text.cpp', 'glyph-raster.cpp', 'theme-file.cpp', 'fill-painter.cpp', 'corner-clip.cpp'],
+    dependencies: [wayfire, tomlplusplus, dependency('harfbuzz')],
     cpp_args: wayfire_plugin_args,
     install: true,
     install_dir: wayfire_plugin_dir,

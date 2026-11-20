@@ -51,11 +51,12 @@ tests = {
     'title-text': {
         'sources': [
             test_sources / 'compositor/decoration/title-text.cpp',
+            test_sources / 'compositor/decoration/glyph-raster.cpp',
             test_sources / 'compositor/decoration/fill-painter.cpp',
             test_sources / 'compositor/decoration/theme-file.cpp',
         ],
         'include': test_sources / 'compositor/decoration',
-        'dependencies': [tomlplusplus, dependency('pangocairo')],
+        'dependencies': [tomlplusplus, dependency('pangocairo'), dependency('fontconfig'), dependency('harfbuzz'), dependency('wayland-server')],
     },
     'keyboard': {
         'sources': [
