@@ -511,3 +511,11 @@ title_gradient = ["#2e2e2e", "#4d4d4d"]
 title_gradient_inactive = ["#2e2e2e95", "#4d4d4d95"]
 title_shadow_color = "#ffffff8c"
 title_shadow_color_inactive = "#ffffff4d"
+
+# Side bars stay blue with white words while their window is in front, as
+# Finder's do, wherever the keyboard is.
+[[update]]
+revision = 26
+
+[update.settings."controls.selected_item"]
+source_lists = ["KFilePlacesView", "KateFileTree"]

@@ -400,6 +400,9 @@ PANEL_OPAQUE_ENTRY = 109
 PANEL_OPAQUE_PICTURE = "panel-background-opaque"
 PANEL_OPAQUE_STAND_IN = ["#f9f9f9", "#c3c3c3"]
 
+# kde's places panel and kate's file list, lit like finder's side bar while their window is in front
+SOURCE_LISTS_LINE = 'source_lists = ["KFilePlacesView", "KateFileTree"]\n'
+
 # white at 15 % with a 50 % edge, gone 0.2 s after the drag ends
 DESKTOP_BAND_LINE = 'band = { color = "#ffffff26", border_color = "#ffffff91", border_width = 1, fade_ms = 200 }\n'
 
@@ -2026,7 +2029,7 @@ fill = ["#73b8ea", "#3984d2"]
 top_line = "#5ea3df"
 bottom_line = "#3577c2"
 text_color = "#ffffff"
-
+{SOURCE_LISTS_LINE}
 [controls.button]
 slice = {CONTROL_BUTTON_BOX_SLICE}
 normal = "images/controls/button-box.png"

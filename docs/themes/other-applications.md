@@ -55,6 +55,10 @@ top_line = "#5a8cc0"           # optional: one-pixel lines along its top...
 bottom_line = "#2f5c8c"        # ...and bottom
 text_color = "#ffffff"
 hover_fill = ["#00000014"]     # optional: the item under the pointer; no mark without it
+# Optional: lists that stay marked as selected while their window is in
+# front, even when the keyboard is elsewhere, as a side bar does. They are
+# named by their Qt class, and a Qt that does not know the setting ignores it.
+source_lists = ["KFilePlacesView", "KateFileTree"]
 
 [controls.button]              # optional: push buttons, as pictures
 # Toolkits treat a picture's edge as the control's edge. They add the strips

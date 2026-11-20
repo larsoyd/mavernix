@@ -2319,6 +2319,42 @@ wait $shell || true
         self.link_settings()
         self.assertFalse((self.home / ".config" / "qt6ct" / "qt6ct.conf").is_symlink())
 
+    def source_list_environment(self, controls):
+        self.home.mkdir(parents=True, exist_ok=True)
+        settings = self.home / "settings.json"
+        settings.write_text(json.dumps({"theme": {"controls": controls}}))
+        self.session_functions("environment_line", "list_setting", "write_environment",
+                               setup=f"shell_settings={shlex.quote(str(settings))}\nwrite_environment")
+        return (self.home / "state" / "desktop.env").read_text()
+
+    def test_side_bar_lists_the_theme_names_stay_lit_with_their_window(self):
+        text = self.source_list_environment({"selected_item": {"source_lists": ["KFilePlacesView", "KateFileTree"]}})
+        self.assertIn("export QT_WINDOW_SELECTION_VIEWS=KFilePlacesView\\,KateFileTree\n", text)
+        self.assertEqual(subprocess.run(["bash", "-c", f"{text}\nprintf %s \"$QT_WINDOW_SELECTION_VIEWS\""],
+                                        capture_output=True, text=True, timeout=10).stdout,
+                         "KFilePlacesView,KateFileTree")
+
+    def test_a_theme_without_side_bar_lists_names_none(self):
+        for controls in ({}, {"selected_item": {"fill": ["#3a6ea5"]}}, {"selected_item": {"source_lists": []}}):
+            with self.subTest(controls=controls):
+                self.assertIn("unset QT_WINDOW_SELECTION_VIEWS\n", self.source_list_environment(controls))
+
+    def test_services_and_logins_carry_the_side_bar_lists(self):
+        for script in ("configure-desktop", "start-desktop", "at_login.py"):
+            with self.subTest(script=script):
+                self.assertIn("QT_WINDOW_SELECTION_VIEWS", (SESSION_SOURCE_DIR / script).read_text())
+
+    def test_sea_lion_names_finders_side_bars(self):
+        sys.path.insert(0, str(LOOKS_DIR.parent))
+        self.addCleanup(sys.path.remove, str(LOOKS_DIR.parent))
+        import make_theme
+        with open(LOOKS_DIR / "sea-lion" / "updates.toml", "rb") as file:
+            updates = {update["revision"]: update for update in tomllib.load(file)["update"]}
+        made = tomllib.loads(make_theme.SOURCE_LISTS_LINE)["source_lists"]
+        self.assertEqual(made, ["KFilePlacesView", "KateFileTree"])
+        self.assertNotIn("themes", updates[26])
+        self.assertEqual(updates[26]["settings"], {"controls.selected_item": {"source_lists": made}})
+
     def test_services_and_logins_carry_the_platform_theme(self):
         for script in ("configure-desktop", "start-desktop", "at_login.py"):
             with self.subTest(script=script):
