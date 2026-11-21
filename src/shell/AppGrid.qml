@@ -151,12 +151,28 @@ PanelWindow {
 
     // --- What is shown --------------------------------------------------------
 
+    // read once per finished scan and only while awake: a rescan swaps entries
+    // out one at a time, and sorting them all at each swap held the shell up
+    property var installed: []
+    function readInstalled() {
+        if (awake) {
+            installed = DesktopEntries.applications.values
+        }
+    }
+    onAwakeChanged: readInstalled()
+    Connections {
+        target: DesktopEntries
+        function onApplicationsChanged() {
+            grid.readInstalled()
+        }
+    }
+
     readonly property var applications: {
         const wanted = searchField.text.trim().toLowerCase()
         const list = []
         // [app_grid] hidden: programs the user took out of the grid.
         const hidden = grid.choices?.value("app_grid", "hidden") ?? []
-        for (const entry of DesktopEntries.applications.values) {
+        for (const entry of installed) {
             if (entry.noDisplay || hidden.includes(entry.id)) {
                 continue
             }
