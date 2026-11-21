@@ -66,7 +66,7 @@ Item {
     // in milliseconds
     property int leaveDuration: 0
     signal leftDock()
-    // 0 to 1, the dock narrows the tile's slot with it
+    // 0 to 1 while leaving
     property real gone: 0
     NumberAnimation {
         id: leaveAnimation
@@ -97,7 +97,10 @@ Item {
             appearAnimation.start()
         }
     }
-    readonly property real slotShare: 1 - gone
+    // set by the dock for a program that is not kept: its slot opens and
+    // closes with its icon, any other tile stands in a whole slot
+    property bool opensSlot: false
+    readonly property real slotShare: opensSlot ? iconScale : 1
     // read by the dock's layers too, which shrink with the icon
     readonly property real iconScale:
         (smallestAppearScale + (1 - smallestAppearScale) * appeared) * (1 - gone)

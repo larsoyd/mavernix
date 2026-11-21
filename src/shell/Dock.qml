@@ -1029,7 +1029,7 @@ PanelWindow {
                                                 : (looks.full_icon ?? "user-trash-full"))
     }
 
-    // a tile's slot narrows as the tile leaves
+    // an unkept program's slot opens and closes with its tile
     readonly property var placeWidths: places.map(
         place => place.isSeparator ? looks.separator.width : tileOf(place.key)?.slotShare ?? 1)
     readonly property real rowUnits: placeWidths.reduce((sum, width) => sum + width, 0)
@@ -1720,6 +1720,7 @@ PanelWindow {
             readonly property var edges: DockLayout.tileEdges(
                 restLeft + ((resting?.width ?? 0) - wholeWidth) / 2, wholeWidth, dock.pushNow)
 
+            opensSlot: place.kept === false
             leaving: place.leaving ?? false
             leaveDuration: dock.leaveMs
             onLeftDock: dock.dropLeft(modelData)
