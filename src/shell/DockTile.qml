@@ -57,6 +57,14 @@ Item {
         if (appearDuration > 0) {
             appeared = 0
             appearAnimation.start()
+            // opensSlot is bound only after the tile is made
+            Qt.callLater(bounceIn)
+        }
+    }
+    // a program that is not kept bounces once as it grows in
+    function bounceIn() {
+        if (opensSlot) {
+            bounceAnimation.start()
         }
     }
 
@@ -145,7 +153,10 @@ Item {
     property var frontWindow: null
 
     // In pixels; the dock moves the tile up by this and the reflection down.
-    property real lift: 0
+    // a bounce is as high as the icon is big just then, so it rises with a growing one
+    readonly property real lift: bounced * (bounce.height[0] * height * iconScale + bounce.height[1])
+    // 0 to 1, how far up its bounce the icon is
+    property real bounced: 0
 
     // Until the first window appears or bounce.longest_ms has passed.
     property bool launching: false
@@ -184,19 +195,17 @@ Item {
     // attention, and always finished.
     SequentialAnimation {
         id: bounceAnimation
-        // [factor, offset] of the tile's size.
-        readonly property real peak: tile.bounce.height[0] * tile.height + tile.bounce.height[1]
 
         NumberAnimation {
             target: tile
-            property: "lift"
-            to: bounceAnimation.peak
+            property: "bounced"
+            to: 1
             duration: tile.bounce.half_period_ms
             easing.type: Easing.OutQuad
         }
         NumberAnimation {
             target: tile
-            property: "lift"
+            property: "bounced"
             to: 0
             duration: tile.bounce.half_period_ms
             easing.type: Easing.InQuad
