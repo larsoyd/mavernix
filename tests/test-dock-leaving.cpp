@@ -17,9 +17,11 @@ class TestDockLeaving : public QObject
         return {{"key", QString::fromLatin1(key)}, {"isSeparator", false}, {"kept", true}, {"listedAs", QString::fromLatin1(key)}};
     }
 
-    static QVariantMap unkept(const char* key)
+    // there because a window with this app id is open, the id being its key unless given
+    static QVariantMap unkept(const char* key, const char* runsAs = nullptr)
     {
-        return {{"key", QString::fromLatin1(key)}, {"isSeparator", false}, {"kept", false}, {"listedAs", QString::fromLatin1(key)}};
+        return {{"key", QString::fromLatin1(key)}, {"isSeparator", false}, {"kept", false}, {"listedAs", QString::fromLatin1(key)},
+            {"runsAs", QString::fromLatin1(runsAs ? runsAs : key)}};
     }
 
     // a separator or the trash: no word on keeping at all
@@ -35,7 +37,7 @@ class TestDockLeaving : public QObject
 
     static QVariantMap leaving(const char* key)
     {
-        return {{"key", QString::fromLatin1(key)}, {"isSeparator", false}, {"kept", false}, {"leaving", true}};
+        return {{"key", QString::fromLatin1(key)}, {"isSeparator", false}, {"kept", false}, {"leaving", true}, {"runsAs", QString::fromLatin1(key)}};
     }
 
     QVariantList merged(const QVariantList& shown, const QVariantList& live, bool leaves = true, const QStringList& open = {})
@@ -64,7 +66,12 @@ class TestDockLeaving : public QObject
         component.setData("import QtQml\n"
                           "import \"file://" SHELL_DIR "/DockLayout.js\" as DockLayout\n"
                           "QtObject {\n"
-                          "  function withLeaving(a) { return DockLayout.withLeaving(a[0], a[1], a[2], a[3]) }\n"
+                          "  function withLeaving(a) {\n"
+                          "    const open = a[3].map(id => ({ id: id, appId: id }))\n"
+                          "    const shown = a[0].map(place => place.isWindow\n"
+                          "      ? Object.assign({}, place, { window: open.find(window => window.id === place.window) ?? { id: place.window } }) : place)\n"
+                          "    return DockLayout.withLeaving(shown, a[1], a[2], open)\n"
+                          "  }\n"
                           "}\n",
             QUrl());
         probe.reset(component.create());
@@ -159,6 +166,20 @@ class TestDockLeaving : public QObject
     void oneAlreadyLeavingFinishesWhenLeavingIsOff()
     {
         QCOMPARE(row(merged({kept("a"), leaving("p")}, {kept("a")}, false)), QStringLiteral("a p*"));
+    }
+
+    void aProgramStillOpenUnderAnotherKeyGoesAtOnce()
+    {
+        // a running program shown by its app id until its entry is known
+        const QVariantList shown{kept("a"), unkept("program konsole", "konsole")};
+        const QVariantList live{kept("a"), unkept("entry konsole", "konsole")};
+        QCOMPARE(row(merged(shown, live, true, {"konsole"})), QStringLiteral("a entry konsole"));
+    }
+
+    void aProgramWithNoWindowLeftShrinksAway()
+    {
+        const QVariantList shown{kept("a"), unkept("p")};
+        QCOMPARE(row(merged(shown, {kept("a")}, true, {"other"})), QStringLiteral("a p*"));
     }
 
     void anEmptyRowStaysEmpty()

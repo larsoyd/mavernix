@@ -595,11 +595,11 @@ PanelWindow {
             const entry = WindowPrograms.entry(window.appId)
             if (entry !== null && !listed.includes(entry)) {
                 groups[0].push({ isSeparator: false, entry: entry, window: null, isTrash: false,
-                                 kept: false, listedAs: entry.id })
+                                 kept: false, listedAs: entry.id, runsAs: window.appId })
                 listed.push(entry)
             } else if (entry === null && window.appId !== "" && !listedAppIds.includes(window.appId)) {
                 groups[0].push({ isSeparator: false, entry: null, window: null, isTrash: false,
-                                 kept: false, appId: window.appId })
+                                 kept: false, appId: window.appId, runsAs: window.appId })
                 listedAppIds.push(window.appId)
             }
         }

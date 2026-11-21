@@ -104,9 +104,10 @@ function shelfEdges(looks, tileSize, rowStart, rowEnd, now) {
 }
 
 // the row to show: live plus the places that left it and still shrink away
-// an unkept program or a closed window stays after its old left neighbour
+// an unkept program with no window left, or a closed minimised window
 function withLeaving(shown, live, leaves, openWindows) {
-    const goes = place => place.kept === false || (place.isWindow && !openWindows.includes(place.window))
+    const goes = place => place.isWindow ? !openWindows.includes(place.window)
+        : place.kept === false && !openWindows.some(window => window.appId === place.runsAs)
     const result = live.slice()
     let after = -1
     for (const place of shown) {
