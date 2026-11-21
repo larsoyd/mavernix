@@ -528,3 +528,11 @@ themes = ["sea-lion", "sea-lion-dark"]
 
 [update.settings."window.titlebar"]
 title_smoothing = "subpixel"
+
+# A program not kept in the dock leaves it by shrinking away, the row closing
+# around it, and a kept program's light fades out.
+[[update]]
+revision = 28
+
+[update.settings.dock]
+tile_leave_ms = 500

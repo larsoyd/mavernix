@@ -561,7 +561,7 @@ PanelWindow {
         }
     }
 
-    readonly property var places: {
+    readonly property var livePlaces: {
         // `kept` tells a place kept in the dock from one there only while its
         // program runs; `listedAs` is how the groups name it.
         const groups = []
@@ -659,6 +659,24 @@ PanelWindow {
         return all
     }
 
+    // the row as shown: the live places plus an unkept program's place
+    // while its tile shrinks away after the program is gone
+    property var places: []
+    readonly property int leaveMs: looks.tile_leave_ms ?? 0
+    function showPlaces(next) {
+        // an open menu stays with its place as the row changes under it
+        const menuKey = places[menuIndex]?.key
+        places = next
+        menuIndex = next.findIndex(place => place.key === menuKey && !place.leaving)
+        if (next.some(place => place.leaving)) {
+            slotsRest = false
+        }
+    }
+    onLivePlacesChanged: showPlaces(DockLayout.withLeaving(places, livePlaces, leaveMs > 0))
+    function dropLeft(key) {
+        showPlaces(places.filter(place => place.key !== key))
+    }
+
     readonly property int endGroupSize:
         (config.last_group_at_end ?? false) && keptGroups.length > 1
             ? keptGroups[keptGroups.length - 1].length : 0
@@ -683,6 +701,7 @@ PanelWindow {
         shownScreen = wantedScreen
         readInstalled()
         keepMinimizeOrder()
+        showPlaces(livePlaces)
     }
 
     // --- Minimised windows' pictures ---------------------------------------------
@@ -1010,8 +1029,9 @@ PanelWindow {
                                                 : (looks.full_icon ?? "user-trash-full"))
     }
 
+    // a tile's slot narrows as the tile leaves
     readonly property var placeWidths: places.map(
-        place => place.isSeparator ? looks.separator.width : 1)
+        place => place.isSeparator ? looks.separator.width : tileOf(place.key)?.slotShare ?? 1)
     readonly property real rowUnits: placeWidths.reduce((sum, width) => sum + width, 0)
 
     // --- Telling the compositor where windows minimise to ----------------------
@@ -1163,7 +1183,20 @@ PanelWindow {
 
     // ...nor while resized by hand: sizes and places change together at every
     // step, and sliding places would lag behind the sizes.
-    readonly property bool slides: settled && draggedIconSize === 0
+    readonly property bool slides: settled && draggedIconSize === 0 && slotsRest
+
+    // ...nor while a slot narrows or widens: its neighbours keep to its edge
+    // rest comes back a moment later, once the row is whole again
+    property bool slotsRest: true
+    readonly property bool slotsMove: placeWidths.some(
+        (width, index) => width < 1 && !(places[index]?.isSeparator ?? true))
+    onSlotsMoveChanged: {
+        if (slotsMove) {
+            slotsRest = false
+        } else {
+            Qt.callLater(() => slotsRest = !slotsMove)
+        }
+    }
 
     component Slide: NumberAnimation {
         duration: dock.looks.tile_slide_ms
@@ -1388,6 +1421,7 @@ PanelWindow {
             blurRadius: dock.looks.icon_shadow?.blur ?? 0
 
             x: tile?.iconX ?? 0
+            scale: tile?.iconScale ?? 1
             width: tile?.iconSize ?? 0
             y: dock.fromBottom(dock.base + (tile?.lift ?? 0) + (dock.looks.icon_shadow?.raise ?? 0), height)
         }
@@ -1445,6 +1479,7 @@ PanelWindow {
                 blurRadius: dock.looks.icon_shadow?.blur ?? 0
 
                 x: tile?.iconX ?? 0
+                scale: tile?.iconScale ?? 1
                 width: tile?.iconSize ?? 0
                 // by this window's own height: the dock's is not there yet while both are being made
                 y: glassWindow.height - dock.base - (tile?.lift ?? 0) - (dock.looks.icon_shadow?.raise ?? 0) - height
@@ -1575,6 +1610,7 @@ PanelWindow {
                 opacity: reflections.looks.opacity * (tile?.shownShare ?? 1)
 
                 x: tile?.iconX ?? 0
+                scale: tile?.iconScale ?? 1
                 width: tile?.iconSize ?? 0
                 // Its top edge starts a little above the icon's lower edge,
                 // hidden behind the icon, and it moves down as the icon rises.
@@ -1602,6 +1638,7 @@ PanelWindow {
             blurRadius: dock.looks.floor_shadow.blur * iconSize
 
             x: tile?.iconX ?? 0
+            scale: tile?.iconScale ?? 1
             width: iconSize
             // The documented value where a theme leaves it out.
             heightShare: dock.looks.floor_shadow.height ?? 0.5
@@ -1622,7 +1659,32 @@ PanelWindow {
             readonly property bool small: looks.small_fill !== undefined
                                           && dock.tileSize < looks.small_below_tile_size
 
-            visible: !place.isSeparator && (tile?.running ?? false)
+            // on at once, a kept program's light fades as the program goes
+            // and one on a leaving tile is gone at once
+            readonly property bool lit: !place.isSeparator && (tile?.running ?? false)
+            readonly property bool leaving: place.leaving ?? false
+            opacity: 0
+            visible: opacity > 0
+            NumberAnimation on opacity {
+                id: lightFade
+                running: false
+                to: 0
+                duration: dock.leaveMs
+                easing.type: Easing.InOutSine
+            }
+            function light() {
+                lightFade.stop()
+                if (lit) {
+                    opacity = 1
+                } else if (leaving) {
+                    opacity = 0
+                } else {
+                    lightFade.start()
+                }
+            }
+            onLitChanged: light()
+            onLeavingChanged: light()
+            Component.onCompleted: light()
             fill: small ? looks.small_fill : looks.fill
             themeDirectory: dock.themeDirectory
             width: small ? looks.small_width : looks.width
@@ -1652,9 +1714,15 @@ PanelWindow {
                 enabled: dock.slides && placed
                 Slide {}
             }
-            readonly property var edges:
-                DockLayout.tileEdges(restLeft, resting?.width ?? 0, dock.pushNow)
+            // whole and centred on its slot, however narrow the slot
+            readonly property real wholeWidth:
+                place.isSeparator ? resting?.width ?? 0 : dock.tileSize
+            readonly property var edges: DockLayout.tileEdges(
+                restLeft + ((resting?.width ?? 0) - wholeWidth) / 2, wholeWidth, dock.pushNow)
 
+            leaving: place.leaving ?? false
+            leaveDuration: dock.leaveMs
+            onLeftDock: dock.dropLeft(modelData)
             entry: place.entry
             appId: place.appId ?? ""
             choices: dock.choices

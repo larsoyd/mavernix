@@ -280,6 +280,14 @@ app_grid_layout_test = executable(
 )
 test('app-grid-layout', app_grid_layout_test, env: {'QT_QPA_PLATFORM': 'offscreen'})
 
+dock_leaving_test = executable(
+    'test-dock-leaving',
+    ['test-dock-leaving.cpp', qt.compile_moc(sources: 'test-dock-leaving.cpp', dependencies: qt_test)],
+    dependencies: [qt_test, dependency('qt6', modules: ['Core', 'Qml'])],
+    cpp_args: ['-DSHELL_DIR="' + (meson.project_source_root() / 'src' / 'shell') + '"'],
+)
+test('dock-leaving', dock_leaving_test, env: {'QT_QPA_PLATFORM': 'offscreen'})
+
 desktop_places_test = executable(
     'test-desktop-places',
     ['test-desktop-places.cpp', qt.compile_moc(sources: 'test-desktop-places.cpp', dependencies: qt_test)],

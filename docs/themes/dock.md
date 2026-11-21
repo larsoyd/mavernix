@@ -32,6 +32,7 @@ pressed_darken = 0.4      # a pressed icon's colours are multiplied by this
 tile_slide_ms = 270       # tiles and the shelf's ends slide for this long when the row changes
 tile_appear_ms = 350      # a new tile grows in and fades in for this long...
 tile_appear_scale = 0.1   # ...starting from this share of its size
+tile_leave_ms = 500       # a program not kept in the dock shrinks out of it for this long, and a kept one's light fades out
 
 [dock.shelf]
 shape = "box"             # or "slab", see below

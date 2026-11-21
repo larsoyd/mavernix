@@ -47,20 +47,70 @@ Item {
         id: appearAnimation
         target: tile
         property: "appeared"
-        from: 0
         to: 1
         duration: tile.appearDuration
         easing.type: Easing.InOutSine
         onFinished: console.debug("[dock] tile_grew label=" + tile.labelText)
     }
     Component.onCompleted: {
+        iconSource = liveIconSource
         if (appearDuration > 0) {
+            appeared = 0
             appearAnimation.start()
         }
     }
 
+    // set by the dock once the program is gone: the tile shrinks and fades
+    // from where it stands, then says it has left the dock
+    property bool leaving: false
+    // in milliseconds
+    property int leaveDuration: 0
+    signal leftDock()
+    // 0 to 1, the dock narrows the tile's slot with it
+    property real gone: 0
+    NumberAnimation {
+        id: leaveAnimation
+        target: tile
+        property: "gone"
+        easing.type: Easing.InOutSine
+        property string label: ""
+        onFinished: {
+            if (tile.leaving) {
+                console.debug("[dock] tile_left label=" + label)
+                tile.leftDock()
+            }
+        }
+    }
+    // a program that comes back while its tile leaves grows again from there
+    onLeavingChanged: {
+        appearAnimation.stop()
+        leaveAnimation.stop()
+        leaveAnimation.to = leaving ? 1 : 0
+        leaveAnimation.duration = leaving ? leaveDuration : appearDuration
+        leaveAnimation.start()
+        if (leaving) {
+            leaveAnimation.label = labelText
+            return
+        }
+        iconSource = liveIconSource
+        if (appeared < 1) {
+            appearAnimation.start()
+        }
+    }
+    readonly property real slotShare: 1 - gone
+    // read by the dock's layers too, which shrink with the icon
+    readonly property real iconScale:
+        (smallestAppearScale + (1 - smallestAppearScale) * appeared) * (1 - gone)
+
     // Read by the dock's layers that draw this icon's shadow and reflection.
-    readonly property string iconSource: {
+    // a leaving tile keeps the one it had, its entry may go before it does
+    property string iconSource: ""
+    onLiveIconSourceChanged: {
+        if (!leaving) {
+            iconSource = liveIconSource
+        }
+    }
+    readonly property string liveIconSource: {
         if (pictureComing) {
             return ""
         }
@@ -172,7 +222,7 @@ Item {
         y: tile.height - height
         width: tile.iconSize
         height: tile.iconSize
-        scale: tile.smallestAppearScale + (1 - tile.smallestAppearScale) * tile.appeared
+        scale: tile.iconScale
         opacity: tile.shownShare
         fragmentShader: "lanczos.frag.qsb"
         property var source: fullSize
@@ -238,7 +288,7 @@ Item {
     property real drawnIconSize: 0
     signal minimizedWindowWanted(var window)
     signal dragMoved(real windowX, real windowY)
-    readonly property real shownShare: lifted ? 0 : appeared
+    readonly property real shownShare: lifted ? 0 : appeared * (1 - gone)
 
     function activate() {
         if (opensFolder) {
@@ -301,9 +351,10 @@ Item {
         id: press
         anchors.fill: parent
         acceptedButtons: Qt.LeftButton | Qt.RightButton
-        enabled: tile.entry !== null || tile.appId !== "" || tile.minimizedWindow !== null
-                 || tile.command.length > 0
-                 || tile.shellAction !== "" || tile.opensFolder
+        enabled: !tile.leaving
+                 && (tile.entry !== null || tile.appId !== "" || tile.minimizedWindow !== null
+                     || tile.command.length > 0
+                     || tile.shellAction !== "" || tile.opensFolder)
 
         // In pixels.
         readonly property real dragStartDistance: 8

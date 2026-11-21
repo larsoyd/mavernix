@@ -102,3 +102,21 @@ function shelfEdges(looks, tileSize, rowStart, rowEnd, now) {
     const right = left + Math.floor(pushedPosition(rowEnd, now) + endPadding - looks.end_trim - left + 0.5)
     return { left: left, right: right }
 }
+
+// the row to show: live plus the places that left it and still shrink away
+// an unkept program's place stays after its old left neighbour, marked leaving
+function withLeaving(shown, live, leaves) {
+    const result = live.slice()
+    let after = -1
+    for (const place of shown) {
+        const index = result.findIndex(other => other.key === place.key)
+        if (index >= 0) {
+            after = index
+        } else if (place.leaving || (leaves && place.kept === false)) {
+            after += 1
+            result.splice(after, 0, place.leaving ? place
+                : Object.assign({}, place, { leaving: true, listedAs: undefined }))
+        }
+    }
+    return result
+}

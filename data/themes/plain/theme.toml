@@ -607,6 +607,7 @@ pressed_darken = 0.7
 tile_slide_ms = 150
 tile_appear_ms = 150
 tile_appear_scale = 0.6
+tile_leave_ms = 150
 
 [dock.minimized]
 # A minimized window's tile: a picture of the window with an app badge.

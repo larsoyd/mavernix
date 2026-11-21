@@ -565,6 +565,7 @@ DOCK_BOUNCE_HEIGHT = [0.2, 4.4]
 DOCK_BOUNCE_LONGEST_MS = 120000
 DOCK_TILE_SLIDE_MS = 270
 DOCK_TILE_APPEAR_MS = 350
+DOCK_TILE_LEAVE_MS = 500
 
 # --- Controls inside windows (buttons, checkboxes...) ------------------------
 # Theme picture name -> the tags of the original control picture.
@@ -1778,6 +1779,7 @@ pressed_darken = {DOCK_PRESSED_DARKEN}
 tile_slide_ms = {DOCK_TILE_SLIDE_MS}
 tile_appear_ms = {DOCK_TILE_APPEAR_MS}
 tile_appear_scale = 0.1
+tile_leave_ms = {DOCK_TILE_LEAVE_MS}
 
 [dock.menu]
 background = "#252525e0"
