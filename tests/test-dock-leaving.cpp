@@ -22,10 +22,15 @@ class TestDockLeaving : public QObject
         return {{"key", QString::fromLatin1(key)}, {"isSeparator", false}, {"kept", false}, {"listedAs", QString::fromLatin1(key)}};
     }
 
-    // a separator, a window or the trash: no word on keeping at all
+    // a separator or the trash: no word on keeping at all
     static QVariantMap other(const char* key)
     {
         return {{"key", QString::fromLatin1(key)}, {"isSeparator", false}};
+    }
+
+    static QVariantMap minimised(const char* key, const char* window)
+    {
+        return {{"key", QString::fromLatin1(key)}, {"isSeparator", false}, {"isWindow", true}, {"window", QString::fromLatin1(window)}};
     }
 
     static QVariantMap leaving(const char* key)
@@ -33,11 +38,11 @@ class TestDockLeaving : public QObject
         return {{"key", QString::fromLatin1(key)}, {"isSeparator", false}, {"kept", false}, {"leaving", true}};
     }
 
-    QVariantList merged(const QVariantList& shown, const QVariantList& live, bool leaves = true)
+    QVariantList merged(const QVariantList& shown, const QVariantList& live, bool leaves = true, const QStringList& open = {})
     {
         QVariant result;
         QMetaObject::invokeMethod(probe.get(), "withLeaving", Q_RETURN_ARG(QVariant, result),
-            Q_ARG(QVariant, QVariant(QVariantList{QVariant(shown), QVariant(live), leaves})));
+            Q_ARG(QVariant, QVariant(QVariantList{QVariant(shown), QVariant(live), leaves, QVariant(open)})));
         return result.toList();
     }
 
@@ -59,7 +64,7 @@ class TestDockLeaving : public QObject
         component.setData("import QtQml\n"
                           "import \"file://" SHELL_DIR "/DockLayout.js\" as DockLayout\n"
                           "QtObject {\n"
-                          "  function withLeaving(a) { return DockLayout.withLeaving(a[0], a[1], a[2]) }\n"
+                          "  function withLeaving(a) { return DockLayout.withLeaving(a[0], a[1], a[2], a[3]) }\n"
                           "}\n",
             QUrl());
         probe.reset(component.create());
@@ -81,10 +86,30 @@ class TestDockLeaving : public QObject
         QCOMPARE(row(merged({kept("a"), kept("b")}, {kept("a")})), QStringLiteral("a"));
     }
 
-    void aWindowOrTheTrashGoesAtOnce()
+    void aSeparatorOrTheTrashGoesAtOnce()
     {
-        const QVariantList shown{kept("a"), other("separator 0"), other("window 3"), other("trash")};
+        const QVariantList shown{kept("a"), other("separator 0"), other("trash")};
         QCOMPARE(row(merged(shown, {kept("a")})), QStringLiteral("a"));
+    }
+
+    void aMinimisedWindowThatClosesShrinksAway()
+    {
+        const QVariantList shown{kept("a"), other("separator 0"), minimised("window 3", "w3"), other("trash")};
+        const QVariantList live{kept("a"), other("separator 0"), other("trash")};
+        QCOMPARE(row(merged(shown, live, true, {"w1"})), QStringLiteral("a separator 0 window 3* trash"));
+    }
+
+    void aWindowBroughtBackLeavesItsTileAtOnce()
+    {
+        const QVariantList shown{kept("a"), other("separator 0"), minimised("window 3", "w3"), other("trash")};
+        const QVariantList live{kept("a"), other("separator 0"), other("trash")};
+        QCOMPARE(row(merged(shown, live, true, {"w1", "w3"})), QStringLiteral("a separator 0 trash"));
+    }
+
+    void aClosedWindowGoesAtOnceWhenLeavingIsOff()
+    {
+        const QVariantList shown{kept("a"), minimised("window 3", "w3")};
+        QCOMPARE(row(merged(shown, {kept("a")}, false, {})), QStringLiteral("a"));
     }
 
     void aProgramThatComesBackIsNoLongerLeaving()

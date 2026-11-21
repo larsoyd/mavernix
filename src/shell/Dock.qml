@@ -627,6 +627,7 @@ PanelWindow {
                 isSeparator: false,
                 entry: WindowPrograms.entry(window.appId),
                 window: window,
+                isWindow: true,
                 isTrash: false
             })
         }
@@ -659,8 +660,8 @@ PanelWindow {
         return all
     }
 
-    // the row as shown: the live places plus an unkept program's place
-    // while its tile shrinks away after the program is gone
+    // the row as shown: the live places plus the place of an unkept program
+    // or a closed minimised window while its tile shrinks away
     property var places: []
     readonly property int leaveMs: looks.tile_leave_ms ?? 0
     function showPlaces(next) {
@@ -672,7 +673,8 @@ PanelWindow {
             slotsRest = false
         }
     }
-    onLivePlacesChanged: showPlaces(DockLayout.withLeaving(places, livePlaces, leaveMs > 0))
+    onLivePlacesChanged: showPlaces(DockLayout.withLeaving(
+        places, livePlaces, leaveMs > 0, ToplevelManager.toplevels.values))
     function dropLeft(key) {
         showPlaces(places.filter(place => place.key !== key))
     }
@@ -1371,6 +1373,11 @@ PanelWindow {
         return height - bottom - itemHeight
     }
 
+    // how far down the window the middle of a tile's icon is
+    function iconMiddle(tile) {
+        return fromBottom(base + (tile?.lift ?? 0) + (tile?.iconSize ?? 0) / 2, 0)
+    }
+
     Item {
         id: pointerArea
         x: dock.shelfEdges.left
@@ -1421,7 +1428,8 @@ PanelWindow {
             blurRadius: dock.looks.icon_shadow?.blur ?? 0
 
             x: tile?.iconX ?? 0
-            scale: tile?.iconScale ?? 1
+            iconScale: tile?.iconScale ?? 1
+            iconMiddle: dock.iconMiddle(tile)
             width: tile?.iconSize ?? 0
             y: dock.fromBottom(dock.base + (tile?.lift ?? 0) + (dock.looks.icon_shadow?.raise ?? 0), height)
         }
@@ -1479,7 +1487,8 @@ PanelWindow {
                 blurRadius: dock.looks.icon_shadow?.blur ?? 0
 
                 x: tile?.iconX ?? 0
-                scale: tile?.iconScale ?? 1
+                iconScale: tile?.iconScale ?? 1
+                iconMiddle: glassWindow.height - dock.base - (tile?.lift ?? 0) - (tile?.iconSize ?? 0) / 2
                 width: tile?.iconSize ?? 0
                 // by this window's own height: the dock's is not there yet while both are being made
                 y: glassWindow.height - dock.base - (tile?.lift ?? 0) - (dock.looks.icon_shadow?.raise ?? 0) - height
@@ -1610,7 +1619,8 @@ PanelWindow {
                 opacity: reflections.looks.opacity * (tile?.shownShare ?? 1)
 
                 x: tile?.iconX ?? 0
-                scale: tile?.iconScale ?? 1
+                iconScale: tile?.iconScale ?? 1
+                iconMiddle: dock.iconMiddle(tile) - reflections.y
                 width: tile?.iconSize ?? 0
                 // Its top edge starts a little above the icon's lower edge,
                 // hidden behind the icon, and it moves down as the icon rises.
@@ -1638,7 +1648,8 @@ PanelWindow {
             blurRadius: dock.looks.floor_shadow.blur * iconSize
 
             x: tile?.iconX ?? 0
-            scale: tile?.iconScale ?? 1
+            iconScale: tile?.iconScale ?? 1
+            iconMiddle: dock.iconMiddle(tile)
             width: iconSize
             // The documented value where a theme leaves it out.
             heightShare: dock.looks.floor_shadow.height ?? 0.5
@@ -1674,10 +1685,10 @@ PanelWindow {
             }
             function light() {
                 lightFade.stop()
-                if (lit) {
-                    opacity = 1
-                } else if (leaving) {
+                if (leaving) {
                     opacity = 0
+                } else if (lit) {
+                    opacity = 1
                 } else {
                     lightFade.start()
                 }
@@ -1720,7 +1731,7 @@ PanelWindow {
             readonly property var edges: DockLayout.tileEdges(
                 restLeft + ((resting?.width ?? 0) - wholeWidth) / 2, wholeWidth, dock.pushNow)
 
-            opensSlot: place.kept === false
+            opensSlot: place.kept === false || (place.leaving ?? false)
             leaving: place.leaving ?? false
             leaveDuration: dock.leaveMs
             onLeftDock: dock.dropLeft(modelData)

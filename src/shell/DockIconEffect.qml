@@ -37,6 +37,17 @@ Item {
 
     readonly property real shrink: width > 0 ? width / drawnWidth : 1
 
+    // shrinks with its icon, about the icon's middle so it stays under it
+    property real iconScale: 1
+    // that middle's place down the parent
+    property real iconMiddle: 0
+    transform: Scale {
+        origin.x: effect.width / 2
+        origin.y: effect.iconMiddle - effect.y
+        xScale: effect.iconScale
+        yScale: effect.iconScale
+    }
+
     height: width * heightShare
 
     Item {
