@@ -62,4 +62,8 @@ preview_frame = { color = "#ffffff", width = 3, share = 0.86, shadow_color = "#0
 # how long it takes to fade away where you let it go (it's gone at once if
 # left out).
 band = { color = "#3a6ea540", border_color = "#3a6ea5", border_width = 1, fade_ms = 200 }
+# Optional: how long icons take to glide to a place you give them by a drop
+# onto the grid, Clean Up or a new order, eased in and out. Left out, they
+# jump there.
+move_ms = 350
 ```

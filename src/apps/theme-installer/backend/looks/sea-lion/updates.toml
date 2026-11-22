@@ -536,3 +536,10 @@ revision = 28
 
 [update.settings.dock]
 tile_leave_ms = 500
+
+# Desktop icons glide to the places they are put in, as Finder's do.
+[[update]]
+revision = 29
+
+[update.settings."desktop.icons"]
+move_ms = 350

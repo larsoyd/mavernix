@@ -779,6 +779,18 @@ class TestSeaLionUpdates(unittest.TestCase):
         self.assertNotIn("import_brings", update)
         self.assertEqual(update["settings"], {"window.titlebar": made})
 
+    def test_older_themes_get_the_imports_icon_glide(self):
+        made = tomllib.loads(self.make_theme.DESKTOP_ICON_MOTION_LINES)
+        # finder moves desktop icons over 350 ms, eased in and out
+        self.assertEqual(made, {"move_ms": 350})
+        self.assertIn(29, self.updates)
+        update = self.updates[29]
+        self.assertNotIn("themes", update)
+        self.assertNotIn("import_brings", update)
+        self.assertEqual(update["settings"], {"desktop.icons": made})
+        import inspect
+        self.assertIn("{DESKTOP_ICON_MOTION_LINES}", inspect.getsource(self.make_theme.build_theme_text))
+
     def test_titles_are_built_as_os_x_builds_its_letters_in_both_looks(self):
         made = tomllib.loads(self.make_theme.TITLE_SMOOTHING_LINES)
         self.assertEqual(made, {"title_smoothing": "subpixel"})

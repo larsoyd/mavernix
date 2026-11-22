@@ -36,6 +36,10 @@ To build it, check out `larsoyd` and follow [docs/building.md](../docs/building.
 - The app grid sizes its icons and spacing to the screen, as Launchpad does.
 - The app grid, the dock and Dolphin can make a desktop shortcut for any program or file.
 
+### Desktop
+
+- Desktop icons glide to their places after a drop onto the grid, Clean Up or a new sort order, as Finder's do.
+
 ### Menu bar
 
 - Global menus for GTK, GMenu and X11 programs, as well as Firefox, Thunderbird, GIMP, REAPER (on X11 and native Wayland) and Windows programs under Wine and Proton.

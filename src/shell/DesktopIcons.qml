@@ -68,6 +68,19 @@ Item {
     readonly property bool snapToGrid: userChoices.value("desktop_files", "snap_to_grid") ?? false
     readonly property bool deselectAfterOpening: userChoices.value("desktop_files", "deselect_after_opening") ?? false
 
+    // icons glide only to places a person asked for, not when the screen changes size
+    readonly property int moveMs: looks?.move_ms ?? 0
+    property bool gliding: false
+    function glideNext() {
+        gliding = true
+        glideEnd.restart()
+    }
+    Timer {
+        id: glideEnd
+        interval: icons.moveMs + 1000
+        onTriggered: icons.gliding = false
+    }
+
     // Files put by hand: name -> offset of the icon's left edge from the
     // screen's far side and its top from the screen's top. Measured from the
     // far side so the icons stay beside that edge on other screen sizes.
@@ -114,13 +127,17 @@ Item {
         const kept = []
         for (let index = 0; index < entries.length; index++) {
             if (isPicked(entries[index].path)) {
+                const point = { x: Math.max(0, Math.min(width - iconSize, iconX(index) + byX)),
+                                y: Math.max(topRoom, Math.min(height - iconSize, iconY(index) + byY)) }
                 names.push(entries[index].name)
-                dropped.push({ x: Math.max(0, Math.min(width - iconSize, iconX(index) + byX)),
-                               y: Math.max(topRoom, Math.min(height - iconSize, iconY(index) + byY)) })
+                dropped.push(point)
+                // put down where the drag let go, so only the snap glides
+                iconItems.itemAt(index)?.jump(point)
             } else if (putByHand[entries[index].name] !== undefined) {
                 kept.push(places[index])
             }
         }
+        glideNext()
         rememberPlaces(placesByName(names, snapToGrid ? DesktopPlaces.onGrid(grid, kept, dropped) : dropped))
     }
 
@@ -134,6 +151,7 @@ Item {
                 put.push(places[index])
             }
         }
+        glideNext()
         rememberPlaces(placesByName(names, DesktopPlaces.onGrid(grid, [], put)))
     }
     function placesByName(names, points) {
@@ -320,9 +338,10 @@ Item {
     // --- The icons -------------------------------------------------------------------------
 
     Repeater {
+        id: iconItems
         model: icons.entries
 
-        Item {
+        DesktopIconMotion {
             id: fileItem
             required property var modelData
             required property int index
@@ -331,8 +350,8 @@ Item {
             readonly property var plate: (icons.frontmost ? undefined : name.away_background)
                                          ?? name.picked_background ?? ({ color: "#3a6ea5", radius: 4 })
 
-            x: icons.iconX(index)
-            y: icons.iconY(index)
+            place: Qt.point(icons.iconX(index), icons.iconY(index))
+            duration: icons.gliding ? icons.moveMs : 0
             width: icons.iconSize
             height: icons.iconSize
 
@@ -712,6 +731,7 @@ Item {
         } else if (id === idRename) {
             startRenaming()
         } else if (id >= orderBase) {
+            glideNext()
             userChoices.set("desktop_files", "places", ({}))
             userChoices.set("desktop_files", "order", orders[id - orderBase])
         }
