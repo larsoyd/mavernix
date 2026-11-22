@@ -26,6 +26,8 @@ TAG = "mavernix-programs"
 XDG_OPEN = "/usr/bin/xdg-open"
 # xdg-open drops this before it runs the program, so only the service's own xdg-open sees it
 OPEN_HERE = "MAVERNIX_OPEN_HERE"
+# made by the shell from the click that asked, so a program with the file open can raise its window
+TOKEN = "XDG_ACTIVATION_TOKEN"
 # how long the compositor waits for the window, a slow program's first one included
 WINDOW_WAIT_SECONDS = 10
 
@@ -100,6 +102,9 @@ def main():
     if origin is not None:
         expect_window(name, origin)
     environment[OPEN_HERE] = "1"
+    environment.pop(TOKEN, None)
+    if os.environ.get(TOKEN):
+        environment[TOKEN] = os.environ[TOKEN]
     try:
         os.execvpe("mavernix-start-program",
                    ["mavernix-start-program", "--in", folder, name, XDG_OPEN, target], environment)

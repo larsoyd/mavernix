@@ -18,6 +18,7 @@ wayland_client = dependency('wayland-client')
 
 moc_sources = qt.compile_moc(
     headers: [
+        'activated-start.hpp',
         'active-window.hpp',
         'application-menu.hpp',
         'bluetooth-agent.hpp',
@@ -59,6 +60,7 @@ module_dir = mavernix_libdir / 'qml' / 'Shell' / 'Native'
 shared_module(
     'shellnative',
     [
+        'activated-start.cpp',
         'active-window.cpp',
         'application-menu.cpp',
         'bluetooth-agent.cpp',
@@ -98,7 +100,7 @@ shared_module(
         'zone-picker.cpp',
         moc_sources,
     ],
-    dependencies: [qt_native, librsvg, gio, kguiaddons, dependency('xcb'), wayland_client],
+    dependencies: [qt_native, librsvg, gio, kguiaddons, kwindowsystem, dependency('xcb'), wayland_client],
     install: true,
     install_dir: module_dir,
 )

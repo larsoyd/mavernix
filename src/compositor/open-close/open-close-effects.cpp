@@ -298,6 +298,24 @@ class plugin_t : public wf::plugin_interface_t
         expected.erase(one);
     };
 
+    // an open that brought back a window the program already had uses up what it expected
+    wf::signal::connection_t<wf::view_focus_request_signal> on_focus_request = [this](wf::view_focus_request_signal* event) {
+        auto view = wf::toplevel_cast(event->view);
+        if (!view || view->parent || !view->is_mapped())
+        {
+            return;
+        }
+        const std::string app_id = view->get_app_id();
+        const auto before = expected.size();
+        expected.erase(std::remove_if(expected.begin(), expected.end(), [&](const expected_t& one) {
+            return std::any_of(one.ids.begin(), one.ids.end(), [&](const std::string& id) { return same_text(id, app_id); });
+        }), expected.end());
+        if (expected.size() != before)
+        {
+            LOGI("[themed-open-close] app_id=", app_id, " view=", view->get_id(), " result=window-brought-back");
+        }
+    };
+
     // every icon's box at once, in that output's pixels
     wf::ipc::method_callback on_origins = [](const wf::json_t& data) {
         if (!data.has_member("output") || !data["output"].is_string())
@@ -378,6 +396,7 @@ class plugin_t : public wf::plugin_interface_t
         methods->register_method(ORIGINS_METHOD, on_origins);
         methods->register_method(EXPECT_METHOD, on_expect);
         wf::get_core().connect(&on_mapped);
+        wf::get_core().connect(&on_focus_request);
     }
 
     void fini() override

@@ -124,6 +124,14 @@ tests = {
         'include': test_sources / 'shell/native',
         'dependencies': [qt_native],
     },
+    'activated-start': {
+        'sources': [
+            test_sources / 'shell/native/activated-start.cpp',
+            qt.compile_moc(headers: test_sources / 'shell/native/activated-start.hpp', dependencies: qt_native),
+        ],
+        'include': test_sources / 'shell/native',
+        'dependencies': [qt_native, kwindowsystem],
+    },
     'clipboard-history': {
         'sources': [
             test_sources / 'shell/native/clipboard-history.cpp',

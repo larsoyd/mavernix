@@ -9,6 +9,7 @@
 #include <QQmlEngine>
 #include <qqml.h>
 
+#include "activated-start.hpp"
 #include "active-window.hpp"
 #include "application-menu.hpp"
 #include "bluetooth-agent.hpp"
@@ -65,6 +66,7 @@ void ShellNativePlugin::registerTypes(const char* uri)
     const int major_version = 1;
     const int minor_version = 0;
 
+    qmlRegisterType<ActivatedStart>(uri, major_version, minor_version, "ActivatedStart");
     qmlRegisterType<ActiveWindow>(uri, major_version, minor_version, "ActiveWindow");
     qmlRegisterType<ApplicationMenu>(uri, major_version, minor_version, "ApplicationMenu");
     qmlRegisterType<BluetoothAgent>(uri, major_version, minor_version, "BluetoothAgent");

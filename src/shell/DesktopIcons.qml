@@ -204,9 +204,13 @@ Item {
 
     // --- What is done to files ------------------------------------------------------------
 
+    // with a token from the click, so a program that has the file open brings its window back
+    ActivatedStart {
+        id: starter
+    }
     function run(command, more) {
         if ((command ?? []).length > 0) {
-            Quickshell.execDetached(command.concat(more))
+            starter.run(command.concat(more), icons)
         }
     }
     // An executable .desktop file is started, with any files given to it.
@@ -214,7 +218,7 @@ Item {
         return entries.some(entry => entry.path === path && entry.isLauncher)
     }
     function launch(launcher, files) {
-        Quickshell.execDetached(["gio", "launch", launcher].concat(files ?? []))
+        starter.run(["gio", "launch", launcher].concat(files ?? []), icons)
     }
     function openPicked() {
         const launchers = pickedPaths.filter(path => isLauncher(path))

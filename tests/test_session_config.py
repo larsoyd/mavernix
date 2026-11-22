@@ -107,6 +107,15 @@ class TestWrittenSettings(SessionTestCase):
                 self.assertIn("themed-decoration", settings["core"]["plugins"].split())
                 self.assertEqual(Path(settings["themed-decoration"]["theme"]).name, desktop)
 
+    def test_a_program_asked_to_open_what_it_has_open_can_bring_its_window_back(self):
+        for desktop in DESKTOPS:
+            with self.subTest(desktop=desktop):
+                written = self.home / f"{desktop}.ini"
+                self.run_script("make_wayfire_config.py", CONFIG_DIR / f"{desktop}.toml", written)
+                settings = configparser.ConfigParser(interpolation=None, strict=False)
+                settings.read(written)
+                self.assertIn("xdg-activation", settings["core"]["plugins"].split())
+
     def test_windows_that_leave_the_frame_to_the_desktop_get_its_frame(self):
         for desktop in DESKTOPS:
             with self.subTest(desktop=desktop):
@@ -2663,11 +2672,13 @@ print(answers.get(" ".join(sys.argv[1:]), ""))
         (self.settings.parent / "shell.pid").write_text(f"{shell.pid}\n")
         return shell
 
-    def open(self, *arguments, compositor=None):
+    def open(self, *arguments, compositor=None, token=None):
         caller = {"PATH": "/usr/bin:/bin", "DESKTOP_SHELL_SETTINGS": str(self.settings),
                   "STEAMVIDEOTOKEN": "secret"}
         if compositor:
             caller["WAYFIRE_SOCKET"] = compositor
+        if token:
+            caller["XDG_ACTIVATION_TOKEN"] = token
         return subprocess.run([sys.executable, str(SESSION_SOURCE_DIR / "bin" / "mavernix-open"), *arguments],
                               capture_output=True, text=True, env=caller, cwd=self.root, timeout=30)
 
@@ -2713,6 +2724,23 @@ print(answers.get(" ".join(sys.argv[1:]), ""))
         self.assertEqual(started["environment"].get("SHELL_ONLY"), "yes")
         self.assertNotIn("STEAMVIDEOTOKEN", started["environment"])
         self.assertEqual(started["environment"].get("MAVERNIX_OPEN_HERE"), "1")
+
+    def test_the_token_of_the_click_that_asked_reaches_the_program(self):
+        self.start_shell(self.settings)
+        result = self.open("https://example.com/", token="from-the-click")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(self.started()["environment"].get("XDG_ACTIVATION_TOKEN"), "from-the-click")
+
+    def test_the_shells_own_token_from_its_start_is_never_handed_on(self):
+        environment = {"PATH": f"{self.bin}:/usr/bin:/bin", "DESKTOP_SHELL_SETTINGS": str(self.settings),
+                       "XDG_SESSION_DESKTOP": "mavernix", "XDG_ACTIVATION_TOKEN": "spent-at-login"}
+        shell = subprocess.Popen(["sleep", "60"], env=environment, cwd=self.home)
+        self.addCleanup(shell.wait)
+        self.addCleanup(shell.kill)
+        (self.settings.parent / "shell.pid").write_text(f"{shell.pid}\n")
+        result = self.open("https://example.com/")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertNotIn("XDG_ACTIVATION_TOKEN", self.started()["environment"])
 
     def test_a_file_is_named_after_the_program_for_its_type(self):
         self.start_shell(self.settings)

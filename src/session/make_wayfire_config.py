@@ -40,6 +40,8 @@ BASE_PLUGINS = [
     "autostart", "command",
     "idle",
     "fast-switcher",
+    # a program asked again for what it has open brings that window back
+    "xdg-activation",
     # The control socket the shell talks to.
     "ipc", "ipc-rules",
     # Ours (src/compositor/).
