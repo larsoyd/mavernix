@@ -126,6 +126,28 @@ static void forget_ended_threads(void)
     }
 }
 
+// wine makes a new desktop after the last program on the old one closes, the agent outlives it
+// so the name is kept from the start, a desktop that is gone no longer gives it
+static WCHAR desktop_name[64];
+static HDESK followed;
+static void follow_desktop(void)
+{
+    if (hooked_count || !desktop_name[0])
+        return;
+    HDESK desktop = OpenDesktopW(desktop_name, 0, FALSE, DESKTOP_ENUMERATE | DESKTOP_READOBJECTS | DESKTOP_HOOKCONTROL);
+    if (!desktop)
+        return;
+    if (!SetThreadDesktop(desktop))
+    {
+        say("refused: cannot follow desktop %ls error=%lu", desktop_name, GetLastError());
+        CloseDesktop(desktop);
+        return;
+    }
+    if (followed)
+        CloseDesktop(followed);
+    followed = desktop;
+}
+
 static BOOL path_beside(const WCHAR *name, WCHAR path[MAX_PATH])
 {
     DWORD length = GetModuleFileNameW(NULL, path, MAX_PATH);
@@ -184,11 +206,14 @@ int wmain(int argc, WCHAR **argv)
     if (!menu_hook)
         return say("refused: no client library error=%lu", GetLastError()), 1;
     IsWow64Process(GetCurrentProcess(), &own_wow64);
+    if (!GetUserObjectInformationW(GetThreadDesktop(GetCurrentThreadId()), UOI_NAME, desktop_name, sizeof desktop_name, NULL))
+        say("refused: no desktop name error=%lu, programs after a desktop restart are missed", GetLastError());
     ask_qt_for_native_menus();
     say("watching");
     while (WaitForSingleObject(ends, 1000) == WAIT_TIMEOUT)
     {
         forget_ended_threads();
+        follow_desktop();
         EnumWindows(visit, 0);
     }
     say("the prefix ends threads=%d", hooked_count);

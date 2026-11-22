@@ -409,6 +409,32 @@ def run(bridge_path, agents, app_path, narrow_app_path, home):
         except subprocess.TimeoutExpired:
             raise AssertionError(f"the prefix still runs: {in_prefix(environment['WINEPREFIX'])}")
         print("[wine-menu] PASS the agent does not keep the prefix running", flush=True)
+
+        # a prefix kept up past its last program gets a new desktop for the next one, the agents stay
+        subprocess.run(["wineserver", "-p", "120"], env=environment, timeout=15)
+        def start_app():
+            started = subprocess.Popen(["wine", app_path], env=environment, stdin=subprocess.PIPE,
+                                       stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, text=True,
+                                       start_new_session=True)
+            wait(lambda: x_window(environment, "Menu Test 64"), "the program's X window", 60)
+            return started, x_window(environment, "Menu Test 64")
+        before_calls = len(calls)
+        app, first_xid = start_app()
+        wait(lambda: registered(first_xid, before_calls), "the first program to register its menu", 40)
+        app.stdin.write("quit\n")
+        app.stdin.flush()
+        app.wait(timeout=15)
+        wait(lambda: not any("explorer.exe" in found for found in in_prefix(environment["WINEPREFIX"])),
+             "the desktop of the last program to end", 30)
+        check(any("wine-menu-agent64" in found for found in in_prefix(environment["WINEPREFIX"])),
+              f"the agents ended with the desktop: {in_prefix(environment['WINEPREFIX'])}")
+        before_calls = len(calls)
+        app, later_xid = start_app()
+        wait(lambda: registered(later_xid, before_calls), "a program on the new desktop to register its menu", 20)
+        app.stdin.write("quit\n")
+        app.stdin.flush()
+        app.wait(timeout=15)
+        print("[wine-menu] PASS a program after the desktop came back gets its menu", flush=True)
         print("[wine-menu] result=pass", flush=True)
     except (AssertionError, subprocess.TimeoutExpired):
         print("registrar calls:", *calls, sep="\n", file=sys.stderr)
