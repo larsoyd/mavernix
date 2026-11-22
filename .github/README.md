@@ -41,6 +41,7 @@ To build it, check out `larsoyd` and follow [docs/building.md](../docs/building.
 - Desktop icons glide to their places after a drop onto the grid, Clean Up or a new sort order, as Finder's do.
 - Holding Super alone while dropping desktop icons turns Snap to Grid the other way for that drop, as Command does in Finder.
 - Moving desktop files to the trash plays the theme's trash sound once they are there.
+- A folder or file opened from the desktop grows its window out of the icon and shrinks back into it when closed. A program opened from its icon leaves a fading ghost of the icon.
 
 ### Menu bar
 

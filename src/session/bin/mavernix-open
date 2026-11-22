@@ -3,7 +3,10 @@
 the shell's environment and folder, as the Dock starts programs. The program
 that asked neither waits for it nor hands it its environment or cgroups.
 
-    mavernix-open FILE|URL
+    mavernix-open [--origin ICON] FILE|URL
+
+With --origin, the compositor is told that the program's next window comes
+from that desktop icon, so it grows out of it.
 
 Without a running shell it refuses, and xdg-open opens it the usual way.
 """
@@ -16,10 +19,15 @@ import syslog
 import urllib.parse
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+import compositor_call  # noqa: E402
+
 TAG = "mavernix-programs"
 XDG_OPEN = "/usr/bin/xdg-open"
 # xdg-open drops this before it runs the program, so only the service's own xdg-open sees it
 OPEN_HERE = "MAVERNIX_OPEN_HERE"
+# how long the compositor waits for the window, a slow program's first one included
+WINDOW_WAIT_SECONDS = 10
 
 
 def refuse(reason):
@@ -66,12 +74,31 @@ def handler(target, environment):
     return entry.removesuffix(".desktop") or "xdg-open"
 
 
+def expect_window(name, origin):
+    """Tells the compositor the program's next window comes from a desktop icon, never in the way of opening."""
+    ids = [name, name.rsplit(".", 1)[-1]]
+    try:
+        answer = compositor_call.call("themed-open-close/expect",
+                                      {"ids": list(dict.fromkeys(ids)), "origin": origin, "seconds": WINDOW_WAIT_SECONDS})
+    except (OSError, ValueError) as error:
+        answer = {"error": str(error)}
+    if "error" in answer:
+        syslog.openlog(TAG)
+        syslog.syslog(syslog.LOG_INFO, f"open origin={origin} not told: {answer['error']}")
+
+
 def main():
-    if len(sys.argv) != 2:
-        sys.exit("usage: mavernix-open FILE|URL")
-    target = sys.argv[1]
+    arguments = sys.argv[1:]
+    origin = None
+    if arguments[:1] == ["--origin"] and len(arguments) == 3:
+        origin, arguments = arguments[1], arguments[2:]
+    if len(arguments) != 1:
+        sys.exit("usage: mavernix-open [--origin ICON] FILE|URL")
+    target = arguments[0]
     environment, folder = shell()
     name = handler(target, environment)
+    if origin is not None:
+        expect_window(name, origin)
     environment[OPEN_HERE] = "1"
     try:
         os.execvpe("mavernix-start-program",

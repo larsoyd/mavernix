@@ -543,6 +543,9 @@ place_once = ["mavernix-theme-installer"]
 # File actions, each given the paths. A command left out removes its menu
 # entry.
 open_command = ["gio", "open"]
+# Opens one file at a time, given the file twice: as the icon its window
+# grows out of and as what to open. Left out, open_command opens them.
+open_from_icon_command = ["mavernix-open", "--origin"]
 trash_command = ["gio", "trash"]
 rename_command = ["gio", "rename"]
 new_folder_command = ["mavernix-file-action", "new-folder"]

@@ -22,6 +22,7 @@
 #include "folder-watch.hpp"
 #include "held-keys.hpp"
 #include "icon-files.hpp"
+#include "icon-origins.hpp"
 #include "item-picture.hpp"
 #include "lid-watch.hpp"
 #include "main-screen.hpp"
@@ -77,6 +78,7 @@ void ShellNativePlugin::registerTypes(const char* uri)
     qmlRegisterType<FolderContents>(uri, major_version, minor_version, "FolderContents");
     qmlRegisterType<FolderWatch>(uri, major_version, minor_version, "FolderWatch");
     qmlRegisterType<HeldKeys>(uri, major_version, minor_version, "HeldKeys");
+    qmlRegisterType<IconOrigins>(uri, major_version, minor_version, "IconOrigins");
     qmlRegisterType<IconFiles>(uri, major_version, minor_version, "IconFiles");
     qmlRegisterType<ItemPicture>(uri, major_version, minor_version, "ItemPicture");
     qmlRegisterType<LidWatch>(uri, major_version, minor_version, "LidWatch");

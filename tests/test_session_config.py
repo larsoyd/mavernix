@@ -16,10 +16,12 @@ import os
 import re
 import shlex
 import shutil
+import socket
 import struct
 import subprocess
 import sys
 import tempfile
+import threading
 import time
 import tomllib
 import unittest
@@ -833,7 +835,12 @@ class TestSeaLionUpdates(unittest.TestCase):
         made = tomllib.loads(self.make_theme.ICON_ZOOM_TABLE)
         self.assertEqual(made, {"animation": {"icon_zoom": {"duration_ms": 200}}})
         self.assertIn(31, self.updates)
-        self.assertEqual(self.updates[31]["settings"], {"animation.icon_zoom": made["animation"]["icon_zoom"]})
+        launch = tomllib.loads(self.make_theme.DESKTOP_LAUNCH_LINES)
+        # finder's ghost of a program's icon grows and fades in about 150 ms
+        self.assertEqual(launch, {"launch_ms": 150})
+        self.assertEqual(self.updates[31]["settings"], {"animation.icon_zoom": made["animation"]["icon_zoom"],
+                                                        "desktop.icons": launch})
+        self.assertIn("{DESKTOP_LAUNCH_LINES}", inspect.getsource(self.make_theme.build_theme_text))
         self.assertNotIn("themes", self.updates[31])
         self.assertIn("{ICON_ZOOM_TABLE}", inspect.getsource(self.make_theme.build_theme_text))
 
@@ -2656,11 +2663,40 @@ print(answers.get(" ".join(sys.argv[1:]), ""))
         (self.settings.parent / "shell.pid").write_text(f"{shell.pid}\n")
         return shell
 
-    def open(self, target):
+    def open(self, *arguments, compositor=None):
         caller = {"PATH": "/usr/bin:/bin", "DESKTOP_SHELL_SETTINGS": str(self.settings),
                   "STEAMVIDEOTOKEN": "secret"}
-        return subprocess.run([sys.executable, str(SESSION_SOURCE_DIR / "bin" / "mavernix-open"), target],
+        if compositor:
+            caller["WAYFIRE_SOCKET"] = compositor
+        return subprocess.run([sys.executable, str(SESSION_SOURCE_DIR / "bin" / "mavernix-open"), *arguments],
                               capture_output=True, text=True, env=caller, cwd=self.root, timeout=30)
+
+    def compositor(self):
+        """A stand-in control socket that answers ok and keeps every request."""
+        path = str(self.root / "wayfire.socket")
+        server = socket.socket(socket.AF_UNIX)
+        server.bind(path)
+        server.listen()
+        server.settimeout(20)
+        heard = []
+
+        def serve():
+            try:
+                connection, _ = server.accept()
+            except OSError:
+                return
+            with connection:
+                (length,) = struct.unpack("<I", connection.recv(4, socket.MSG_WAITALL))
+                heard.append(json.loads(connection.recv(length, socket.MSG_WAITALL)))
+                answer = json.dumps({"result": "ok"}).encode()
+                connection.sendall(struct.pack("<I", len(answer)) + answer)
+        thread = threading.Thread(target=serve)
+        thread.start()
+        # closed first, so a server that heard nothing stops waiting
+        self.addCleanup(thread.join, 25)
+        self.addCleanup(server.close)
+        self.addCleanup(server.shutdown, socket.SHUT_RDWR)
+        return path, heard
 
     def started(self):
         self.assertTrue(self.record.exists(), "mavernix-start-program was not run")
@@ -2689,6 +2725,29 @@ print(answers.get(" ".join(sys.argv[1:]), ""))
         result = self.open("magnet:?xt=urn:btih:0")
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(self.started()["arguments"][2], "xdg-open")
+
+    def test_a_file_from_an_icon_tells_the_compositor_where_its_window_comes_from(self):
+        self.start_shell(self.settings)
+        path, heard = self.compositor()
+        result = self.open("--origin", "/home/me/Desktop/my report.pdf", "file:///papers/my%20report.pdf", compositor=path)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(self.started()["arguments"][2], "org.gnome.Evince")
+        self.assertEqual(heard, [{"method": "themed-open-close/expect",
+                                  "data": {"ids": ["org.gnome.Evince", "Evince"],
+                                           "origin": "/home/me/Desktop/my report.pdf", "seconds": 10}}])
+
+    def test_a_compositor_out_of_reach_still_opens_the_file(self):
+        self.start_shell(self.settings)
+        result = self.open("--origin", "/x", "file:///papers/my%20report.pdf", compositor=str(self.root / "none.socket"))
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(self.started()["arguments"][2], "org.gnome.Evince")
+
+    def test_without_an_origin_the_compositor_is_not_asked(self):
+        self.start_shell(self.settings)
+        path, heard = self.compositor()
+        result = self.open("file:///papers/my%20report.pdf", compositor=path)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(heard, [])
 
     def test_without_a_running_shell_it_refuses(self):
         shell = self.start_shell(self.settings)

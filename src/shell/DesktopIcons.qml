@@ -220,12 +220,62 @@ Item {
         const files = pickedPaths.filter(path => !isLauncher(path))
         for (const launcher of launchers) {
             launch(launcher)
+            leaveGhost(entries.findIndex(entry => entry.path === launcher))
         }
-        if (files.length > 0) {
+        // one at a time from its icon, so its window can grow out of it
+        const fromIcon = wishes.open_from_icon_command ?? []
+        if (fromIcon.length > 0) {
+            for (const file of files) {
+                run(fromIcon, [file, file])
+            }
+        } else if (files.length > 0) {
             run(wishes.open_command, files)
         }
         afterOpening()
     }
+
+    // a program opened from its icon leaves a ghost that grows to twice its size as it fades
+    readonly property int launchMs: looks?.launch_ms ?? 0
+    function leaveGhost(index) {
+        if (launchMs > 0 && index >= 0) {
+            launchGhost.createObject(icons, { x: iconX(index), y: iconY(index),
+                                              source: themeIcons.path(entries[index].icon, entries[index].genericIcon) })
+        }
+    }
+    Component {
+        id: launchGhost
+        Image {
+            id: ghost
+            property real grown: 0
+            width: icons.iconSize
+            height: icons.iconSize
+            sourceSize: Qt.size(width * 2 * Screen.devicePixelRatio, height * 2 * Screen.devicePixelRatio)
+            scale: 1 + grown
+            opacity: 0.6 * (1 - grown)
+            NumberAnimation on grown {
+                from: 0
+                to: 1
+                duration: icons.launchMs
+                onFinished: ghost.destroy()
+            }
+        }
+    }
+
+    // where each icon is, for windows that come from one and go back into it
+    IconOrigins {
+        id: iconOrigins
+    }
+    function tellOrigins() {
+        const boxes = {}
+        if (shown) {
+            entries.forEach((entry, index) => {
+                boxes[entry.path] = [iconX(index), iconY(index), iconSize, iconSize]
+            })
+        }
+        iconOrigins.place(screen.name, boxes)
+    }
+    onPlacesChanged: Qt.callLater(tellOrigins)
+    onShownChanged: Qt.callLater(tellOrigins)
     function afterOpening() {
         if (deselectAfterOpening) {
             pickNone()

@@ -66,4 +66,7 @@ band = { color = "#3a6ea540", border_color = "#3a6ea5", border_width = 1, fade_m
 # onto the grid, Clean Up or a new order, eased in and out. Left out, they
 # jump there.
 move_ms = 350
+# Optional: a program opened from its icon leaves a copy of the icon that
+# grows to twice its size as it fades away, over this long.
+launch_ms = 150
 ```

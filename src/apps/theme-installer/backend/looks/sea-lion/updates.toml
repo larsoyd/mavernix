@@ -551,9 +551,13 @@ import_brings = [
     "Moving files from the desktop to the Trash makes the sound Finder makes.",
 ]
 
-# A folder or document opened from a desktop icon grows out of it and goes back into it.
+# A folder or document opened from a desktop icon grows out of it and goes back into it,
+# and a program leaves a fading ghost of its icon.
 [[update]]
 revision = 31
 
 [update.settings."animation.icon_zoom"]
 duration_ms = 200
+
+[update.settings."desktop.icons"]
+launch_ms = 150
