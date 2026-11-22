@@ -8,6 +8,7 @@
 #include <QFileInfo>
 #include <QMimeDatabase>
 #include <QMimeType>
+#include <QStandardPaths>
 
 #include <algorithm>
 #include <optional>
@@ -118,6 +119,35 @@ static std::optional<launcher_t> launcher_in(const QFileInfo& file)
     return launcher;
 }
 
+// a link to home or one of its usual folders shows that folder's own picture
+static QString folder_icon(const QFileInfo& file)
+{
+    const QString target = file.canonicalFilePath();
+    const QString home = QFileInfo(QDir::homePath()).canonicalFilePath();
+    if (target == home)
+    {
+        return QStringLiteral("user-home");
+    }
+    const std::pair<QStandardPaths::StandardLocation, const char*> usual[] = {
+        {QStandardPaths::DesktopLocation, "user-desktop"},
+        {QStandardPaths::DocumentsLocation, "folder-documents"},
+        {QStandardPaths::DownloadLocation, "folder-download"},
+        {QStandardPaths::MusicLocation, "folder-music"},
+        {QStandardPaths::PicturesLocation, "folder-pictures"},
+        {QStandardPaths::MoviesLocation, "folder-videos"},
+        {QStandardPaths::PublicShareLocation, "folder-publicshare"},
+    };
+    for (const auto& [location, icon] : usual)
+    {
+        const QString place = QFileInfo(QStandardPaths::writableLocation(location)).canonicalFilePath();
+        if (place == target)
+        {
+            return QString::fromLatin1(icon);
+        }
+    }
+    return QStringLiteral("folder");
+}
+
 // the folder, or the nearest one above it while it is missing
 static QString nearest_folder(QString path)
 {
@@ -187,7 +217,7 @@ void FolderContents::look()
         entries.append(QVariantMap{
             {QStringLiteral("name"), file.fileName()},
             {QStringLiteral("path"), file.absoluteFilePath()},
-            {QStringLiteral("icon"), is_folder ? QStringLiteral("folder") : kind.iconName()},
+            {QStringLiteral("icon"), is_folder ? folder_icon(file) : kind.iconName()},
             {QStringLiteral("genericIcon"), is_folder ? QStringLiteral("folder") : kind.genericIconName()},
             {QStringLiteral("isFolder"), is_folder},
             {QStringLiteral("isLauncher"), false},

@@ -1,6 +1,7 @@
 #include "folder-contents.hpp"
 
 #include <QDir>
+#include <QScopeGuard>
 #include <QFile>
 #include <QSignalSpy>
 #include <QTemporaryDir>
@@ -76,6 +77,45 @@ class TestFolderContents : public QObject
         QVERIFY(QDir().mkpath(desktop));
         write(desktop + QStringLiteral("/second.txt"), "two");
         QTRY_COMPARE_WITH_TIMEOUT(names(contents), QStringList{QStringLiteral("second.txt")}, 3000);
+    }
+
+    void aLinkToAUsualFolderShowsThatFoldersIcon()
+    {
+        QTemporaryDir home;
+        const QByteArray oldHome = qgetenv("HOME");
+        const QByteArray oldConfig = qgetenv("XDG_CONFIG_HOME");
+        qputenv("HOME", home.path().toUtf8());
+        qputenv("XDG_CONFIG_HOME", home.filePath(QStringLiteral(".config")).toUtf8());
+        auto restore = qScopeGuard([&] {
+            qputenv("HOME", oldHome);
+            qputenv("XDG_CONFIG_HOME", oldConfig);
+        });
+
+        QVERIFY(QDir().mkpath(home.filePath(QStringLiteral(".config"))));
+        write(home.filePath(QStringLiteral(".config/user-dirs.dirs")),
+            "XDG_DOWNLOAD_DIR=\"$HOME/Fetched\"\nXDG_MUSIC_DIR=\"$HOME/Tunes\"\nXDG_PICTURES_DIR=\"$HOME/\"\n");
+        for (const char* name : {"Fetched", "Tunes", "Desktop/Plain", "Desktop/Tunes copy"}) {
+            QVERIFY(QDir().mkpath(home.filePath(QString::fromLatin1(name))));
+        }
+        const QString desktop = home.filePath(QStringLiteral("Desktop"));
+        QVERIFY(QFile::link(home.filePath(QStringLiteral("Fetched")), desktop + QStringLiteral("/Downloads")));
+        QVERIFY(QFile::link(home.filePath(QStringLiteral("Tunes")), desktop + QStringLiteral("/Music")));
+        QVERIFY(QFile::link(home.path(), desktop + QStringLiteral("/Home")));
+
+        FolderContents contents;
+        contents.setPath(desktop);
+        QMap<QString, QString> icons;
+        for (const QVariant& entry : contents.entries()) {
+            const QVariantMap map = entry.toMap();
+            icons.insert(map.value(QStringLiteral("name")).toString(), map.value(QStringLiteral("icon")).toString());
+            QCOMPARE(map.value(QStringLiteral("genericIcon")).toString(), QStringLiteral("folder"));
+            QVERIFY(map.value(QStringLiteral("isFolder")).toBool());
+        }
+        QCOMPARE(icons.value(QStringLiteral("Downloads")), QStringLiteral("folder-download"));
+        QCOMPARE(icons.value(QStringLiteral("Music")), QStringLiteral("folder-music"));
+        QCOMPARE(icons.value(QStringLiteral("Home")), QStringLiteral("user-home"));
+        QCOMPARE(icons.value(QStringLiteral("Plain")), QStringLiteral("folder"));
+        QCOMPARE(icons.value(QStringLiteral("Tunes copy")), QStringLiteral("folder"));
     }
 };
 
