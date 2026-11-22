@@ -70,6 +70,7 @@ Item {
         if (!enabled) {
             return
         }
+        console.info(`[sounds] play event=${event}`)
         if (chosenAlert !== "" && alertEvents.includes(event)
                 && pack.sounds["alert-" + chosenAlert] !== undefined) {
             event = "alert-" + chosenAlert

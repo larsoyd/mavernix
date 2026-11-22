@@ -27,7 +27,8 @@ EVENT_SOUNDS = {
     "device-added": f"{SYSTEM_SOUNDS}/system/Volume Mount.aif",
     "device-removed": f"{SYSTEM_SOUNDS}/system/Volume Unmount.aif",
     # Events the naming specification has no name for; the names are ours.
-    "file-trash": f"{SYSTEM_SOUNDS}/finder/move to trash.aif",
+    # finder plays the dock's sound when it moves files to the trash
+    "file-trash": f"{SYSTEM_SOUNDS}/dock/drag to trash.aif",
     "dock-item-trash": f"{SYSTEM_SOUNDS}/dock/drag to trash.aif",
     "dock-item-remove": f"{SYSTEM_SOUNDS}/dock/poof item off dock.aif",
 }

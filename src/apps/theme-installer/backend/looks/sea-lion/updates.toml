@@ -543,3 +543,10 @@ revision = 29
 
 [update.settings."desktop.icons"]
 move_ms = 350
+
+# Moving files to the trash makes the sound Finder makes.
+[[update]]
+revision = 30
+import_brings = [
+    "Moving files from the desktop to the Trash makes the sound Finder makes.",
+]

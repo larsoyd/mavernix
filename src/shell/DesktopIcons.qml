@@ -28,6 +28,7 @@ Item {
     required property var settings
     required property var userChoices
     required property var screen
+    required property var sounds
 
     readonly property var looks: (settings.theme.desktop ?? ({})).icons ?? null
     readonly property var wishes: settings.config.desktop_files ?? ({})
@@ -230,9 +231,22 @@ Item {
             pickNone()
         }
     }
+    // the sound comes once the files are in the trash, as finder's does
     function trashPicked() {
-        if (pickedPaths.length > 0) {
-            run(wishes.trash_command, pickedPaths)
+        if (pickedPaths.length > 0 && (wishes.trash_command ?? []).length > 0) {
+            trashing.createObject(icons, { command: wishes.trash_command.concat(pickedPaths) })
+        }
+    }
+    Component {
+        id: trashing
+        Process {
+            running: true
+            onExited: code => {
+                if (code === 0) {
+                    icons.sounds.play("file-trash")
+                }
+                destroy()
+            }
         }
     }
     function duplicatePicked() {

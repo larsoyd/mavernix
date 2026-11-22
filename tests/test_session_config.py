@@ -791,6 +791,14 @@ class TestSeaLionUpdates(unittest.TestCase):
         import inspect
         self.assertIn("{DESKTOP_ICON_MOTION_LINES}", inspect.getsource(self.make_theme.build_theme_text))
 
+    def test_moving_files_to_the_trash_sounds_as_finder_does(self):
+        import make_sounds
+        # finder's move to trash task plays system sound 0x10, drag to trash.aif
+        self.assertTrue(make_sounds.EVENT_SOUNDS["file-trash"].endswith("/dock/drag to trash.aif"))
+        self.assertIn(30, self.updates)
+        self.assertEqual(len(self.updates[30]["import_brings"]), 1)
+        self.assertNotIn("settings", self.updates[30])
+
     def test_titles_are_built_as_os_x_builds_its_letters_in_both_looks(self):
         made = tomllib.loads(self.make_theme.TITLE_SMOOTHING_LINES)
         self.assertEqual(made, {"title_smoothing": "subpixel"})

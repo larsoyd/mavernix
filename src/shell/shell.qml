@@ -101,6 +101,7 @@ ShellRoot {
             fill: shell.desktopFill
             onPictureFailed: shell.unreadablePicture = shell.chosenPicture
             showsFiles: modelData === shell.mainScreen
+            soundPlayer: sounds
             // (Not named `userChoices` there, which would shadow this id.)
             choices: userChoices
         }
