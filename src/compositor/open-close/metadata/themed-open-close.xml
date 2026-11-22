@@ -2,12 +2,19 @@
 <wayfire>
 	<plugin name="themed-open-close">
 		<_short>Themed Open and Close</_short>
-		<_long>Adds the effect "pop" for opening and closing windows to the animate plugin: the window grows to its size from a little smaller as it fades in. Choose it with animate's open_animation and close_animation options.</_long>
+		<_long>Adds the effect "pop" for opening and closing windows to the animate plugin: the window grows to its size from a little smaller as it fades in. Choose it with animate's open_animation and close_animation options. A window the desktop expects from one of its icons grows out of that icon instead, and the effect "icon-zoom" takes it back into the icon as it closes while every other window closes at once.</_long>
 		<category>Effects</category>
 		<option name="pop_duration" type="animation">
 			<_short>Pop duration</_short>
 			<_long>How long the pop effect takes, and its curve.</_long>
 			<default>200ms circle</default>
+		</option>
+		<option name="icon_zoom_ms" type="int">
+			<_short>Icon zoom duration</_short>
+			<_long>How long a window takes to grow out of a desktop icon or back into it, in milliseconds, eased in and out.</_long>
+			<default>200</default>
+			<min>1</min>
+			<max>2000</max>
 		</option>
 	</plugin>
 </wayfire>

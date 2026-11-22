@@ -197,15 +197,18 @@ def animation_sections(theme):
 
     # Wayfire has one duration per kind of effect, shared by opening and closing.
     durations = {}
+    # windows opened from a desktop icon grow out of it, a way without its own effect takes icon-zoom
+    icon_zoom = animations.get("icon_zoom")
     for name, option in (("window_open", "open_animation"), ("window_close", "close_animation")):
         animation = animations.get(name, {"kind": "none"})
         kind = animation.get("kind", "none")
         if kind not in WAYFIRE_WINDOW_KINDS + OUR_WINDOW_KINDS + ("none",):
             fail(f'animation.{name}.kind is "{kind}"; it must be one of '
                  f'{", ".join(WAYFIRE_WINDOW_KINDS + OUR_WINDOW_KINDS)} or "none"')
-        animate.append(f"{option} = {kind}")
         if kind == "none":
+            animate.append(f"{option} = {'icon-zoom' if icon_zoom else 'none'}")
             continue
+        animate.append(f"{option} = {kind}")
 
         curve = animation.get("curve", "linear")
         if curve not in WAYFIRE_CURVES:
@@ -219,6 +222,8 @@ def animation_sections(theme):
     ours = ["[themed-open-close]"]
     for kind, duration in durations.items():
         (ours if kind in OUR_WINDOW_KINDS else animate).append(f"{kind}_duration = {duration}")
+    if icon_zoom:
+        ours.append(f"icon_zoom_ms = {icon_zoom['duration_ms']}")
     if len(ours) > 1:
         plugins.append("themed-open-close")
         sections.append(ours)

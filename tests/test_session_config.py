@@ -548,6 +548,43 @@ class TestWindowAnimations(SessionTestCase):
         self.assertIn(["[themed-open-close]", "pop_duration = 120ms circle"], sections)
 
 
+    def icon_zoom(self, theme):
+        sys.path[:0] = [self.folder.name, str(SESSION_SOURCE_DIR)]
+        try:
+            import make_wayfire_config
+        finally:
+            del sys.path[:2]
+        return make_wayfire_config.animation_sections(theme)
+
+    def test_windows_from_desktop_icons_zoom_out_and_back(self):
+        theme = {"animation": {"window_open": {"kind": "pop", "duration_ms": 120, "curve": "ease-out"},
+                               "icon_zoom": {"duration_ms": 200}}}
+        sections, plugins = self.icon_zoom(theme)
+        self.assertIn("themed-open-close", plugins)
+        self.assertIn("open_animation = pop", sections[0])
+        # every other window still closes at once
+        self.assertIn("close_animation = icon-zoom", sections[0])
+        self.assertIn(["[themed-open-close]", "pop_duration = 120ms circle", "icon_zoom_ms = 200"], sections)
+
+    def test_an_icon_zoom_alone_takes_both_ways(self):
+        sections, plugins = self.icon_zoom({"animation": {"icon_zoom": {"duration_ms": 200}}})
+        self.assertIn("themed-open-close", plugins)
+        self.assertIn("open_animation = icon-zoom", sections[0])
+        self.assertIn("close_animation = icon-zoom", sections[0])
+        self.assertIn(["[themed-open-close]", "icon_zoom_ms = 200"], sections)
+
+    def test_a_themes_own_close_stays(self):
+        theme = {"animation": {"window_close": {"kind": "fade", "duration_ms": 100, "curve": "linear"},
+                               "icon_zoom": {"duration_ms": 200}}}
+        sections, _ = self.icon_zoom(theme)
+        self.assertIn("close_animation = fade", sections[0])
+
+    def test_no_icon_zoom_leaves_closing_alone(self):
+        sections, plugins = self.icon_zoom({"animation": {}})
+        self.assertIn("close_animation = none", sections[0])
+        self.assertNotIn("themed-open-close", plugins)
+
+
 class TestUncoveredColour(SessionTestCase):
     def test_pushed_desktop_uncovers_the_lists_colour(self):
         sys.path[:0] = [self.folder.name, str(SESSION_SOURCE_DIR)]
@@ -790,6 +827,15 @@ class TestSeaLionUpdates(unittest.TestCase):
         self.assertEqual(update["settings"], {"desktop.icons": made})
         import inspect
         self.assertIn("{DESKTOP_ICON_MOTION_LINES}", inspect.getsource(self.make_theme.build_theme_text))
+
+    def test_older_themes_get_the_imports_icon_zoom(self):
+        import inspect
+        made = tomllib.loads(self.make_theme.ICON_ZOOM_TABLE)
+        self.assertEqual(made, {"animation": {"icon_zoom": {"duration_ms": 200}}})
+        self.assertIn(31, self.updates)
+        self.assertEqual(self.updates[31]["settings"], {"animation.icon_zoom": made["animation"]["icon_zoom"]})
+        self.assertNotIn("themes", self.updates[31])
+        self.assertIn("{ICON_ZOOM_TABLE}", inspect.getsource(self.make_theme.build_theme_text))
 
     def test_moving_files_to_the_trash_sounds_as_finder_does(self):
         import make_sounds

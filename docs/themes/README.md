@@ -222,6 +222,13 @@ curve = "ease-out"
   - For `window_resize`: `"blend"`. This is for a window that jumps to a new size in one go, like when it's made as large as the screen and back, or put on half of it. The window's old picture is stretched to the new size while the new one fades in over it. Without the table, the change is instant.
 - `curve` is one of `"linear"`, `"ease-in"`, `"ease-out"`, `"ease-in-out"`. The compositor has no real ease-in, so it uses ease-in-out instead.
 
+```toml
+[animation.icon_zoom]
+duration_ms = 200
+```
+
+With this table, a file or folder opened from a desktop icon has its window grow out of that icon, and closing that window shrinks it back into the icon, wherever the icon is by then. It's eased in and out. A window whose icon has gone, or that came from somewhere else, opens with `window_open` and closes with `window_close`. When either of those is `"none"`, the other windows still appear and go at once.
+
 ### A dock that hides itself
 
 ```toml

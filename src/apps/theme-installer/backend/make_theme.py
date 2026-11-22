@@ -411,6 +411,8 @@ SOURCE_LISTS_LINE = 'source_lists = ["KFilePlacesView", "KateFileTree"]\n'
 DESKTOP_BAND_LINE = 'band = { color = "#ffffff26", border_color = "#ffffff91", border_width = 1, fade_ms = 200 }\n'
 
 # finder moves desktop icons to their places over 350 ms, eased in and out
+# and grows a folder's or a document's window out of its icon in 200 ms
+ICON_ZOOM_TABLE = "[animation.icon_zoom]\nduration_ms = 200\n"
 DESKTOP_ICON_MOTION_LINES = "move_ms = 350\n"
 
 
@@ -2121,6 +2123,7 @@ kind = "pop"
 duration_ms = 200
 curve = "ease-out"
 
+{ICON_ZOOM_TABLE}
 [animation.window_resize]
 kind = "blend"
 duration_ms = 320
