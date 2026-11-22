@@ -6,6 +6,7 @@
 #include <QDir>
 #include <QFile>
 #include <QFileInfo>
+#include <QHash>
 #include <QMimeDatabase>
 #include <QMimeType>
 #include <QStandardPaths>
@@ -72,21 +73,16 @@ struct launcher_t
     QString icon;
 };
 
-static std::optional<launcher_t> launcher_in(const QFileInfo& file)
+// the keys of a file's [Desktop Entry] group
+static QHash<QString, QString> desktop_entry(const QString& path)
 {
-    if (file.suffix() != QLatin1String("desktop") || !file.isFile() || !file.isExecutable())
-    {
-        return std::nullopt;
-    }
-    QFile entry(file.absoluteFilePath());
+    QHash<QString, QString> keys;
+    QFile entry(path);
     if (!entry.open(QIODevice::ReadOnly | QIODevice::Text))
     {
-        return std::nullopt;
+        return keys;
     }
-
-    launcher_t launcher;
     bool in_entry_group = false;
-    bool is_application = false;
     while (!entry.atEnd())
     {
         const QString line = QString::fromUtf8(entry.readLine()).trimmed();
@@ -95,34 +91,39 @@ static std::optional<launcher_t> launcher_in(const QFileInfo& file)
             in_entry_group = line == QLatin1String("[Desktop Entry]");
             continue;
         }
-        if (!in_entry_group)
+        const qsizetype equals = line.indexOf(QLatin1Char('='));
+        if (in_entry_group && equals > 0)
         {
-            continue;
-        }
-        if (line.startsWith(QLatin1String("Name=")))
-        {
-            launcher.name = line.mid(5);
-        }
-        else if (line.startsWith(QLatin1String("Icon=")))
-        {
-            launcher.icon = line.mid(5);
-        }
-        else if (line == QLatin1String("Type=Application"))
-        {
-            is_application = true;
+            keys.insert(line.left(equals), line.mid(equals + 1));
         }
     }
-    if (!is_application || launcher.name.isEmpty())
+    return keys;
+}
+
+static std::optional<launcher_t> launcher_in(const QFileInfo& file)
+{
+    if (file.suffix() != QLatin1String("desktop") || !file.isFile() || !file.isExecutable())
+    {
+        return std::nullopt;
+    }
+    const QHash<QString, QString> keys = desktop_entry(file.absoluteFilePath());
+    const launcher_t launcher{keys.value(QStringLiteral("Name")), keys.value(QStringLiteral("Icon"))};
+    if (keys.value(QStringLiteral("Type")) != QLatin1String("Application") || launcher.name.isEmpty())
     {
         return std::nullopt;
     }
     return launcher;
 }
 
-// a link to home or one of its usual folders shows that folder's own picture
+// the icon the folder names for itself, else home's or a usual folder's own picture
 static QString folder_icon(const QFileInfo& file)
 {
     const QString target = file.canonicalFilePath();
+    const QString own = desktop_entry(target + QStringLiteral("/.directory")).value(QStringLiteral("Icon"));
+    if (!own.isEmpty())
+    {
+        return own;
+    }
     const QString home = QFileInfo(QDir::homePath()).canonicalFilePath();
     if (target == home)
     {

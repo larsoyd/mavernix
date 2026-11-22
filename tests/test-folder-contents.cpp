@@ -117,6 +117,31 @@ class TestFolderContents : public QObject
         QCOMPARE(icons.value(QStringLiteral("Plain")), QStringLiteral("folder"));
         QCOMPARE(icons.value(QStringLiteral("Tunes copy")), QStringLiteral("folder"));
     }
+
+    void aFolderShowsTheIconItsDirectoryFileNames()
+    {
+        QTemporaryDir home;
+        for (const char* name : {"code", "Desktop/Sketches", "Desktop/Other group"}) {
+            QVERIFY(QDir().mkpath(home.filePath(QString::fromLatin1(name))));
+        }
+        write(home.filePath(QStringLiteral("code/.directory")), "[Desktop Entry]\nIcon=folder-development\n");
+        write(home.filePath(QStringLiteral("Desktop/Sketches/.directory")),
+            "[Settings]\nIcon=wrong\n\n[Desktop Entry]\nIcon=folder-pictures\n");
+        write(home.filePath(QStringLiteral("Desktop/Other group/.directory")), "[Dolphin]\nIcon=wrong\n");
+        const QString desktop = home.filePath(QStringLiteral("Desktop"));
+        QVERIFY(QFile::link(home.filePath(QStringLiteral("code")), desktop + QStringLiteral("/git")));
+
+        FolderContents contents;
+        contents.setPath(desktop);
+        QMap<QString, QString> icons;
+        for (const QVariant& entry : contents.entries()) {
+            const QVariantMap map = entry.toMap();
+            icons.insert(map.value(QStringLiteral("name")).toString(), map.value(QStringLiteral("icon")).toString());
+        }
+        QCOMPARE(icons.value(QStringLiteral("git")), QStringLiteral("folder-development"));
+        QCOMPARE(icons.value(QStringLiteral("Sketches")), QStringLiteral("folder-pictures"));
+        QCOMPARE(icons.value(QStringLiteral("Other group")), QStringLiteral("folder"));
+    }
 };
 
 QTEST_GUILESS_MAIN(TestFolderContents)
