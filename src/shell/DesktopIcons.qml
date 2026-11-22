@@ -307,6 +307,17 @@ Item {
     }
 
     property string renamingPath: ""
+    // a second slow click on the name of the one picked file renames it, once a double click is ruled out
+    Timer {
+        id: renameSoon
+        property string path: ""
+        interval: Qt.styleHints.mouseDoubleClickInterval
+        onTriggered: {
+            if (icons.pickedPaths.length === 1 && icons.pickedPaths[0] === path) {
+                icons.startRenaming()
+            }
+        }
+    }
     function startRenaming() {
         if (pickedPaths.length === 1 && (wishes.rename_command ?? []).length > 0) {
             renamingPath = pickedPaths[0]
@@ -369,6 +380,7 @@ Item {
 
         onPressed: mouse => {
             icons.forceActiveFocus()
+            renameSoon.stop()
             if (mouse.button === Qt.RightButton) {
                 icons.pickNone()
                 icons.openMenu("desktop", mouse.x, mouse.y)
@@ -656,9 +668,14 @@ Item {
                 acceptedButtons: Qt.LeftButton | Qt.RightButton
                 drag.target: carried
 
+                property bool armsRename: false
                 onPressed: mouse => {
                     icons.forceActiveFocus()
+                    renameSoon.stop()
                     const path = fileItem.modelData.path
+                    armsRename = mouse.button === Qt.LeftButton && mouse.modifiers === Qt.NoModifier
+                        && fileItem.picked && icons.pickedPaths.length === 1 && icons.frontmost
+                        && mouse.y >= namePlate.y
                     if (mouse.button === Qt.LeftButton) {
                         const held = mapToItem(fileItem, mouse.x, mouse.y)
                         fileItem.takeDragPicture(held.x, held.y)
@@ -682,6 +699,10 @@ Item {
                     if (mouse.button === Qt.LeftButton
                         && (mouse.modifiers & (Qt.ControlModifier | Qt.ShiftModifier)) === 0) {
                         icons.pickOnly(fileItem.modelData.path)
+                    }
+                    if (armsRename) {
+                        renameSoon.path = fileItem.modelData.path
+                        renameSoon.restart()
                     }
                 }
                 onDoubleClicked: mouse => {
