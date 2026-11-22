@@ -551,6 +551,9 @@ rename_command = ["gio", "rename"]
 new_folder_command = ["mavernix-file-action", "new-folder"]
 move_in_command = ["mavernix-file-action", "move-into"]
 duplicate_command = ["mavernix-file-action", "duplicate"]
+# Space shows the picked files with preview_command, given their paths. None
+# is set here, so Space does nothing.
+# preview_command = ["some-previewer"]
 background_command = ["mavernix-settings", "desktop"]
 
 [desktop_files.words]

@@ -312,6 +312,14 @@ desktop_icon_motion_test = executable(
 )
 test('desktop-icon-motion', desktop_icon_motion_test, env: {'QT_QPA_PLATFORM': 'offscreen'})
 
+desktop_keys_test = executable(
+    'test-desktop-keys',
+    ['test-desktop-keys.cpp', qt.compile_moc(sources: 'test-desktop-keys.cpp', dependencies: qt_test)],
+    dependencies: [qt_test, dependency('qt6', modules: ['Core', 'Qml'])],
+    cpp_args: ['-DSHELL_DIR="' + (meson.project_source_root() / 'src' / 'shell') + '"'],
+)
+test('desktop-keys', desktop_keys_test, env: {'QT_QPA_PLATFORM': 'offscreen'})
+
 dock_screen_test = executable(
     'test-dock-screen',
     ['test-dock-screen.cpp', qt.compile_moc(sources: 'test-dock-screen.cpp', dependencies: qt_test)],

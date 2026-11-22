@@ -13,6 +13,7 @@ import Quickshell.Io
 import Quickshell.Wayland
 import Shell.Native
 import "DesktopPlaces.js" as DesktopPlaces
+import "DesktopKeys.js" as DesktopKeys
 import "DesktopShortcut.js" as DesktopShortcut
 import "DroppedFiles.js" as DroppedFiles
 import "ThemeValues.js" as ThemeValues
@@ -413,8 +414,62 @@ Item {
     focus: true
     Keys.onDeletePressed: trashPicked()
     Keys.onEscapePressed: pickNone()
-    Keys.onSpacePressed: quickLook()
+    Keys.onSpacePressed: previewPicked()
     Keys.onReturnPressed: startRenaming()
+    Keys.onPressed: event => {
+        const arrows = { [Qt.Key_Left]: "left", [Qt.Key_Right]: "right", [Qt.Key_Up]: "up", [Qt.Key_Down]: "down" }
+        const control = (event.modifiers & Qt.ControlModifier) !== 0
+        if (arrows[event.key] !== undefined) {
+            movePick(arrows[event.key], (event.modifiers & Qt.ShiftModifier) !== 0)
+        } else if (control && event.key === Qt.Key_A) {
+            pickedPaths = entries.map(entry => entry.path)
+        } else if (control && event.key === Qt.Key_O) {
+            openPicked()
+        } else if (control && event.key === Qt.Key_D) {
+            duplicatePicked()
+        } else if (control && event.key === Qt.Key_Backspace) {
+            trashPicked()
+        } else if (!control && (event.modifiers & (Qt.AltModifier | Qt.MetaModifier)) === 0
+                   && event.text.trim() !== "") {
+            typeToPick(event.text)
+        } else {
+            return
+        }
+        event.accepted = true
+    }
+
+    // arrows move the pick to the nearest icon that way, shift adds it
+    function movePick(direction, adding) {
+        const from = entries.findIndex(entry => entry.path === pickedPaths[pickedPaths.length - 1])
+        const to = DesktopKeys.next(places, from, direction)
+        if (to < 0) {
+            return
+        }
+        const path = entries[to].path
+        pickedPaths = adding ? pickedPaths.filter(other => other !== path).concat([path]) : [path]
+    }
+
+    // letters typed close together spell the start of a name
+    property string typedSoFar: ""
+    Timer {
+        id: typingPause
+        interval: 1000
+        onTriggered: icons.typedSoFar = ""
+    }
+    function typeToPick(text) {
+        typedSoFar += text
+        typingPause.restart()
+        const found = DesktopKeys.typed(entries.map(entry => entry.name), typedSoFar)
+        if (found >= 0) {
+            pickOnly(entries[found].path)
+        }
+    }
+
+    function previewPicked() {
+        if (pickedPaths.length > 0) {
+            run(wishes.preview_command, pickedPaths)
+        }
+    }
 
     // --- The icons -------------------------------------------------------------------------
 

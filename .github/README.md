@@ -42,6 +42,7 @@ To build it, check out `larsoyd` and follow [docs/building.md](../docs/building.
 - Holding Super alone while dropping desktop icons turns Snap to Grid the other way for that drop, as Command does in Finder.
 - Moving desktop files to the trash plays the theme's trash sound once they are there.
 - A folder or file opened from the desktop grows its window out of the icon and shrinks back into it when closed. A program opened from its icon leaves a fading ghost of the icon.
+- On the desktop the arrow keys move the pick (Shift adds to it), typing a name picks it, Ctrl+A picks everything, Ctrl+O opens, Ctrl+D duplicates and Ctrl+Backspace moves to the trash. Space hands the pick to a previewer when one is set.
 
 ### Menu bar
 
