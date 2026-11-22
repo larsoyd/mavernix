@@ -5,7 +5,7 @@
   <a href="https://github.com/larsoyd/mavernix/blob/main/README.md">Project README</a> · <a href="https://github.com/Mavernix/mavernix">Upstream</a> · <a href="https://github.com/larsoyd/mavernix/tree/main">main branch</a>
 </p>
 
-This is the `larsoyd` branch of a fork of [Mavernix](https://github.com/Mavernix/mavernix). The `main` branch mirrors upstream exactly. This branch sits on top of the latest upstream release and is rebased onto each new one.
+This is the `larsoyd` branch of a fork of [Mavernix](https://github.com/Mavernix/mavernix) with my own opinionated tweaks and additions. The `main` branch mirrors upstream exactly. This branch sits on top of the latest upstream release and is rebased onto each new one.
 
 For what Mavernix is, how to install it and how to use it, read the [project README on main](https://github.com/larsoyd/mavernix/blob/main/README.md). This page only covers how this branch differs.
 
