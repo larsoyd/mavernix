@@ -44,22 +44,23 @@ function onGrid(grid, kept, moving) {
 }
 
 // null in put means not placed by hand, those flow into slots nobody covers
-// on the grid the hand placed ones get their nearest free slots first
+// on the grid the hand placed ones not loose get their nearest free slots first
 function places(grid, put, snap) {
     const result = put.slice()
-    const putPlaces = result.filter(place => place !== null)
+    const snapped = result.filter(place => place !== null && snap && !place.loose)
+    const kept = result.filter(place => place !== null && !snapped.includes(place))
     const taken = {}
-    if (snap) {
-        const slots = freeSlots(grid, putPlaces, taken)
-        for (let index = 0; index < result.length; index++) {
-            if (result[index] !== null) {
-                result[index] = slotPlace(grid, slots.shift())
-            }
-        }
-    } else {
-        const slotsToCheck = result.length + 4 * putPlaces.length
-        for (let slot = 0; slot < slotsToCheck; slot++) {
-            taken[slot] = putPlaces.some(place => coversSlot(grid, place, slot))
+    // far enough for the flow and for every slot a snapped icon can reach
+    const farthest = Math.max(0, ...result.filter(place => place !== null)
+                                         .map(place => slotAt(grid, place.x, place.y) + 2 * grid.rows))
+    const slotsToCheck = Math.max(result.length + 4 * kept.length, farthest)
+    for (let slot = 0; slot < slotsToCheck; slot++) {
+        taken[slot] = kept.some(place => coversSlot(grid, place, slot))
+    }
+    const slots = freeSlots(grid, snapped, taken)
+    for (let index = 0; index < result.length; index++) {
+        if (snapped.includes(result[index])) {
+            result[index] = slotPlace(grid, slots[snapped.indexOf(result[index])])
         }
     }
     let slot = 0

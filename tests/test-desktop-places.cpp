@@ -18,6 +18,12 @@ class TestDesktopPlaces : public QObject
 
     static QVariant at(int x, int y) { return QVariantMap{{QStringLiteral("x"), x}, {QStringLiteral("y"), y}}; }
 
+    // put off the grid on purpose, so the grid leaves it there
+    static QVariant loose(int x, int y)
+    {
+        return QVariantMap{{QStringLiteral("x"), x}, {QStringLiteral("y"), y}, {QStringLiteral("loose"), true}};
+    }
+
     QVariantList call(const char* function, const QVariantList& arguments)
     {
         QVariant result;
@@ -84,6 +90,16 @@ class TestDesktopPlaces : public QObject
     void theGridLetsOthersFlowIntoTheSlotsBesidePutIcons()
     {
         QCOMPARE(text(places({at(880, 30), none(), none()}, true)), QStringLiteral("916,30 916,126 916,222"));
+    }
+
+    void theGridLeavesALooseIconWhereItWasPut()
+    {
+        QCOMPARE(text(places({loose(734, 298), at(720, 330)}, true)), QStringLiteral("734,298 724,414"));
+    }
+
+    void theGridLetsOthersFlowAroundALooseIcon()
+    {
+        QCOMPARE(text(places({loose(868, 30), none(), none()}, true)), QStringLiteral("868,30 916,126 916,222"));
     }
 
     void theGridKeepsAnIconBelowTheLastRowInTheLastRow()

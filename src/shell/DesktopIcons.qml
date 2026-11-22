@@ -89,7 +89,7 @@ Item {
     // one place per entry, same order
     readonly property var places: DesktopPlaces.places(grid, entries.map(entry => {
         const put = putByHand[entry.name]
-        return put === undefined ? null : { x: width - put[0], y: put[1] }
+        return put === undefined ? null : { x: width - put[0], y: put[1], loose: put[2] === true }
     }), snapToGrid)
     function iconX(index) {
         return places[index]?.x ?? 0
@@ -105,7 +105,8 @@ Item {
         for (const entry of entries) {
             const place = moved[entry.name]
             if (place !== undefined) {
-                next[entry.name] = [Math.round(width - place.x), Math.round(place.y)]
+                const stored = [Math.round(width - place.x), Math.round(place.y)]
+                next[entry.name] = place.loose ? stored.concat([true]) : stored
             } else if (putByHand[entry.name] !== undefined) {
                 next[entry.name] = putByHand[entry.name]
             }
@@ -115,30 +116,46 @@ Item {
 
     // dragged icon's middle lands at the point, all picked ones stay on screen
     // and under the panel, on the grid they take free slots
-    function movePicked(draggedPath, middleX, middleY) {
+    function dropPicked(draggedPath, middleX, middleY) {
         const draggedIndex = entries.findIndex(entry => entry.path === draggedPath)
         if (draggedIndex < 0) {
             return
         }
         const byX = middleX - iconSize / 2 - iconX(draggedIndex)
         const byY = middleY - iconSize / 2 - iconY(draggedIndex)
-        const names = []
-        const dropped = []
-        const kept = []
+        const drop = { names: [], dropped: [], kept: [] }
         for (let index = 0; index < entries.length; index++) {
             if (isPicked(entries[index].path)) {
                 const point = { x: Math.max(0, Math.min(width - iconSize, iconX(index) + byX)),
                                 y: Math.max(topRoom, Math.min(height - iconSize, iconY(index) + byY)) }
-                names.push(entries[index].name)
-                dropped.push(point)
+                drop.names.push(entries[index].name)
+                drop.dropped.push(point)
                 // put down where the drag let go, so only the snap glides
                 iconItems.itemAt(index)?.jump(point)
             } else if (putByHand[entries[index].name] !== undefined) {
-                kept.push(places[index])
+                drop.kept.push(places[index])
             }
         }
-        glideNext()
-        rememberPlaces(placesByName(names, snapToGrid ? DesktopPlaces.onGrid(grid, kept, dropped) : dropped))
+        pendingDrop = drop
+        heldKeys.check()
+    }
+    property var pendingDrop: null
+    // super alone held at the drop turns the grid the other way for it, as command does in finder
+    HeldKeys {
+        id: heldKeys
+        onChecked: held => {
+            const drop = icons.pendingDrop
+            icons.pendingDrop = null
+            if (drop === null) {
+                return
+            }
+            const commandAlone = held.super && !held.alt && !held.ctrl && !held.shift
+            const snap = commandAlone ? !icons.snapToGrid : icons.snapToGrid
+            const loose = drop.dropped.map(point => ({ x: point.x, y: point.y, loose: icons.snapToGrid }))
+            icons.glideNext()
+            icons.rememberPlaces(icons.placesByName(drop.names,
+                snap ? DesktopPlaces.onGrid(icons.grid, drop.kept, drop.dropped) : loose))
+        }
     }
 
     // Snaps every hand-placed icon to its nearest free slot.
@@ -321,7 +338,7 @@ Item {
             }
             // The desktop's own icon dropped here is placed; other files are moved in.
             if (icons.carriedPath !== "" && paths.includes(icons.carriedPath)) {
-                icons.movePicked(icons.carriedPath, drop.x, drop.y)
+                icons.dropPicked(icons.carriedPath, drop.x, drop.y)
             } else {
                 icons.takeIn(paths)
             }

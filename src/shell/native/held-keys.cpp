@@ -125,6 +125,27 @@ void HeldKeys::answered(bool held)
     emit letGo();
 }
 
+void HeldKeys::check()
+{
+    if (!compositor.isConnected())
+    {
+        emit checked(allAsQtSees());
+        return;
+    }
+    compositor.request("held-modifiers/get", {}, [this](const QJsonObject& answer) {
+        emit checked(answer.contains("error") ? allAsQtSees() : answer.toVariantMap());
+    });
+}
+
+QVariantMap HeldKeys::allAsQtSees()
+{
+    const Qt::KeyboardModifiers now = QGuiApplication::queryKeyboardModifiers();
+    return {{QStringLiteral("super"), now.testFlag(Qt::MetaModifier)},
+        {QStringLiteral("alt"), now.testFlag(Qt::AltModifier)},
+        {QStringLiteral("ctrl"), now.testFlag(Qt::ControlModifier)},
+        {QStringLiteral("shift"), now.testFlag(Qt::ShiftModifier)}};
+}
+
 bool HeldKeys::heldAsQtSees() const
 {
     const Qt::KeyboardModifiers now = QGuiApplication::queryKeyboardModifiers();

@@ -17,6 +17,7 @@
 #include <QObject>
 #include <QString>
 #include <QTimer>
+#include <QVariantMap>
 
 #include "compositor-socket.hpp"
 
@@ -34,17 +35,22 @@ class HeldKeys : public QObject
     void setModifier(const QString& modifier);
     bool watching() const { return isWatching; }
     void setWatching(bool watching);
+    // asks once which modifiers are held, answered by checked
+    Q_INVOKABLE void check();
 
   signals:
     void modifierChanged();
     void watchingChanged();
     // The modifier is not held (any more); once per watch.
     void letGo();
+    // super, alt, ctrl and shift, each true while held
+    void checked(const QVariantMap& held);
 
   private:
     void ask();
     void answered(bool held);
     bool heldAsQtSees() const;
+    static QVariantMap allAsQtSees();
 
     CompositorSocket compositor;
     QTimer nextQuestion;
