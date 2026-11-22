@@ -432,6 +432,10 @@ def main():
     for program in ("wine", "wineserver", "Xvfb", "xwininfo"):
         if shutil.which(program) is None:
             sys.exit(f"refused: {program} is not installed")
+    # a fixture that was never built otherwise reads as a program that hangs
+    for built in sys.argv[1:5]:
+        if not os.path.exists(built):
+            sys.exit(f"refused: {built} is missing, build the test's targets first")
     home = tempfile.mkdtemp(prefix="wine-menu-")
     try:
         run(*(os.path.abspath(argument) for argument in sys.argv[1:5]), home)
