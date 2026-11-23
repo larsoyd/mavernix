@@ -722,8 +722,6 @@ Item {
                 })
                 // what follows the pointer: the picked icons as taken on press, else the icon for the file's kind
                 Drag.imageSource: icons.flockPicture !== "" ? icons.flockPicture : icons.iconSourceOf(fileItem.modelData)
-                Drag.imageSourceSize: icons.flockPicture !== "" ? Qt.size(flock.width, flock.height)
-                                                                : Qt.size(icons.iconSize, icons.iconSize)
                 Drag.hotSpot: icons.flockPicture !== "" ? icons.flockHold
                                                         : Qt.point(icons.iconSize / 2, icons.iconSize / 2)
                 Drag.onDragFinished: dropAction => {
