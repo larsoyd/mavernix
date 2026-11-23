@@ -80,4 +80,9 @@ launch_ms = 150
 drag_opacity = 0.85
 slide_back_ms = 250
 drag_badge = { size = 18, fill = { color = "#d0312d" }, text_color = "#ffffff" }
+# Optional: a drag that rests on a folder for spring_ms makes it blink three
+# times, spring_blink_ms apart, and then opens it, so files can be dropped
+# inside. Left out, folders never open by themselves.
+spring_ms = 700
+spring_blink_ms = 90
 ```

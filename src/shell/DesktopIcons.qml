@@ -70,6 +70,9 @@ Item {
     readonly property bool snapToGrid: userChoices.value("desktop_files", "snap_to_grid") ?? false
     readonly property bool deselectAfterOpening: userChoices.value("desktop_files", "deselect_after_opening") ?? false
 
+    // how long a drag rests on a folder before it springs open, none without it
+    readonly property int springMs: looks?.spring_ms ?? 0
+
     // icons glide only to places a person asked for, not when the screen changes size
     readonly property int moveMs: looks?.move_ms ?? 0
     property bool gliding: false
@@ -228,15 +231,16 @@ Item {
             leaveGhost(entries.findIndex(entry => entry.path === launcher))
         }
         // one at a time from its icon, so its window can grow out of it
-        const fromIcon = wishes.open_from_icon_command ?? []
-        if (fromIcon.length > 0) {
-            for (const file of files) {
-                run(fromIcon, [file, file])
-            }
+        if ((wishes.open_from_icon_command ?? []).length > 0) {
+            files.forEach(openFromIcon)
         } else if (files.length > 0) {
             run(wishes.open_command, files)
         }
         afterOpening()
+    }
+    function openFromIcon(file) {
+        const fromIcon = wishes.open_from_icon_command ?? []
+        run(fromIcon.length > 0 ? fromIcon : wishes.open_command, fromIcon.length > 0 ? [file, file] : [file])
     }
 
     // a program opened from its icon leaves a ghost that grows to twice its size as it fades
@@ -685,7 +689,7 @@ Item {
                 look: fileItem.name
                 text: fileItem.modelData.name
                 face: icons.fonts.desktop_icon ?? icons.fonts.interface
-                lit: fileItem.picked || fileDrop.containsDrag
+                lit: (fileItem.picked || fileDrop.containsDrag) && !fileItem.blinkedOff
                 picked: fileItem.picked
                 away: !icons.frontmost
                 lettersShown: icons.renamingPath !== fileItem.modelData.path
@@ -727,12 +731,46 @@ Item {
                 }
             }
 
+            // a drag held over a folder blinks it three times and opens it, as finder's spring loaded folders do
+            property int blinks: 0
+            readonly property bool blinkedOff: blinks % 2 === 1
+            readonly property bool springs: fileItem.modelData.isFolder && icons.springMs > 0
+            Timer {
+                id: springWait
+                interval: icons.springMs
+                onTriggered: springBlink.start()
+            }
+            Timer {
+                id: springBlink
+                interval: icons.looks?.spring_blink_ms ?? 83
+                repeat: true
+                triggeredOnStart: true
+                onTriggered: {
+                    if (fileItem.blinks < 3) {
+                        fileItem.blinks += 1
+                        return
+                    }
+                    stop()
+                    fileItem.blinks = 0
+                    icons.openFromIcon(fileItem.modelData.path)
+                }
+            }
+
             // Files dropped on a program launcher are given to its program; files
             // dropped on a folder are moved into it.
             DropArea {
                 id: fileDrop
                 enabled: fileItem.modelData.isLauncher || fileItem.modelData.isFolder
                 anchors.fill: parent
+                onContainsDragChanged: {
+                    springBlink.stop()
+                    fileItem.blinks = 0
+                    if (containsDrag && fileItem.springs) {
+                        springWait.restart()
+                    } else {
+                        springWait.stop()
+                    }
+                }
                 // An icon dragged over itself is left to the desktop, which places it.
                 onEntered: drag => {
                     if (icons.carriedPath !== "" && fileItem.picked) {
@@ -757,7 +795,7 @@ Item {
             }
             Fill {
                 readonly property real reach: icons.looks?.picked_reach ?? 4
-                visible: fileDrop.containsDrag
+                visible: fileDrop.containsDrag && !fileItem.blinkedOff
                 anchors.fill: parent
                 anchors.margins: -reach
                 fill: icons.looks?.picked ?? ({ color: "#00000040", radius: 4 })

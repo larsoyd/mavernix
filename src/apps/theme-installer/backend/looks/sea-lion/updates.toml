@@ -580,3 +580,11 @@ revision = 33
 drag_opacity = 0.85
 slide_back_ms = 280
 drag_badge = { size = 20, fill = { gradient = ["#f06060", "#f01c1c", "#e01111", "#ca0606"], border = { color = "#ffffff", width = 1 } }, text_color = "#ffffff" }
+
+# A drag resting on a desktop folder makes it blink and open, as Finder's spring-loaded folders do.
+[[update]]
+revision = 34
+
+[update.settings."desktop.icons"]
+spring_ms = 670
+spring_blink_ms = 83

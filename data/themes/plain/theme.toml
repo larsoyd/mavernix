@@ -757,3 +757,5 @@ band = { color = "#3a6ea540", border_color = "#3a6ea5", border_width = 1 }
 drag_opacity = 0.85
 slide_back_ms = 250
 drag_badge = { size = 18, fill = { color = "#d0312d" } }
+spring_ms = 700
+spring_blink_ms = 90

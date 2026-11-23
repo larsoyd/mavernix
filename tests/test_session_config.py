@@ -883,6 +883,14 @@ class TestSeaLionUpdates(unittest.TestCase):
         self.assertNotIn("themes", self.updates[33])
         self.assertIn("{DESKTOP_DRAG_LINES}", inspect.getsource(self.make_theme.build_theme_text))
 
+    def test_older_themes_get_spring_loaded_folders(self):
+        import inspect
+        made = tomllib.loads(self.make_theme.DESKTOP_SPRING_LINES)
+        # filmed on 10.9.5: the first blink 670 ms after arrival, then 83 ms apart
+        self.assertEqual(made, {"spring_ms": 670, "spring_blink_ms": 83})
+        self.assertEqual(self.updates[34]["settings"], {"desktop.icons": made})
+        self.assertIn("{DESKTOP_SPRING_LINES}", inspect.getsource(self.make_theme.build_theme_text))
+
     @staticmethod
     def inline(value):
         if isinstance(value, dict):
