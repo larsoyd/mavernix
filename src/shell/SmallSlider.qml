@@ -53,7 +53,7 @@ FocusScope {
         fill: ({ image: slider.pictures.track ?? "", slice: slider.pictures.track_slice ?? [0, 0, 0, 0] })
     }
     Rectangle {
-        visible: !track.visible
+        visible: !track.visible || track.missing
         x: 1
         y: 4
         width: slider.width - 3

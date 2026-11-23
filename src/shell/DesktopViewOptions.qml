@@ -16,12 +16,11 @@ PanelWindow {
     readonly property var font: settings.theme.fonts.view_options ?? settings.theme.fonts.interface
     readonly property string themeDirectory: settings.theme_directory
 
-    // room around the body for its shadow
-    readonly property real halo: 24
     readonly property real bodyWidth: look?.width ?? 201
     readonly property real titleHeight: look?.title_height ?? 16
     readonly property real bodyHeight: titleHeight + 250
 
+    // the whole screen with input on the body only, so a move is an item's and not the surface's
     screen: desktop.screen
     visible: look !== null && desktop.viewOptionsShown && ToplevelManager.activeToplevel === null
     color: "transparent"
@@ -31,15 +30,16 @@ PanelWindow {
     WlrLayershell.namespace: "mavernix-view-options"
     anchors {
         left: true
+        right: true
         top: true
+        bottom: true
     }
-    implicitWidth: bodyWidth + 2 * halo
-    implicitHeight: bodyHeight + 2 * halo
     mask: Region {
         item: body
     }
 
-    // the body's top left on the screen, where it was last put, kept inside the screen under the panel
+    // where it was last put, else where finder first shows it, kept on the screen under the menu bar
+    // finder's panel is 559 high and starts 736 from the left and 310 up
     readonly property real screenWidth: screen?.width ?? 1280
     readonly property real screenHeight: screen?.height ?? 720
     readonly property var stored: desktop.chosen("view_options_place") ?? null
@@ -47,12 +47,10 @@ PanelWindow {
     readonly property point place: {
         const wanted = dragged.x >= 0 ? dragged
             : stored !== null ? Qt.point(screenWidth - stored[0], stored[1])
-            : Qt.point(Math.round(screenWidth / 2 - bodyWidth / 2), Math.round(screenHeight / 4))
+            : Qt.point(736, screenHeight - 310 - 559)
         return Qt.point(Math.round(Math.max(0, Math.min(screenWidth - bodyWidth, wanted.x))),
                         Math.round(Math.max(desktop.topRoom, Math.min(screenHeight - bodyHeight, wanted.y))))
     }
-    margins.left: place.x - halo
-    margins.top: place.y - halo
 
     function close() {
         desktop.viewOptionsShown = false
@@ -74,8 +72,8 @@ PanelWindow {
 
     FocusScope {
         id: body
-        x: panel.halo
-        y: panel.halo
+        x: panel.place.x
+        y: panel.place.y
         width: panel.bodyWidth
         height: panel.bodyHeight
         focus: true
@@ -123,13 +121,16 @@ PanelWindow {
             }
             MouseArea {
                 anchors.fill: parent
+                // measured on the screen, which stays still while the panel follows
                 property point grip: Qt.point(0, 0)
                 onPressed: mouse => {
                     body.forceActiveFocus()
-                    grip = Qt.point(mouse.x, mouse.y)
+                    const at = mapToItem(null, mouse.x, mouse.y)
+                    grip = Qt.point(at.x - panel.place.x, at.y - panel.place.y)
                 }
                 onPositionChanged: mouse => {
-                    panel.dragged = Qt.point(panel.place.x + mouse.x - grip.x, panel.place.y + mouse.y - grip.y)
+                    const at = mapToItem(null, mouse.x, mouse.y)
+                    panel.dragged = Qt.point(at.x - grip.x, at.y - grip.y)
                 }
                 onReleased: {
                     panel.desktop.userChoices.set("desktop_files", "view_options_place",
@@ -197,6 +198,21 @@ PanelWindow {
                 sourceSize: Qt.size(width * Screen.devicePixelRatio, height * Screen.devicePixelRatio)
                 source: parent.icon
             }
+            // a grid of cells lines across, drawn when the theme has no picture of it
+            property int cells: 0
+            Repeater {
+                model: !endArt.ready && parent.cells > 0 ? 2 * (parent.cells + 1) : 0
+                Rectangle {
+                    required property int index
+                    readonly property bool across: index % 2 === 0
+                    readonly property real at: Math.round(Math.floor(index / 2) * (parent.width - 1) / parent.cells)
+                    x: across ? 0 : at
+                    y: across ? at : 0
+                    width: across ? parent.width : 1
+                    height: across ? 1 : parent.height
+                    color: ThemeValues.color(panel.look?.text_color ?? "#000000")
+                }
+            }
         }
 
         readonly property real below: panel.titleHeight - 16
@@ -251,6 +267,7 @@ PanelWindow {
             y: body.below + 89
             width: 16
             height: 16
+            cells: 3
             path: panel.look?.grid_small ?? ""
         }
         SmallSlider {
@@ -271,6 +288,7 @@ PanelWindow {
             y: body.below + 83
             width: 25
             height: 25
+            cells: 4
             path: panel.look?.grid_large ?? ""
         }
 
@@ -294,7 +312,7 @@ PanelWindow {
             font: panel.font
             settings: panel.settings
             screen: panel.screen
-            windowPlace: Qt.point(panel.place.x - panel.halo, panel.place.y - panel.halo)
+            windowPlace: Qt.point(0, 0)
             choices: [10, 11, 12, 13, 14, 15, 16].map(size => ({ value: size, label: String(size) }))
             value: panel.desktop.view.textSize
             onChosen: value => panel.desktop.chooseView("text_size", value)
@@ -369,7 +387,7 @@ PanelWindow {
             font: panel.font
             settings: panel.settings
             screen: panel.screen
-            windowPlace: Qt.point(panel.place.x - panel.halo, panel.place.y - panel.halo)
+            windowPlace: Qt.point(0, 0)
             // the panel's own order, which puts the dates before the last opened
             choices: {
                 const word = by => by === "none" ? panel.words.arrange_none : by === "grid" ? panel.words.snap_to_grid

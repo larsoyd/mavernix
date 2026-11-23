@@ -56,7 +56,7 @@ FocusScope {
                  slice: button.pictures.slice ?? [0, 0, 0, 0] })
     }
     Rectangle {
-        visible: !art.visible
+        visible: !art.visible || art.missing
         x: 1
         y: 1
         width: parent.width - 2

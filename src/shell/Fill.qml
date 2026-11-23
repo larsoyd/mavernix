@@ -100,9 +100,13 @@ Item {
         asynchronous: true
     }
 
+    // a stretched picture the theme names but that cannot be read, for callers that draw a stand-in
+    readonly property bool missing: isImage && !coversArea && sliced.status === Image.Error
+
     // A stretched picture: `slice` edges keep their size. Qt picks an
     // "@2x" file by itself on double-density displays.
     BorderImage {
+        id: sliced
         anchors.fill: parent
         visible: root.isImage && !root.coversArea
         source: visible ? root.imageAddress : ""
