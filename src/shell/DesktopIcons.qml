@@ -499,8 +499,6 @@ Item {
             required property int index
             readonly property bool picked: icons.isPicked(modelData.path)
             readonly property var name: icons.looks?.name ?? ({})
-            readonly property var plate: (icons.frontmost ? undefined : name.away_background)
-                                         ?? name.picked_background ?? ({ color: "#3a6ea5", radius: 4 })
 
             place: Qt.point(icons.iconX(index), icons.iconY(index))
             duration: icons.gliding ? icons.moveMs : 0
@@ -536,94 +534,18 @@ Item {
             }
 
             // finder's name bubble shows while picked or while something is dragged over it
-            readonly property bool lit: picked || fileDrop.containsDrag
-            readonly property var face: icons.fonts.desktop_icon ?? icons.fonts.interface
-            readonly property real room: name.most_width ?? 110
-            DesktopNameLines {
-                id: nameLines
-                text: fileItem.modelData.name
-                most: fileItem.name.lines ?? 1
-                room: fileItem.room
-                font: nameMetrics.font
-            }
-            FontMetrics {
-                id: nameMetrics
-                font.family: fileItem.face.family
-                font.pixelSize: fileItem.face.size
-                font.bold: fileItem.face.bold ?? false
-            }
-            readonly property var shownLines: nameLines.lines.map(line => nameMetrics.elidedText(line, Qt.ElideMiddle, room))
-            readonly property var lineWidths: shownLines.map(line => nameMetrics.advanceWidth(line))
-            readonly property real textWidth: Math.max(...lineWidths)
-
-            Item {
+            DesktopName {
                 id: namePlate
-                readonly property real lineHeight: fileItem.name.height ?? 18
-                readonly property real padding: fileItem.name.padding ?? 6
-                width: fileItem.textWidth + 2 * padding
-                height: lineHeight * nameLines.lines.length
+                look: fileItem.name
+                text: fileItem.modelData.name
+                face: icons.fonts.desktop_icon ?? icons.fonts.interface
+                lit: fileItem.picked || fileDrop.containsDrag
+                picked: fileItem.picked
+                away: !icons.frontmost
+                lettersShown: icons.renamingPath !== fileItem.modelData.path
+                themeDirectory: icons.themeDirectory
                 anchors.horizontalCenter: parent.horizontalCenter
                 y: parent.height + (fileItem.name.gap ?? 4)
-
-                // a plate per line, each with the same plate a little lower as its dark edge
-                Repeater {
-                    model: fileItem.lit ? fileItem.lineWidths : []
-                    Item {
-                        required property real modelData
-                        required property int index
-                        width: modelData + 2 * namePlate.padding
-                        height: namePlate.lineHeight
-                        x: (namePlate.width - width) / 2
-                        y: index * namePlate.lineHeight
-
-                        Fill {
-                            readonly property var edge: fileItem.name.picked_edge
-                            visible: edge !== undefined
-                            width: parent.width
-                            height: parent.height
-                            y: edge?.drop ?? 0
-                            fill: ({ color: edge?.color ?? "#00000000", radius: fileItem.plate.radius })
-                            themeDirectory: icons.themeDirectory
-                        }
-                        Fill {
-                            anchors.fill: parent
-                            fill: fileItem.plate
-                            themeDirectory: icons.themeDirectory
-                        }
-                    }
-                }
-                Item {
-                    id: letters
-                    readonly property real room: Math.ceil(fileItem.name.shadow_blur ?? 0) + (fileItem.name.shadow_drop ?? 1)
-                    visible: icons.renamingPath !== fileItem.modelData.path
-                    anchors.centerIn: parent
-                    // whole pixels, or the layer stretches the letters
-                    width: Math.ceil(fileItem.textWidth) + 2 * room
-                    height: namePlate.height + 2 * room
-                    layer.enabled: true
-                    // a lit name loses its shadow
-                    layer.effect: CastShadow {
-                        look: fileItem.lit ? null : fileItem.name
-                        ink: ThemeValues.color(fileItem.picked && !icons.frontmost
-                                               ? fileItem.name.away_color ?? fileItem.name.color ?? "#ffffff"
-                                               : fileItem.name.color ?? "#ffffff")
-                    }
-
-                    Repeater {
-                        model: fileItem.shownLines
-                        Text {
-                            required property string modelData
-                            required property int index
-                            x: letters.room + Math.round((fileItem.textWidth - (fileItem.lineWidths[index] ?? 0)) / 2)
-                            y: letters.room + index * namePlate.lineHeight
-                            height: namePlate.lineHeight
-                            verticalAlignment: Text.AlignVCenter
-                            text: modelData
-                            color: "white"
-                            font: nameMetrics.font
-                        }
-                    }
-                }
             }
 
             // Drag data: the picked files' addresses, and their paths as plain text for
