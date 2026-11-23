@@ -80,6 +80,27 @@ class DesktopShortcut(unittest.TestCase):
         self.assertEqual(self.shortcut("paint-box", "In/Out").returncode, 0)
         self.assertEqual([file.name for file in self.desktop.iterdir()], ["In-Out.desktop"])
 
+    def test_an_entry_in_a_subfolder_is_found_by_its_dashed_id(self):
+        folder = self.own / "applications" / "wine" / "Programs"
+        folder.mkdir(parents=True)
+        (folder / "Notepad++.desktop").write_text(ENTRY.replace("Name=Paint Box", "Name=Notepad++"))
+        result = self.shortcut("wine-Programs-Notepad++")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual([file.name for file in self.desktop.iterdir()], ["Notepad++.desktop"])
+
+    def test_the_users_subfolder_entry_wins_over_the_systems_flat_one(self):
+        (self.own / "applications" / "kits").mkdir()
+        (self.own / "applications" / "kits" / "paint-box.desktop").write_text(ENTRY.replace("Name=Paint Box", "Name=Mine"))
+        (self.system / "applications" / "kits-paint-box.desktop").write_text(ENTRY)
+        self.assertEqual(self.shortcut("kits-paint-box").returncode, 0)
+        self.assertEqual([file.name for file in self.desktop.iterdir()], ["Mine.desktop"])
+
+    def test_a_dashed_id_does_not_match_a_file_of_another_name(self):
+        (self.system / "applications" / "kits").mkdir()
+        (self.system / "applications" / "kits" / "paint.desktop").write_text(ENTRY)
+        self.assertEqual(self.shortcut("kits-paint-box").returncode, 1)
+        self.assertEqual(self.shortcut("kits").returncode, 1)
+
     def test_a_program_without_an_entry_is_refused_and_leaves_nothing(self):
         result = self.shortcut("no-such-program")
         self.assertEqual(result.returncode, 1)

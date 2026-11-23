@@ -37,12 +37,29 @@ split_name() {
     fi
 }
 
+nested_entry() {
+    [ -d "$1" ] || return 0
+    find "$1" -mindepth 2 -name '*.desktop' | while IFS= read -r path; do
+        relative=${path#"$1"/}
+        if [ "$(printf '%s' "${relative%.desktop}" | tr / -)" = "$2" ]; then
+            printf '%s\n' "$path"
+            break
+        fi
+    done
+}
+
 # the desktop entry file of program ID, the user's own before the system's
 entry_file() {
     folders="${XDG_DATA_HOME:-$HOME/.local/share}:${XDG_DATA_DIRS:-/usr/local/share:/usr/share}"
     while [ -n "$folders" ]; do
-        candidate="${folders%%:*}/applications/$1.desktop"
-        if [ -f "$candidate" ]; then
+        applications="${folders%%:*}/applications"
+        if [ -f "$applications/$1.desktop" ]; then
+            printf '%s\n' "$applications/$1.desktop"
+            return 0
+        fi
+        # an entry in a subfolder has its path with dashes for an id, wine/Programs/a.desktop is wine-Programs-a
+        candidate=$(nested_entry "$applications" "$1")
+        if [ -n "$candidate" ]; then
             printf '%s\n' "$candidate"
             return 0
         fi
