@@ -535,58 +535,93 @@ Item {
                 source: fileItem.iconSource
             }
 
+            // finder's name bubble shows while picked or while something is dragged over it
+            readonly property bool lit: picked || fileDrop.containsDrag
+            readonly property var face: icons.fonts.desktop_icon ?? icons.fonts.interface
+            readonly property real room: name.most_width ?? 110
+            DesktopNameLines {
+                id: nameLines
+                text: fileItem.modelData.name
+                most: fileItem.name.lines ?? 1
+                room: fileItem.room
+                font: nameMetrics.font
+            }
+            FontMetrics {
+                id: nameMetrics
+                font.family: fileItem.face.family
+                font.pixelSize: fileItem.face.size
+                font.bold: fileItem.face.bold ?? false
+            }
+            readonly property var shownLines: nameLines.lines.map(line => nameMetrics.elidedText(line, Qt.ElideMiddle, room))
+            readonly property var lineWidths: shownLines.map(line => nameMetrics.advanceWidth(line))
+            readonly property real textWidth: Math.max(...lineWidths)
+
             Item {
                 id: namePlate
-                width: Math.min(label.implicitWidth, fileItem.name.most_width ?? 110) + 2 * (fileItem.name.padding ?? 6)
-                height: fileItem.name.height ?? 18
+                readonly property real lineHeight: fileItem.name.height ?? 18
+                readonly property real padding: fileItem.name.padding ?? 6
+                width: fileItem.textWidth + 2 * padding
+                height: lineHeight * nameLines.lines.length
                 anchors.horizontalCenter: parent.horizontalCenter
                 y: parent.height + (fileItem.name.gap ?? 4)
 
-                // the same plate a little lower shows as a dark edge under it
-                Fill {
-                    readonly property var edge: fileItem.name.picked_edge
-                    visible: fileItem.picked && edge !== undefined
-                    width: parent.width
-                    height: parent.height
-                    y: edge?.drop ?? 0
-                    fill: ({ color: edge?.color ?? "#00000000", radius: fileItem.plate.radius })
-                    themeDirectory: icons.themeDirectory
-                }
-                Fill {
-                    visible: fileItem.picked
-                    anchors.fill: parent
-                    fill: fileItem.plate
-                    themeDirectory: icons.themeDirectory
+                // a plate per line, each with the same plate a little lower as its dark edge
+                Repeater {
+                    model: fileItem.lit ? fileItem.lineWidths : []
+                    Item {
+                        required property real modelData
+                        required property int index
+                        width: modelData + 2 * namePlate.padding
+                        height: namePlate.lineHeight
+                        x: (namePlate.width - width) / 2
+                        y: index * namePlate.lineHeight
+
+                        Fill {
+                            readonly property var edge: fileItem.name.picked_edge
+                            visible: edge !== undefined
+                            width: parent.width
+                            height: parent.height
+                            y: edge?.drop ?? 0
+                            fill: ({ color: edge?.color ?? "#00000000", radius: fileItem.plate.radius })
+                            themeDirectory: icons.themeDirectory
+                        }
+                        Fill {
+                            anchors.fill: parent
+                            fill: fileItem.plate
+                            themeDirectory: icons.themeDirectory
+                        }
+                    }
                 }
                 Item {
                     id: letters
                     readonly property real room: Math.ceil(fileItem.name.shadow_blur ?? 0) + (fileItem.name.shadow_drop ?? 1)
+                    visible: icons.renamingPath !== fileItem.modelData.path
                     anchors.centerIn: parent
                     // whole pixels, or the layer stretches the letters
-                    width: Math.ceil(label.width) + 2 * room
-                    height: Math.ceil(label.implicitHeight) + 2 * room
+                    width: Math.ceil(fileItem.textWidth) + 2 * room
+                    height: namePlate.height + 2 * room
                     layer.enabled: true
-                    // a picked name loses its shadow
+                    // a lit name loses its shadow
                     layer.effect: CastShadow {
-                        look: fileItem.picked ? null : fileItem.name
+                        look: fileItem.lit ? null : fileItem.name
                         ink: ThemeValues.color(fileItem.picked && !icons.frontmost
                                                ? fileItem.name.away_color ?? fileItem.name.color ?? "#ffffff"
                                                : fileItem.name.color ?? "#ffffff")
                     }
 
-                    Text {
-                        id: label
-                        visible: icons.renamingPath !== fileItem.modelData.path
-                        x: letters.room
-                        y: letters.room
-                        width: Math.min(implicitWidth, fileItem.name.most_width ?? 110)
-                        elide: Text.ElideMiddle
-                        text: fileItem.modelData.name
-                        color: "white"
-                        readonly property var face: icons.fonts.desktop_icon ?? icons.fonts.interface
-                        font.family: face.family
-                        font.pixelSize: face.size
-                        font.bold: face.bold ?? false
+                    Repeater {
+                        model: fileItem.shownLines
+                        Text {
+                            required property string modelData
+                            required property int index
+                            x: letters.room + Math.round((fileItem.textWidth - (fileItem.lineWidths[index] ?? 0)) / 2)
+                            y: letters.room + index * namePlate.lineHeight
+                            height: namePlate.lineHeight
+                            verticalAlignment: Text.AlignVCenter
+                            text: modelData
+                            color: "white"
+                            font: nameMetrics.font
+                        }
                     }
                 }
             }
@@ -761,9 +796,17 @@ Item {
                 readonly property var name: icons.looks?.name ?? ({})
                 readonly property var face: icons.fonts.desktop_icon ?? icons.fonts.interface
                 x: icons.iconX(icons.renamingIndex) + icons.iconSize / 2 - width / 2
-                y: icons.iconY(icons.renamingIndex) + icons.iconSize + (name.gap ?? 4)
-                width: Math.max(input.implicitWidth + 10, 60)
-                height: name.height ?? 18
+                // moved up when a long name's lines would reach past the screen
+                y: Math.max(0, Math.min(icons.iconY(icons.renamingIndex) + icons.iconSize + (name.gap ?? 4),
+                                        icons.height - height - 4))
+                // as wide as the text, up to the name's own width, then it wraps
+                width: Math.min(Math.max(fieldMetrics.advanceWidth(input.text) + 10, 60),
+                                (name.most_width ?? 110) + 2 * (name.padding ?? 6))
+                height: Math.max(name.height ?? 18, input.contentHeight + 2)
+                FontMetrics {
+                    id: fieldMetrics
+                    font: input.font
+                }
                 color: ThemeValues.color(field.color ?? "#ffffff")
                 border.width: 1
                 border.color: ThemeValues.color(field.border_color ?? "#808080")
@@ -771,6 +814,9 @@ Item {
                 TextInput {
                     id: input
                     anchors.centerIn: parent
+                    width: parent.width - 10
+                    wrapMode: TextInput.WrapAtWordBoundaryOrAnywhere
+                    horizontalAlignment: TextInput.AlignHCenter
                     focus: true
                     text: icons.entries[icons.renamingIndex]?.name ?? ""
                     color: ThemeValues.color(parent.field.text_color ?? "#000000")

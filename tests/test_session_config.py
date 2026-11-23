@@ -853,6 +853,31 @@ class TestSeaLionUpdates(unittest.TestCase):
         self.assertNotIn("themes", self.updates[31])
         self.assertIn("{ICON_ZOOM_TABLE}", inspect.getsource(self.make_theme.build_theme_text))
 
+    def test_older_themes_get_two_line_desktop_names(self):
+        import inspect
+        import re
+        line = re.search(r"^name = \{\{ color = .*picked_background.*$", inspect.getsource(self.make_theme), re.M).group(0)
+        made = tomllib.loads(line.replace("{{", "{").replace("}}", "}"))["name"]
+        # finder's names take 2 lines of ceil(12.64 zeros) at grid spacing 54, 101 px in bold lucida 12
+        self.assertEqual((made["lines"], made["most_width"]), (2, 101))
+        self.assertIn(32, self.updates)
+        correction = self.updates[32]["corrections"][0]
+        self.assertEqual((correction["table"], correction["key"], correction["now"]), ("desktop.icons", "name", made))
+        with tempfile.TemporaryDirectory() as folder:
+            theme_file = Path(folder) / "sea-lion" / "theme.toml"
+            theme_file.parent.mkdir()
+            theme_file.write_text('[theme]\nname = "Sea Lion"\nrevision = 31\n\n[desktop.icons]\nname = '
+                                  + self.inline(correction["was"]) + "\n")
+            import updates
+            self.assertTrue(updates.refresh_theme(theme_file, [self.updates[32]]))
+            self.assertEqual(tomllib.loads(theme_file.read_text())["desktop"]["icons"]["name"], made)
+
+    @staticmethod
+    def inline(value):
+        if isinstance(value, dict):
+            return "{ " + ", ".join(f"{key} = {TestSeaLionUpdates.inline(item)}" for key, item in value.items()) + " }"
+        return '"' + value + '"' if isinstance(value, str) else str(value)
+
     def test_moving_files_to_the_trash_sounds_as_finder_does(self):
         import make_sounds
         # finder's move to trash task plays system sound 0x10, drag to trash.aif

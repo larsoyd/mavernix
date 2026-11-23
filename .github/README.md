@@ -43,6 +43,7 @@ To build it, check out `larsoyd` and follow [docs/building.md](../docs/building.
 - Moving desktop files to the trash plays the theme's trash sound once they are there.
 - A folder or file opened from the desktop grows its window out of the icon and shrinks back into it when closed. A program opened from its icon leaves a fading ghost of the icon.
 - On the desktop the arrow keys move the pick (Shift adds to it), typing a name picks it, Ctrl+A picks everything, Ctrl+O opens, Ctrl+D duplicates and Ctrl+Backspace moves to the trash. Space hands the pick to a previewer when one is set.
+- Long desktop names go on to a second line at a word, with that line cut in the middle, each line on its own plate as in Finder. A folder's name lights up while files are dragged over it, and the rename field wraps instead of running off the screen.
 - A second slow click on the name of the one picked desktop icon starts renaming it, as in Finder.
 - Opening something from the desktop that a program already has open brings that window back, out of the dock when it was minimized, as in Finder.
 - A folder on the desktop or in a dock folder that is, or links to, the home folder or one of its usual folders (Downloads, Music and the rest) shows that folder's own icon. A folder given its own icon in Dolphin shows that one.

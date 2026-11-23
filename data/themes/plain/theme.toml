@@ -752,5 +752,5 @@ edge_to_icon_middle = 58
 bottom_room = 90
 picked = { color = "#ffffff30", radius = 4 }
 picked_reach = 4
-name = { color = "#ffffff", shadow_color = "#000000c0", height = 18, padding = 5, gap = 4, most_width = 96, picked_background = { color = "#3a6ea5", radius = 4 } }
+name = { color = "#ffffff", shadow_color = "#000000c0", height = 18, padding = 5, gap = 4, most_width = 96, lines = 2, picked_background = { color = "#3a6ea5", radius = 4 } }
 band = { color = "#3a6ea540", border_color = "#3a6ea5", border_width = 1 }
