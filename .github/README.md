@@ -47,6 +47,7 @@ To build it, check out `larsoyd` and follow [docs/building.md](../docs/building.
 - Long desktop names go on to a second line at a word, with that line cut in the middle, each line on its own plate as in Finder. A folder's name lights up while files are dragged over it, and the rename field wraps instead of running off the screen.
 - Dragging picked desktop icons carries all of them with their names, with a red badge counting them, and the picture sits under the pointer where it was taken. A drop nothing takes slides back to the icons, as in Finder.
 - Holding a drag over a desktop folder makes it blink and spring open, so files can be dropped inside, as Finder's spring-loaded folders do.
+- Desktop icons that are links wear Finder's alias arrow, taken from the installer by the Sea Lion import.
 - A second slow click on the name of the one picked desktop icon starts renaming it, as in Finder.
 - Opening something from the desktop that a program already has open brings that window back, out of the dock when it was minimized, as in Finder.
 - A folder on the desktop or in a dock folder that is, or links to, the home folder or one of its usual folders (Downloads, Music and the rest) shows that folder's own icon. A folder given its own icon in Dolphin shows that one.

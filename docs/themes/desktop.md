@@ -85,4 +85,8 @@ drag_badge = { size = 18, fill = { color = "#d0312d" }, text_color = "#ffffff" }
 # inside. Left out, folders never open by themselves.
 spring_ms = 700
 spring_blink_ms = 90
+# Optional: an icon theme emblem laid over a link's icon from its lower left,
+# share of the icon's size. Left out, or when the icon theme lacks it, links
+# look like what they point to.
+link_emblem = { icon = "emblem-symbolic-link", share = 0.4 }
 ```

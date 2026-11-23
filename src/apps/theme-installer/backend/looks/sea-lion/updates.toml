@@ -588,3 +588,13 @@ revision = 34
 [update.settings."desktop.icons"]
 spring_ms = 670
 spring_blink_ms = 83
+
+# Links on the desktop show Finder's alias arrow, drawn from the installer's badge.
+[[update]]
+revision = 35
+import_brings = [
+    "Links on the desktop show Finder's alias arrow.",
+]
+
+[update.settings."desktop.icons"]
+link_emblem = { icon = "emblem-alias-badge", share = 1 }

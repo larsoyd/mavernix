@@ -759,3 +759,4 @@ slide_back_ms = 250
 drag_badge = { size = 18, fill = { color = "#d0312d" } }
 spring_ms = 700
 spring_blink_ms = 90
+link_emblem = { icon = "emblem-symbolic-link", share = 0.4 }

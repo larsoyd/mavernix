@@ -7,6 +7,9 @@ Item {
     required property var entry
     required property string iconSource
     property var frame: null
+    // laid over a link's icon from its lower left, at share of its size
+    property string linkEmblem: ""
+    property real linkEmblemShare: 1
 
     readonly property bool isPicture: entry.icon.startsWith("image-")
 
@@ -23,5 +26,14 @@ Item {
         visible: !preview.visible
         sourceSize: Qt.size(width * Screen.devicePixelRatio, height * Screen.devicePixelRatio)
         source: iconPicture.iconSource
+    }
+    Image {
+        visible: iconPicture.entry.isLink === true && iconPicture.linkEmblem !== ""
+        anchors.left: parent.left
+        anchors.bottom: parent.bottom
+        width: Math.round(parent.width * iconPicture.linkEmblemShare)
+        height: width
+        sourceSize: Qt.size(width * Screen.devicePixelRatio, height * Screen.devicePixelRatio)
+        source: visible ? iconPicture.linkEmblem : ""
     }
 }

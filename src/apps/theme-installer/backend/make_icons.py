@@ -146,6 +146,8 @@ ICONS = {
     "dialog-information": ("status", "AlertNoteIcon.icns"),
     "dialog-error": ("status", "AlertStopIcon.icns"),
     "dialog-question": ("status", "GenericQuestionMarkIcon.icns"),
+    # laid over a whole link icon, so not named like kde's small corner emblems
+    "emblem-alias-badge": ("emblems", "AliasBadgeIcon.icns"),
 
     "system-file-manager": ("apps", "System/Library/CoreServices/Finder.app"),
     "utilities-terminal": ("apps", "Applications/Utilities/Terminal.app"),
@@ -961,7 +963,8 @@ def index_text(contexts_by_size):
             directory = f"{folder_name(size, scale)}/{context}"
             directories.append(directory)
             context_name = {"apps": "Applications", "places": "Places", "devices": "Devices",
-                            "mimetypes": "MimeTypes", "status": "Status", "actions": "Actions"}[context]
+                            "mimetypes": "MimeTypes", "status": "Status", "actions": "Actions",
+                            "emblems": "Emblems"}[context]
             lines = [f"[{directory}]", f"Size={size}", f"Context={context_name}"]
             if scale != 1:
                 lines += [f"Scale={scale}"]

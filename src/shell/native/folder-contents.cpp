@@ -211,6 +211,7 @@ void FolderContents::look()
                 {QStringLiteral("genericIcon"), QStringLiteral("application-x-executable")},
                 {QStringLiteral("isFolder"), false},
                 {QStringLiteral("isLauncher"), true},
+                {QStringLiteral("isLink"), file.isSymLink()},
             });
             continue;
         }
@@ -222,6 +223,7 @@ void FolderContents::look()
             {QStringLiteral("genericIcon"), is_folder ? QStringLiteral("folder") : kind.genericIconName()},
             {QStringLiteral("isFolder"), is_folder},
             {QStringLiteral("isLauncher"), false},
+            {QStringLiteral("isLink"), file.isSymLink()},
         });
     }
 

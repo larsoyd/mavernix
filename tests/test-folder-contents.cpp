@@ -118,6 +118,38 @@ class TestFolderContents : public QObject
         QCOMPARE(icons.value(QStringLiteral("Tunes copy")), QStringLiteral("folder"));
     }
 
+    void linksSayTheyAreLinksAndNothingElseDoes()
+    {
+        QTemporaryDir place;
+        const QString desktop = place.filePath(QStringLiteral("Desktop"));
+        QVERIFY(QDir().mkpath(desktop + QStringLiteral("/Folder")));
+        QVERIFY(QDir().mkpath(place.filePath(QStringLiteral("Away"))));
+        write(desktop + QStringLiteral("/Note.txt"), "x");
+        write(place.filePath(QStringLiteral("far.txt")), "x");
+        write(place.filePath(QStringLiteral("tool.desktop")), "[Desktop Entry]\nType=Application\nName=Tool\nExec=true\n");
+        QFile::setPermissions(place.filePath(QStringLiteral("tool.desktop")),
+            QFile::permissions(place.filePath(QStringLiteral("tool.desktop"))) | QFile::ExeOwner);
+        QVERIFY(QFile::link(place.filePath(QStringLiteral("Away")), desktop + QStringLiteral("/Away link")));
+        QVERIFY(QFile::link(place.filePath(QStringLiteral("far.txt")), desktop + QStringLiteral("/far link.txt")));
+        QVERIFY(QFile::link(place.filePath(QStringLiteral("tool.desktop")), desktop + QStringLiteral("/tool.desktop")));
+
+        FolderContents contents;
+        contents.setPath(desktop);
+        QMap<QString, bool> links;
+        for (const QVariant& entry : contents.entries()) {
+            const QVariantMap map = entry.toMap();
+            QVERIFY2(map.contains(QStringLiteral("isLink")), qPrintable(map.value(QStringLiteral("name")).toString()));
+            links.insert(map.value(QStringLiteral("path")).toString().section(QLatin1Char('/'), -1),
+                map.value(QStringLiteral("isLink")).toBool());
+        }
+        QCOMPARE(links.size(), 5);
+        QCOMPARE(links.value(QStringLiteral("Away link")), true);
+        QCOMPARE(links.value(QStringLiteral("far link.txt")), true);
+        QCOMPARE(links.value(QStringLiteral("tool.desktop")), true);
+        QCOMPARE(links.value(QStringLiteral("Folder")), false);
+        QCOMPARE(links.value(QStringLiteral("Note.txt")), false);
+    }
+
     void aFolderShowsTheIconItsDirectoryFileNames()
     {
         QTemporaryDir home;

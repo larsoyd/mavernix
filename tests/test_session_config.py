@@ -891,6 +891,15 @@ class TestSeaLionUpdates(unittest.TestCase):
         self.assertEqual(self.updates[34]["settings"], {"desktop.icons": made})
         self.assertIn("{DESKTOP_SPRING_LINES}", inspect.getsource(self.make_theme.build_theme_text))
 
+    def test_links_get_the_alias_badge_after_a_new_import(self):
+        import inspect
+        made = tomllib.loads(self.make_theme.DESKTOP_LINK_LINE)
+        self.assertEqual(made, {"link_emblem": {"icon": "emblem-alias-badge", "share": 1}})
+        self.assertEqual(self.updates[35]["settings"], {"desktop.icons": made})
+        # the badge is a new file from the installer, so only an import brings it
+        self.assertTrue(self.updates[35]["import_brings"])
+        self.assertIn("{DESKTOP_LINK_LINE}", inspect.getsource(self.make_theme.build_theme_text))
+
     @staticmethod
     def inline(value):
         if isinstance(value, dict):
@@ -1103,6 +1112,13 @@ class TestSeaLionIcons(unittest.TestCase):
                     self.assertIn(f"{source}/Contents/Info.plist", self.taken)
                     resources = f"{source}/Contents/Resources/"
                     self.assertTrue(any(path.startswith(resources) and path.endswith(".icns") for path in self.taken))
+
+    def test_links_get_finders_alias_badge_under_a_name_of_their_own(self):
+        icons = self.make_icons
+        # kde draws emblem-symbolic-link small in a corner, the badge lies over the whole icon
+        self.assertEqual(icons.ICONS["emblem-alias-badge"], ("emblems", "AliasBadgeIcon.icns"))
+        self.assertNotIn("emblem-symbolic-link", icons.ICONS)
+        self.assertIn("[64x64/emblems]\nSize=64\nContext=Emblems", icons.index_text({(64, 1): {"emblems"}}))
 
     def test_torrent_art_replaces_fallback_without_changing_generic_document(self):
         with tempfile.TemporaryDirectory() as folder:

@@ -494,6 +494,7 @@ Item {
 
     // --- What a drag carries -----------------------------------------------------------------
 
+    readonly property string linkEmblem: themeIcons.find(looks?.link_emblem?.icon ?? "")
     function iconSourceOf(entry) {
         return themeIcons.path(entry.icon, entry.genericIcon)
     }
@@ -554,6 +555,8 @@ Item {
                         entry: parent.entry
                         iconSource: icons.iconSourceOf(parent.entry)
                         frame: icons.looks?.preview_frame ?? null
+                        linkEmblem: icons.linkEmblem
+                        linkEmblemShare: icons.looks?.link_emblem?.share ?? 1
                     }
                     DesktopName {
                         look: icons.nameLook
@@ -681,6 +684,8 @@ Item {
                 entry: fileItem.modelData
                 iconSource: icons.iconSourceOf(fileItem.modelData)
                 frame: icons.looks?.preview_frame ?? null
+                linkEmblem: icons.linkEmblem
+                linkEmblemShare: icons.looks?.link_emblem?.share ?? 1
             }
 
             // finder's name bubble shows while picked or while something is dragged over it
