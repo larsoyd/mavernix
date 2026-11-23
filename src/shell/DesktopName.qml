@@ -26,7 +26,6 @@ Item {
     // finder's item info, a line in smaller letters under the name and never on its plate
     property string info: ""
     property real infoPixelSize: Math.max(9, pixelSize - 2)
-    property real infoHeight: 0
     readonly property real padding: look.padding ?? 6
 
     DesktopNameLines {
@@ -61,8 +60,11 @@ Item {
         return alignLeft ? 0 : Math.round((textWidth - width) / 2)
     }
 
-    width: textWidth + 2 * padding
-    height: titleHeight + (shownInfo === "" ? 0 : infoHeight)
+    // whole pixels, or the letters' layer lands between them
+    width: Math.ceil(textWidth) + 2 * padding
+    // finder's info sits under the title's bubble, 3 taller than its lines
+    readonly property real infoTop: titleHeight + 3
+    height: shownInfo === "" ? titleHeight : infoTop + Math.ceil(infoMetrics.height)
 
     // a plate per line, each with the same plate a little lower as its dark edge
     Repeater {
@@ -70,7 +72,7 @@ Item {
         Item {
             required property real modelData
             required property int index
-            width: modelData + 2 * desktopName.padding
+            width: Math.ceil(modelData) + 2 * desktopName.padding
             height: desktopName.lineHeight
             x: desktopName.lineX(modelData)
             y: index * desktopName.lineHeight
@@ -95,7 +97,8 @@ Item {
         id: letters
         readonly property real room: Math.ceil(desktopName.look.shadow_blur ?? 0) + (desktopName.look.shadow_drop ?? 1)
         visible: desktopName.lettersShown
-        anchors.centerIn: parent
+        x: desktopName.padding - room
+        y: -room
         // whole pixels, or the layer stretches the letters
         width: Math.ceil(desktopName.textWidth) + 2 * room
         height: desktopName.height + 2 * room
@@ -125,9 +128,7 @@ Item {
         Text {
             visible: desktopName.shownInfo !== ""
             x: letters.room + desktopName.lineX(desktopName.infoWidth)
-            y: letters.room + desktopName.titleHeight
-            height: desktopName.infoHeight
-            verticalAlignment: Text.AlignVCenter
+            y: letters.room + desktopName.infoTop
             text: desktopName.shownInfo
             color: "white"
             font: infoMetrics.font

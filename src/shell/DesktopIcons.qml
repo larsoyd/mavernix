@@ -53,6 +53,7 @@ Item {
         spacing: Math.max(1, Math.round(chosen("grid_spacing") ?? 54)),
         textSize: Math.max(10, Math.min(16, Math.round(chosen("text_size") ?? 12))),
         right: chosen("label_position") === "right",
+        align: ["top", "center", "bottom"].includes(chosen("label_align")) ? chosen("label_align") : "top",
         info: chosen("show_item_info") === true,
         preview: chosen("show_icon_preview") ?? true
     })
@@ -113,17 +114,25 @@ Item {
 
     // a name's lines and its item info, sized from the text size the theme's name look was made at
     readonly property var nameLook: looks?.name ?? ({})
-    readonly property real nameScale: view.textSize / (face.size ?? 12)
-    readonly property real lineHeight: Math.round((nameLook.height ?? 18) * nameScale)
+    readonly property real lineHeight: DesktopCell.pitch(lineOf(titleMetrics), view.textSize)
     readonly property real nameRoom: DesktopCell.titleRoom(zeroWidth, view.spacing)
     readonly property int nameLines: DesktopCell.titleLines(view)
-    readonly property real infoHeight: view.info ? Math.round((nameLook.height ?? 18) * infoMetrics.font.pixelSize
-                                                              / (face.size ?? 12)) : 0
     // the name's place from the icon picture's corner, its plate reaching padding past its letters
     readonly property point namePlace: view.right
-        ? Qt.point(inCell.titleX - inCell.pictureX - (nameLook.padding ?? 6),
-                   (cell.height - nameLines * lineHeight - infoHeight) / 2 - inCell.pictureY)
+        ? Qt.point(inCell.titleX - inCell.pictureX - (nameLook.padding ?? 6), 0)
         : Qt.point(0, inCell.titleY - inCell.pictureY - 1)
+    // a name beside its icon meets the picture's top or bottom or centres as finder's does
+    function nameY(block, title, hasInfo) {
+        if (!view.right) {
+            return namePlace.y
+        }
+        const room = cell.height - block
+        const y = view.align === "bottom" ? iconSize - block
+            : view.align === "center"
+                ? DesktopCell.centredTitle(cell.height, title, hasInfo ? lineOf(infoMetrics) - 1 : 0) - inCell.pictureY
+            : 0
+        return Math.max(-inCell.pictureY, Math.min(y, room - inCell.pictureY))
+    }
     function infoText(entry) {
         const info = infos[entry.path] ?? ({})
         if (info.items !== undefined) {
@@ -755,9 +764,8 @@ Item {
                         alignLeft: icons.view.right
                         info: icons.view.info ? icons.infoText(parent.entry) : ""
                         infoPixelSize: infoMetrics.font.pixelSize
-                        infoHeight: icons.infoHeight
-                        x: icons.view.right ? icons.namePlace.x : (parent.width - width) / 2
-                        y: icons.namePlace.y
+                        x: icons.view.right ? icons.namePlace.x : Math.floor((parent.width - width) / 2)
+                        y: icons.nameY(height, titleHeight, shownInfo !== "")
                     }
                 }
             }
@@ -896,9 +904,8 @@ Item {
                 alignLeft: icons.view.right
                 info: icons.view.info ? icons.infoText(fileItem.modelData) : ""
                 infoPixelSize: infoMetrics.font.pixelSize
-                infoHeight: icons.infoHeight
-                x: icons.view.right ? icons.namePlace.x : (parent.width - width) / 2
-                y: icons.namePlace.y
+                x: icons.view.right ? icons.namePlace.x : Math.floor((parent.width - width) / 2)
+                y: icons.nameY(height, titleHeight, shownInfo !== "")
             }
 
             // Drag data: the picked files' addresses, and their paths as plain text for
@@ -1102,7 +1109,7 @@ Item {
                 x: icons.iconX(icons.renamingIndex) + (icons.view.right ? icons.namePlace.x
                                                                          : icons.iconSize / 2 - width / 2)
                 // moved up when a long name's lines would reach past the screen
-                y: Math.max(0, Math.min(icons.iconY(icons.renamingIndex) + icons.namePlace.y,
+                y: Math.max(0, Math.min(icons.iconY(icons.renamingIndex) + icons.nameY(height, height, false),
                                         icons.height - height - 4))
                 // as wide as the text, up to the name's own width, then it wraps
                 width: Math.min(Math.max(fieldMetrics.advanceWidth(input.text) + 10, 60),

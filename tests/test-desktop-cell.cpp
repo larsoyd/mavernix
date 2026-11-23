@@ -47,6 +47,8 @@ class TestDesktopCell : public QObject
                           "  function layout(view, size) { return DesktopCell.layout(view, size) }\n"
                           "  function iconSize(raw) { return DesktopView.iconSize(raw) }\n"
                           "  function arrangement(a) { return DesktopView.arrangement(a[0], a[1]) }\n"
+                          "  function pitch(a) { return DesktopCell.pitch(a[0], a[1]) }\n"
+                          "  function centredTitle(a) { return DesktopCell.centredTitle(a[0], a[1], a[2]) }\n"
                           "}\n",
             QUrl());
         probe.reset(component.create());
@@ -122,6 +124,26 @@ class TestDesktopCell : public QObject
         QVariant result;
         QMetaObject::invokeMethod(probe.get(), function, Q_RETURN_ARG(QVariant, result), Q_ARG(QVariant, argument));
         return result;
+    }
+
+    // a name of one letter repeated over two lines read 13 14 17 18 19 20 20 apart from 10 to 16
+    void namesKeepTheReferenceLinePitch()
+    {
+        const QList<QList<int>> sizes{{10, 13, 13}, {11, 14, 14}, {12, 16, 17}, {13, 17, 18}, {14, 18, 19}, {15, 19, 20}, {16, 19, 20}};
+        for (const QList<int>& size : sizes)
+        {
+            QCOMPARE(ask("pitch", QVariantList{size[1], size[0]}).toInt(), size[2]);
+        }
+    }
+
+    // at text 11 in a 72 high cell the reference drew a two line name's letters from 24, one line from 32,
+    // and a two line name with info from 18, each 3 below the line's top, and at text 10 one line from 31
+    void aNameBesideItsIconCentresAsTheReferenceDoes()
+    {
+        QCOMPARE(ask("centredTitle", QVariantList{72, 28, 0}).toInt(), 21);
+        QCOMPARE(ask("centredTitle", QVariantList{72, 14, 0}).toInt(), 28);
+        QCOMPARE(ask("centredTitle", QVariantList{72, 13, 0}).toInt(), 28);
+        QCOMPARE(ask("centredTitle", QVariantList{72, 28, 11}).toInt(), 15);
     }
 
     // the reference slider left at 69.0, 72.9 and 77.7 showed 68, 72 and 76

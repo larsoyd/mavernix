@@ -18,7 +18,7 @@ PanelWindow {
 
     readonly property real bodyWidth: look?.width ?? 201
     readonly property real titleHeight: look?.title_height ?? 16
-    readonly property real bodyHeight: titleHeight + 250
+    readonly property real bodyHeight: titleHeight + 276
 
     // the whole screen with input on the body only, so a move is an item's and not the surface's
     screen: desktop.screen
@@ -344,14 +344,39 @@ PanelWindow {
             }
         }
 
+        Label {
+            x: 18
+            y: body.below + 193
+            opacity: panel.desktop.view.right ? 1 : (panel.look?.disabled_opacity ?? 0.5)
+            text: panel.words.label_align ?? "Label align:"
+        }
+        SmallPopUpButton {
+            objectName: "labelAlign"
+            x: 88
+            y: body.below + 190
+            width: 105
+            height: 22
+            enabled: panel.desktop.view.right
+            look: panel.look ?? ({})
+            themeDirectory: panel.themeDirectory
+            font: panel.font
+            settings: panel.settings
+            screen: panel.screen
+            windowPlace: Qt.point(0, 0)
+            choices: ["top", "center", "bottom"].map(side => ({ value: side,
+                                                               label: panel.words["align_" + side] ?? side }))
+            value: panel.desktop.view.align
+            onChosen: value => panel.desktop.chooseView("label_align", value)
+        }
+
         Separator {
-            y: body.below + 191
+            y: body.below + 217
         }
 
         SmallCheckBox {
             objectName: "itemInfo"
             x: 19
-            y: body.below + 197
+            y: body.below + 223
             look: panel.look ?? ({})
             themeDirectory: panel.themeDirectory
             font: panel.font
@@ -362,7 +387,7 @@ PanelWindow {
         SmallCheckBox {
             objectName: "iconPreview"
             x: 19
-            y: body.below + 214
+            y: body.below + 240
             look: panel.look ?? ({})
             themeDirectory: panel.themeDirectory
             font: panel.font
@@ -373,13 +398,13 @@ PanelWindow {
 
         Label {
             x: 19
-            y: body.below + 235
+            y: body.below + 261
             text: panel.words.sort_by_label ?? "Sort by:"
         }
         SmallPopUpButton {
             objectName: "sortBy"
             x: 88
-            y: body.below + 232
+            y: body.below + 258
             width: 105
             height: 22
             look: panel.look ?? ({})

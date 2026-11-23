@@ -549,6 +549,8 @@ grid_spacing = 54
 text_size = 12
 # "bottom" or "right" of the icon.
 label_position = "bottom"
+# Where a name beside its icon sits: "top", "center" or "bottom" of the icon.
+label_align = "top"
 # A line under the name: a folder's count, a picture's size, a sound's length.
 show_item_info = false
 # Pictures, films and documents show their contents in place of their icon.
@@ -613,6 +615,10 @@ text_size = "Text size:"
 label_position = "Label position:"
 label_bottom = "Bottom"
 label_right = "Right"
+label_align = "Label align:"
+align_top = "Top"
+align_center = "Center"
+align_bottom = "Bottom"
 show_item_info = "Show item info"
 show_icon_preview = "Show icon preview"
 sort_by_label = "Sort by:"

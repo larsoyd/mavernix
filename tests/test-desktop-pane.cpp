@@ -120,7 +120,7 @@ class TestDesktopPane : public QObject
             reset << key.table + QLatin1Char('.') + key.key;
         }
         for (const char* key : {"arrange_by", "snap_to_grid", "order", "icon_size", "grid_spacing", "text_size",
-                 "label_position", "show_item_info", "show_icon_preview", "view_options_place"})
+                 "label_position", "label_align", "show_item_info", "show_icon_preview", "view_options_place"})
         {
             QVERIFY2(reset.contains(QStringLiteral("desktop_files.") + QLatin1String(key)), qPrintable(reset.join(' ')));
         }

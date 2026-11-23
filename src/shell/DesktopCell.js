@@ -32,6 +32,17 @@ function cell(view, metrics) {
     return { width: even(10 + room + 1 + box + 2), height: even(Math.max(title, box) + below) }
 }
 
+// finder's name lines sit one apart more than the typeset line from size 12 up
+function pitch(line, textSize) {
+    return line + (textSize >= 12 ? 1 : 0)
+}
+
+// a title centred beside its icon, finder's bubble 3 taller than its text
+// and a name without info a pixel shorter
+function centredTitle(cellHeight, title, info) {
+    return info > 0 ? Math.floor((cellHeight - title - 3 - info) / 2) : Math.floor((cellHeight - title - 2) / 2)
+}
+
 // where the picture and the title block start in a cell
 function layout(view, size) {
     const inset = Math.floor(view.iconSize / 16)

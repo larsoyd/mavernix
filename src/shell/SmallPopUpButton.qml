@@ -23,6 +23,7 @@ FocusScope {
     implicitWidth: 70
     implicitHeight: 22
     activeFocusOnTab: true
+    opacity: enabled ? 1 : (look.disabled_opacity ?? 0.5)
 
     property bool open: false
     function openMenu() {
