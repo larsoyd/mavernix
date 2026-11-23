@@ -77,7 +77,13 @@ Item {
         rowItemsData = items
         forgetMarks()
         forgetCrossing()
-        Qt.callLater(scrollToStart)
+        scrollSoon.restart()
+    }
+    // a child timer goes with a submenu that closes before it fires, a queued call would not
+    Timer {
+        id: scrollSoon
+        interval: 0
+        onTriggered: menu.scrollToStart()
     }
     function forgetMarks() {
         hoveredIndex = -1

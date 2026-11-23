@@ -1,27 +1,23 @@
-// a place is { x, y } of an icon's top left corner
+// a place is { x, y } of an icon's top left corner, a grid's cells run down from its right edge
 .pragma library
 
-// slots count down the columns from the screen's far side
 function slotPlace(grid, slot) {
     const column = Math.floor(slot / grid.rows)
-    return { x: grid.width - grid.edge - column * grid.columnPitch - grid.iconSize / 2,
-             y: grid.top + (slot % grid.rows) * grid.rowPitch }
+    return { x: grid.right - (column + 1) * grid.cellWidth + grid.pictureX,
+             y: grid.top + (slot % grid.rows) * grid.cellHeight + grid.pictureY }
 }
 
 function slotAt(grid, x, y) {
-    const column = Math.max(0, Math.round((grid.width - grid.edge - grid.iconSize / 2 - x) / grid.columnPitch))
-    const row = Math.max(0, Math.min(grid.rows - 1, Math.round((y - grid.top) / grid.rowPitch)))
+    const column = Math.max(0, Math.round((grid.right - grid.cellWidth + grid.pictureX - x) / grid.cellWidth))
+    const row = Math.max(0, Math.min(grid.rows - 1, Math.round((y - grid.top - grid.pictureY) / grid.cellHeight)))
     return column * grid.rows + row
 }
 
-// each icon takes a box one pitch square centred on its picture
+// each icon takes a whole cell around its picture
 function coversSlot(grid, place, slot) {
-    const halfGap = (grid.columnPitch - grid.iconSize) / 2
-    const left = place.x - halfGap
     const slotted = slotPlace(grid, slot)
-    const slotLeft = slotted.x - halfGap
-    return left < slotLeft + grid.columnPitch && slotLeft < left + grid.columnPitch
-        && place.y < slotted.y + grid.rowPitch && slotted.y < place.y + grid.rowPitch
+    return place.x < slotted.x + grid.cellWidth && slotted.x < place.x + grid.cellWidth
+        && place.y < slotted.y + grid.cellHeight && slotted.y < place.y + grid.cellHeight
 }
 
 // nearest slot to each place or the next free one after it
@@ -75,4 +71,25 @@ function places(grid, put, snap) {
         slot++
     }
     return result
+}
+
+// when the cell changes finder scales each icon's distance from the first slot by the cell
+// and places again an icon that ends up off the screen
+function rescaled(from, to, put, screen) {
+    const middle = (grid, place) => ({ x: place.x + grid.iconSize / 2, y: place.y + grid.iconSize / 2 })
+    const before = middle(from, slotPlace(from, 0))
+    const after = middle(to, slotPlace(to, 0))
+    return put.map(place => {
+        if (place === null) {
+            return null
+        }
+        const was = middle(from, place)
+        const x = after.x - Math.floor((before.x - was.x) * to.cellWidth / from.cellWidth)
+        const y = after.y - Math.floor((before.y - was.y) * to.cellHeight / from.cellHeight)
+        if (x < 0 || x >= screen.width || y < 0 || y >= screen.height) {
+            return null
+        }
+        const moved = { x: x - to.iconSize / 2, y: y - to.iconSize / 2 }
+        return place.loose ? Object.assign(moved, { loose: true }) : moved
+    })
 }

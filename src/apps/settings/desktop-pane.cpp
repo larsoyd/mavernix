@@ -67,17 +67,28 @@ DesktopPane::DesktopPane(Choices& choices, QWidget* parent) : QWidget(parent)
     connect(files, &QCheckBox::toggled, this,
         [&choices](bool on) { choices.set(QStringLiteral("desktop_files"), QStringLiteral("show"), on); });
     form->addCheck(files);
-    for (const auto& [key, fallback] : {std::pair{"snap_to_grid", "Snap icons to grid"},
-             std::pair{"deselect_after_opening", "Deselect icons after opening"}})
+    // the grid is one of the view options' arrangements, the old switch counts until one is chosen
+    const QVariant arrangement = choices.value(QStringLiteral("desktop_files"), QStringLiteral("arrange_by"));
+    auto* snap = new QCheckBox(
+        words.value(QStringLiteral("desktop_snap_to_grid"), QStringLiteral("Snap icons to grid")).toString());
+    snap->setChecked(arrangement.isValid()
+            ? arrangement.toString() == QLatin1String("grid")
+            : choices.value(QStringLiteral("desktop_files"), QStringLiteral("snap_to_grid")).toBool());
+    connect(snap, &QCheckBox::toggled, this, [&choices](bool on) {
+        choices.set(QStringLiteral("desktop_files"), QStringLiteral("arrange_by"),
+            on ? QStringLiteral("grid") : QStringLiteral("none"));
+    });
+    auto* deselect = new QCheckBox(
+        words.value(QStringLiteral("desktop_deselect_after_opening"), QStringLiteral("Deselect icons after opening"))
+            .toString());
+    deselect->setChecked(choices.value(QStringLiteral("desktop_files"), QStringLiteral("deselect_after_opening")).toBool());
+    connect(deselect, &QCheckBox::toggled, this, [&choices](bool on) {
+        choices.set(QStringLiteral("desktop_files"), QStringLiteral("deselect_after_opening"), on);
+    });
+    for (QCheckBox* box : {snap, deselect})
     {
-        const QString name = QLatin1String(key);
-        auto* box =
-            new QCheckBox(words.value(QStringLiteral("desktop_") + name, QString::fromLatin1(fallback)).toString());
-        box->setChecked(choices.value(QStringLiteral("desktop_files"), name).toBool());
         box->setEnabled(files->isChecked());
         connect(files, &QCheckBox::toggled, box, &QWidget::setEnabled);
-        connect(box, &QCheckBox::toggled, this,
-            [&choices, name](bool on) { choices.set(QStringLiteral("desktop_files"), name, on); });
         form->addCheck(box);
     }
 

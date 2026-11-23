@@ -17,29 +17,52 @@ Item {
 
     readonly property var plate: (away ? look.away_background : undefined)
                                  ?? look.picked_background ?? ({ color: "#3a6ea5", radius: 4 })
-    readonly property real room: look.most_width ?? 110
-    readonly property real lineHeight: look.height ?? 18
+    property real pixelSize: face.size
+    property real room: look.most_width ?? 110
+    property real lineHeight: look.height ?? 18
+    property int most: look.lines ?? 1
+    // a title beside its icon starts at its left
+    property bool alignLeft: false
+    // finder's item info, a line in smaller letters under the name and never on its plate
+    property string info: ""
+    property real infoPixelSize: Math.max(9, pixelSize - 2)
+    property real infoHeight: 0
     readonly property real padding: look.padding ?? 6
 
     DesktopNameLines {
         id: nameLines
         text: desktopName.text
-        most: desktopName.look.lines ?? 1
+        most: desktopName.most
         room: desktopName.room
         font: nameMetrics.font
     }
     FontMetrics {
         id: nameMetrics
         font.family: desktopName.face.family
-        font.pixelSize: desktopName.face.size
+        font.pixelSize: desktopName.pixelSize
         font.bold: desktopName.face.bold ?? false
     }
-    readonly property var shownLines: nameLines.lines.map(line => nameMetrics.elidedText(line, Qt.ElideMiddle, room))
-    readonly property var lineWidths: shownLines.map(line => nameMetrics.advanceWidth(line))
-    readonly property real textWidth: Math.max(...lineWidths)
+    FontMetrics {
+        id: infoMetrics
+        font.family: desktopName.face.family
+        font.pixelSize: desktopName.infoPixelSize
+        font.bold: desktopName.face.bold ?? false
+    }
+    // measuring calls do not follow a new font size, so each also reads the font's height
+    readonly property var shownLines: nameLines.lines.map(line => nameMetrics.height > 0
+                                                                  ? nameMetrics.elidedText(line, Qt.ElideMiddle, room) : line)
+    readonly property var lineWidths: shownLines.map(line => nameMetrics.height > 0 ? nameMetrics.advanceWidth(line) : 0)
+    readonly property string shownInfo: info === "" || infoMetrics.height <= 0 ? ""
+                                                                               : infoMetrics.elidedText(info, Qt.ElideMiddle, room)
+    readonly property real infoWidth: shownInfo === "" || infoMetrics.height <= 0 ? 0 : infoMetrics.advanceWidth(shownInfo)
+    readonly property real textWidth: Math.max(infoWidth, ...lineWidths)
+    readonly property real titleHeight: lineHeight * shownLines.length
+    function lineX(width) {
+        return alignLeft ? 0 : Math.round((textWidth - width) / 2)
+    }
 
     width: textWidth + 2 * padding
-    height: lineHeight * shownLines.length
+    height: titleHeight + (shownInfo === "" ? 0 : infoHeight)
 
     // a plate per line, each with the same plate a little lower as its dark edge
     Repeater {
@@ -49,7 +72,7 @@ Item {
             required property int index
             width: modelData + 2 * desktopName.padding
             height: desktopName.lineHeight
-            x: (desktopName.width - width) / 2
+            x: desktopName.lineX(modelData)
             y: index * desktopName.lineHeight
 
             Fill {
@@ -90,7 +113,7 @@ Item {
             Text {
                 required property string modelData
                 required property int index
-                x: letters.room + Math.round((desktopName.textWidth - (desktopName.lineWidths[index] ?? 0)) / 2)
+                x: letters.room + desktopName.lineX(desktopName.lineWidths[index] ?? 0)
                 y: letters.room + index * desktopName.lineHeight
                 height: desktopName.lineHeight
                 verticalAlignment: Text.AlignVCenter
@@ -98,6 +121,16 @@ Item {
                 color: "white"
                 font: nameMetrics.font
             }
+        }
+        Text {
+            visible: desktopName.shownInfo !== ""
+            x: letters.room + desktopName.lineX(desktopName.infoWidth)
+            y: letters.room + desktopName.titleHeight
+            height: desktopName.infoHeight
+            verticalAlignment: Text.AlignVCenter
+            text: desktopName.shownInfo
+            color: "white"
+            font: infoMetrics.font
         }
     }
 }

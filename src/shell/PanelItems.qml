@@ -79,19 +79,35 @@ Row {
             id: (menuNumber + 1) * entriesPerMenu,
             label: menu.title ?? "",
             enabled: true, separator: false, checkable: false, checked: false, shortcut: [],
-            children: (menu.entries ?? []).map((entry, entryNumber) => ({
-                id: (menuNumber + 1) * entriesPerMenu + entryNumber + 1,
-                label: entry.label ?? "",
-                // Emptying an empty wastebasket is greyed, as there is nothing to do.
-                enabled: (entry.command !== undefined || entry.action !== undefined)
-                         && !(entry.action === "empty_trash" && (panel.shell?.trashIsEmpty ?? false)),
-                separator: entry.separator ?? false,
-                checkable: false, checked: false, shortcut: [], children: []
-            }))
+            children: [].concat(...(menu.entries ?? []).map((entry, entryNumber) => entry.view === true
+                ? viewEntries((menuNumber + 1) * entriesPerMenu + viewBase)
+                : [{
+                    id: (menuNumber + 1) * entriesPerMenu + entryNumber + 1,
+                    label: entry.label ?? "",
+                    // an empty wastebasket's emptying is greyed, there is nothing to do
+                    enabled: (entry.command !== undefined || entry.action !== undefined)
+                             && !(entry.action === "empty_trash" && (panel.shell?.trashIsEmpty ?? false)),
+                    separator: entry.separator ?? false,
+                    checkable: false, checked: false, shortcut: [], children: []
+                }]))
         }))
     }
 
+    // an entry { view = true } stands for the desktop's view entries, numbered from viewBase
+    readonly property int viewBase: 500
+    function viewEntries(first) {
+        const renumber = item => Object.assign({}, item, {
+            id: item.separator ? 0 : first + item.id,
+            children: item.children.map(renumber)
+        })
+        return (panel.shell?.desktopIcons?.viewItems ?? []).map(renumber)
+    }
+
     function runDesktopEntry(id) {
+        if (id % entriesPerMenu >= viewBase) {
+            panel.shell?.desktopIcons?.viewChosen(id % entriesPerMenu - viewBase)
+            return
+        }
         const menu = (desktopMenus.menus ?? [])[Math.floor(id / entriesPerMenu) - 1]
         const entry = (menu?.entries ?? [])[id % entriesPerMenu - 1]
         if (entry?.action !== undefined) {

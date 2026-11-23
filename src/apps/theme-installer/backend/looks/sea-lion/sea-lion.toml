@@ -49,6 +49,14 @@ entries = [
     { label = "Find", action = "search" },
 ]
 
+# { view = true } stands for the desktop's own view entries: Clean Up, Sort By
+# and View Options, worded by [desktop_files.words].
+[[desktop_menus.menus]]
+title = "View"
+entries = [
+    { view = true },
+]
+
 [[desktop_menus.menus]]
 title = "Go"
 entries = [
@@ -171,11 +179,7 @@ open_app_grid = "Open App Grid"
 new_folder_name = "untitled folder"
 change_background = "Change Desktop Background…"
 clean_up = "Clean Up"
-snap_to_grid = "Snap to Grid"
-sort_by_name = "Sort By Name"
-sort_by_kind = "Sort By Kind"
-sort_by_modified = "Sort By Date Modified"
-sort_by_added = "Sort By Date Added"
+clean_up_by = "Clean Up By"
 
 [settings]
 name = "System Preferences"

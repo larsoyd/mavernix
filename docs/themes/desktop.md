@@ -22,26 +22,24 @@ This table shows the files in the user's Desktop folder as icons (`src/shell/Des
 
 ```toml
 [fonts]
-desktop_icon = { family = "DejaVu Sans", size = 12 }   # the names under the icons
+desktop_icon = { family = "DejaVu Sans", size = 12 }   # the names under the icons, at the user's text size
+view_options = { family = "DejaVu Sans", size = 11 }   # the View Options panel's words
 
 [desktop.icons]
-icon_size = 48
-# Icons stand in columns, starting at the far side of the screen. Each icon
-# starts row_pitch below the one above it, and each column sits column_pitch
-# beside the one before. The first icon starts `top` below the panel. The
-# middle of the first column is edge_to_icon_middle from the screen's edge.
-# bottom_room is kept free at the bottom (for a dock).
-row_pitch = 92
-column_pitch = 100
-top = 12
-edge_to_icon_middle = 58
+# The icon size, grid spacing, text size and where the name goes are the
+# user's choices ([desktop_files] in the config, set in the View Options
+# panel). Each icon takes a cell worked out from them the way Finder does it,
+# and cells stand in columns from the screen's far top corner, margin from
+# its edges. bottom_room is kept free at the bottom (for a dock).
+margin = 8
 bottom_room = 90
 picked = { color = "#ffffff30", radius = 4 }    # any fill: the box around a picked file's icon
 picked_reach = 4                                # how far it reaches past the icon
-# The name under the icon: its colour, its line height, how far below the
-# icon it starts, and how wide a line can get. With lines = 2 a long name
-# goes on to a second line at a word, or between letters when one word is
-# too long, and that line is cut short in the middle. Left out, it's 1.
+# The name under the icon: its colour, and its line height at the font's
+# size, which grows with the user's text size. How wide a line gets and how
+# many lines there are follow the grid spacing: a long name goes on to a second
+# line at a word, or between letters when one word is too long, and that line
+# is cut short in the middle. Item info is a line in smaller letters under it.
 # picked_background is the plate behind each line of a picked file's name, and
 # of a folder's name while files are dragged over it (any fill, `padding`
 # wider than the line at each end).
@@ -55,7 +53,7 @@ picked_reach = 4                                # how far it reaches past the ic
 # Also optional: picked_edge is a darker copy of the plate, drop lower, showing
 # as an edge under it. away_background and away_color are the plate and the
 # letters of a picked name while a window is in front of the desktop.
-name = { color = "#ffffff", shadow_color = "#000000c0", height = 18, padding = 5, gap = 4, most_width = 96, lines = 2, picked_background = { color = "#3a6ea5", radius = 4 } }
+name = { color = "#ffffff", shadow_color = "#000000c0", height = 18, padding = 5, picked_background = { color = "#3a6ea5", radius = 4 } }
 # Optional: a frame for a picture that's shown as its own icon. It has an
 # edge of one colour and width, and a soft shadow behind it. `share` is how
 # much of the icon's square the framed picture may take. Without it, the
@@ -89,4 +87,37 @@ spring_blink_ms = 90
 # share of the icon's size. Left out, or when the icon theme lacks it, links
 # look like what they point to.
 link_emblem = { icon = "emblem-symbolic-link", share = 0.4 }
+```
+
+## The View Options panel
+
+The panel that the desktop's menu, the View menu and Super+J show: a small window with the icon size and grid spacing sliders, the text size and Sort By pop-ups, the label position, and the item info and preview boxes (`src/shell/DesktopViewOptions.qml`). Without this table the panel isn't offered.
+
+```toml
+[desktop.view_options]
+width = 201
+title_height = 16                     # the title bar, with the panel's name and a close button
+title_fill = { color = "#e4e4e4" }    # any fill
+title_line = "#c0c0c0"                # the line under it
+title_color = "#505050"
+fill = "#efefef"
+text_color = "#202020"
+separator = "#c0c0c0"
+shadow = { color = "#00000055", offset = [0, 4], blur = 12 }
+# Without the pictures below, the controls are drawn in these colours, with
+# accent for what's switched on.
+accent = "#3a6ea5"
+# Optional pictures. close has normal, hover and pressed. grid_small and
+# grid_large stand at the ends of the spacing slider. checkbox and radio have
+# off, off_pressed, on and on_pressed. popup has normal and pressed, with the
+# slice its corners keep (top, right, bottom, left) and where its text starts.
+# slider has a track and its slice, a thumb that points down, thumb_pressed
+# and a tick.
+close = { normal = "images/close.png", hover = "images/close-hover.png", pressed = "images/close-pressed.png" }
+grid_small = "images/grid-small.png"
+grid_large = "images/grid-large.png"
+checkbox = { off = "images/checkbox-off.png", off_pressed = "images/checkbox-off-pressed.png", on = "images/checkbox-on.png", on_pressed = "images/checkbox-on-pressed.png" }
+radio = { off = "images/radio-off.png", off_pressed = "images/radio-off-pressed.png", on = "images/radio-on.png", on_pressed = "images/radio-on-pressed.png" }
+popup = { normal = "images/popup.png", pressed = "images/popup-pressed.png", slice = [6, 15, 6, 8], text_inset = 10 }
+slider = { track = "images/slider-track.png", track_slice = [2, 3, 2, 3], thumb = "images/slider-thumb.png", thumb_pressed = "images/slider-thumb-pressed.png", tick = "images/slider-tick.png" }
 ```

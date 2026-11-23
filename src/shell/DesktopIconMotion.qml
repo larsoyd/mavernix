@@ -8,6 +8,8 @@ Item {
 
     required property point place
     property int duration: 0
+    // an even glide in place of the eased one
+    property bool evenly: false
 
     Component.onCompleted: {
         x = place.x
@@ -43,7 +45,7 @@ Item {
             target: motion
             property: "x"
             duration: motion.duration
-            easing.type: Easing.Bezier
+            easing.type: motion.evenly ? Easing.Linear : Easing.Bezier
             easing.bezierCurve: [0.42, 0, 0.58, 1, 1, 1]
         }
         NumberAnimation {
@@ -51,7 +53,7 @@ Item {
             target: motion
             property: "y"
             duration: motion.duration
-            easing.type: Easing.Bezier
+            easing.type: motion.evenly ? Easing.Linear : Easing.Bezier
             easing.bezierCurve: [0.42, 0, 0.58, 1, 1, 1]
         }
     }

@@ -340,6 +340,14 @@ desktop_places_test = executable(
 )
 test('desktop-places', desktop_places_test, env: {'QT_QPA_PLATFORM': 'offscreen'})
 
+desktop_cell_test = executable(
+    'test-desktop-cell',
+    ['test-desktop-cell.cpp', qt.compile_moc(sources: 'test-desktop-cell.cpp', dependencies: qt_test)],
+    dependencies: [qt_test, dependency('qt6', modules: ['Core', 'Qml'])],
+    cpp_args: ['-DSHELL_DIR="' + (meson.project_source_root() / 'src' / 'shell') + '"'],
+)
+test('desktop-cell', desktop_cell_test, env: {'QT_QPA_PLATFORM': 'offscreen'})
+
 desktop_names_test = executable(
     'test-desktop-names',
     ['test-desktop-names.cpp', qt.compile_moc(sources: 'test-desktop-names.cpp', dependencies: qt_test)],

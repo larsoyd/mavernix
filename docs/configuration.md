@@ -322,7 +322,9 @@ entries = [
 ]
 ```
 
-An entry either runs a `command` or one of the shell's `action`s. In a command, a leading `~` means your home folder, and adding a `confirm` table makes it ask first, like the logo menu does. The actions are `app_grid`, `window_overview`, `search`, `notification_list`, `lock` and `empty_trash`.
+An entry either runs a `command` or one of the shell's `action`s. In a command, a leading `~` means your home folder, and adding a `confirm` table makes it ask first, like the logo menu does. The actions are `app_grid`, `window_overview`, `search`, `notification_list`, `lock`, `empty_trash` and `view_options`, which shows or hides the desktop's View Options panel.
+
+An entry `{ view = true }` stands for the desktop's own view entries, the ones its right-click menu has: Clean Up, Clean Up By, Sort By and Show View Options. Plain puts them in a View menu.
 
 Without a `[desktop_menus]` table, the panel stays empty while no window is active.
 

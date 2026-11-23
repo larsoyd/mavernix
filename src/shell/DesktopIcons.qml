@@ -12,7 +12,9 @@ import Quickshell
 import Quickshell.Io
 import Quickshell.Wayland
 import Shell.Native
+import "DesktopCell.js" as DesktopCell
 import "DesktopPlaces.js" as DesktopPlaces
+import "DesktopView.js" as DesktopView
 import "DesktopKeys.js" as DesktopKeys
 import "DesktopShortcut.js" as DesktopShortcut
 import "DroppedFiles.js" as DroppedFiles
@@ -42,33 +44,105 @@ Item {
     visible: shown
 
     readonly property string folder: DesktopShortcut.folder(Quickshell, settings)
-    readonly property string order: userChoices.value("desktop_files", "order") ?? "name"
+    // finder's view options, kept in the user's choices
+    function chosen(key) {
+        return userChoices.value("desktop_files", key)
+    }
+    readonly property var view: ({
+        iconSize: DesktopView.iconSize(chosen("icon_size") ?? 64),
+        spacing: Math.max(1, Math.round(chosen("grid_spacing") ?? 54)),
+        textSize: Math.max(10, Math.min(16, Math.round(chosen("text_size") ?? 12))),
+        right: chosen("label_position") === "right",
+        info: chosen("show_item_info") === true,
+        preview: chosen("show_icon_preview") ?? true
+    })
+    readonly property string arrangeBy: DesktopView.arrangement(chosen("arrange_by"), chosen("snap_to_grid"))
+    // sorted icons take the slots in order and go back to them when dragged
+    readonly property bool keepArranged: DesktopView.keepsArranged(arrangeBy)
+    // on the grid even icons placed earlier by hand sit in slots
+    readonly property bool snapToGrid: arrangeBy === "grid"
+    readonly property bool deselectAfterOpening: chosen("deselect_after_opening") ?? false
 
     FolderContents {
         id: contents
         path: icons.shown ? icons.folder : ""
-        order: icons.order
+        // icons not put by hand flow by name, or in the order an old sort chose
+        order: icons.keepArranged ? icons.arrangeBy : (icons.chosen("order") ?? "name")
+        itemInfo: icons.shown && icons.view.info
     }
     readonly property var entries: contents.entries
+    readonly property var infos: contents.infos
 
     // --- Where the icons go ---------------------------------------------------------
 
     readonly property real topRoom:
         (settings.config.panel?.position ?? "top") === "top" ? (settings.theme.panel?.height ?? 0) : 0
-    readonly property real iconSize: looks?.icon_size ?? 48
-    readonly property real rowPitch: looks?.row_pitch ?? 96
-    readonly property real columnPitch: looks?.column_pitch ?? 96
+    readonly property real iconSize: view.iconSize
+    readonly property var face: fonts.desktop_icon ?? fonts.interface
+    FontMetrics {
+        id: titleMetrics
+        font.family: icons.face.family
+        font.pixelSize: icons.view.textSize
+        font.bold: icons.face.bold ?? false
+    }
+    FontMetrics {
+        id: infoMetrics
+        font.family: icons.face.family
+        font.pixelSize: Math.max(9, icons.view.textSize - 2)
+        font.bold: icons.face.bold ?? false
+    }
+    // finder's typeset line, which fits lucida grande's lines from 9 to 16 on the reference desktop
+    function lineOf(metrics) {
+        return Math.round(metrics.ascent) + Math.round(metrics.descent) + 1
+    }
+    // a measuring call does not follow a new font size, the font's height does
+    readonly property real zeroWidth: titleMetrics.height > 0 ? Math.round(titleMetrics.advanceWidth("0")) : 0
+    readonly property var cell: DesktopCell.cell(view, { zero: zeroWidth,
+                                                         line: lineOf(titleMetrics), infoLine: lineOf(infoMetrics) })
+    readonly property var inCell: DesktopCell.layout(view, cell)
+    onCellChanged: console.info(`[desktop] view icon=${view.iconSize} spacing=${view.spacing} text=${view.textSize} right=${view.right} info=${view.info} zero=${zeroWidth} line=${lineOf(titleMetrics)} cell=${cell.width}x${cell.height}`)
+    // finder keeps this far from the screen's edges
+    readonly property real margin: looks?.margin ?? 4
     // The rows that fit between the panel and the room kept free at the bottom.
-    readonly property int rows: Math.max(1, Math.floor(
-        (height - topRoom - (looks?.top ?? 8) - (looks?.bottom_room ?? 100)) / rowPitch))
+    readonly property int rows: Math.max(1, Math.floor((height - topRoom - margin - (looks?.bottom_room ?? 100)) / cell.height))
 
     readonly property var grid: ({
-        width: width, top: topRoom + (looks?.top ?? 8), rows: rows, edge: looks?.edge_to_icon_middle ?? 60,
-        iconSize: iconSize, columnPitch: columnPitch, rowPitch: rowPitch
+        right: width - margin, top: topRoom + margin, rows: rows, cellWidth: cell.width, cellHeight: cell.height,
+        pictureX: inCell.pictureX, pictureY: inCell.pictureY, iconSize: iconSize
     })
-    // on the grid even icons placed earlier by hand sit in slots
-    readonly property bool snapToGrid: userChoices.value("desktop_files", "snap_to_grid") ?? false
-    readonly property bool deselectAfterOpening: userChoices.value("desktop_files", "deselect_after_opening") ?? false
+
+    // a name's lines and its item info, sized from the text size the theme's name look was made at
+    readonly property var nameLook: looks?.name ?? ({})
+    readonly property real nameScale: view.textSize / (face.size ?? 12)
+    readonly property real lineHeight: Math.round((nameLook.height ?? 18) * nameScale)
+    readonly property real nameRoom: DesktopCell.titleRoom(zeroWidth, view.spacing)
+    readonly property int nameLines: DesktopCell.titleLines(view)
+    readonly property real infoHeight: view.info ? Math.round((nameLook.height ?? 18) * infoMetrics.font.pixelSize
+                                                              / (face.size ?? 12)) : 0
+    // the name's place from the icon picture's corner, its plate reaching padding past its letters
+    readonly property point namePlace: view.right
+        ? Qt.point(inCell.titleX - inCell.pictureX - (nameLook.padding ?? 6),
+                   (cell.height - nameLines * lineHeight - infoHeight) / 2 - inCell.pictureY)
+        : Qt.point(0, inCell.titleY - inCell.pictureY - 1)
+    function infoText(entry) {
+        const info = infos[entry.path] ?? ({})
+        if (info.items !== undefined) {
+            const count = words["items_" + (info.items === 0 ? "none" : info.items === 1 ? "one" : "many")]
+                ?? (info.items === 0 ? "No items" : info.items === 1 ? "1 item" : "%1 items")
+            return count.arg(Number(info.items).toLocaleString(Qt.locale(), "f", 0))
+        }
+        if (info.width !== undefined) {
+            const number = value => Number(value).toLocaleString(Qt.locale(), "f", 0)
+            return number(info.width) + "\u2006×\u2006" + number(info.height)
+        }
+        if (info.seconds !== undefined) {
+            const two = value => String(value).padStart(2, "0")
+            const hours = Math.floor(info.seconds / 3600)
+            const rest = two(Math.floor(info.seconds % 3600 / 60)) + ":" + two(info.seconds % 60)
+            return hours > 0 ? hours + ":" + rest : rest
+        }
+        return ""
+    }
 
     // how long a drag rests on a folder before it springs open, none without it
     readonly property int springMs: looks?.spring_ms ?? 0
@@ -76,7 +150,10 @@ Item {
     // icons glide only to places a person asked for, not when the screen changes size
     readonly property int moveMs: looks?.move_ms ?? 0
     property bool gliding: false
-    function glideNext() {
+    // finder moves icons evenly for a new icon size or spacing and eases them otherwise
+    property bool glidesEvenly: false
+    function glideNext(evenly) {
+        glidesEvenly = evenly === true
         gliding = true
         glideEnd.restart()
     }
@@ -93,7 +170,7 @@ Item {
 
     // one place per entry, same order
     readonly property var places: DesktopPlaces.places(grid, entries.map(entry => {
-        const put = putByHand[entry.name]
+        const put = icons.keepArranged ? undefined : putByHand[entry.name]
         return put === undefined ? null : { x: width - put[0], y: put[1], loose: put[2] === true }
     }), snapToGrid)
     function iconX(index) {
@@ -126,6 +203,7 @@ Item {
         if (draggedIndex < 0) {
             return
         }
+
         const byX = middleX - iconSize / 2 - iconX(draggedIndex)
         const byY = middleY - iconSize / 2 - iconY(draggedIndex)
         const drop = { names: [], dropped: [], kept: [] }
@@ -184,6 +262,78 @@ Item {
         glideNext()
         rememberPlaces(placesByName(names, DesktopPlaces.onGrid(grid, [], put)))
     }
+    // finder's clean up by: every icon into the slots in that order, once
+    function cleanUpBy(order) {
+        const byName = {}
+        contents.pathsInOrder(order).forEach((path, slot) => {
+            const entry = entries.find(found => found.path === path)
+            if (entry !== undefined) {
+                byName[entry.name] = DesktopPlaces.slotPlace(grid, slot)
+            }
+        })
+        glideNext()
+        rememberPlaces(byName)
+    }
+    readonly property bool canCleanUp: !keepArranged && entries.length > 0
+
+    // a view change ends a rename, and a new cell scales hand placed icons about the first slot
+    function chooseView(key, value) {
+        if (chosen(key) === value) {
+            return
+        }
+        renamingPath = ""
+        const before = grid
+        userChoices.set("desktop_files", key, value)
+        if (["icon_size", "grid_spacing", "label_position"].includes(key) && !keepArranged) {
+            rescalePlaces(before)
+        }
+        glideNext(key === "icon_size" || key === "grid_spacing")
+    }
+    function rescalePlaces(before) {
+        const names = entries.map(entry => entry.name).filter(name => putByHand[name] !== undefined)
+        const put = names.map(name => {
+            const stored = putByHand[name]
+            return { x: width - stored[0], y: stored[1], loose: stored[2] === true }
+        })
+        const moved = DesktopPlaces.rescaled(before, grid, put, { width: width, height: height })
+        const next = {}
+        names.forEach((name, number) => {
+            const place = moved[number]
+            if (place !== null) {
+                const stored = [Math.round(width - place.x), Math.round(place.y)]
+                next[name] = place.loose ? stored.concat([true]) : stored
+            }
+        })
+        userChoices.set("desktop_files", "places", next)
+    }
+    // sorted icons leave their slots as hand placed ones, so nothing moves when the sort is turned off
+    function arrange(by) {
+        if (by === arrangeBy) {
+            return
+        }
+        renamingPath = ""
+        glideNext()
+        if (keepArranged && !DesktopView.keepsArranged(by)) {
+            rememberPlaces(placesByName(entries.map(entry => entry.name), places))
+        } else if (by === "grid") {
+            cleanUp()
+        }
+        userChoices.set("desktop_files", "arrange_by", by)
+        userChoices.set("desktop_files", "snap_to_grid", undefined)
+    }
+
+    // finder's view options panel, one for the desktop, where it was last put
+    property bool viewOptionsShown: false
+    function toggleViewOptions() {
+        viewOptionsShown = !viewOptionsShown
+    }
+    function themeIconPath(name) {
+        return themeIcons.path(name, "")
+    }
+    DesktopViewOptions {
+        desktop: icons
+    }
+
     function placesByName(names, points) {
         const byName = {}
         names.forEach((name, number) => { byName[name] = points[number] })
@@ -429,7 +579,11 @@ Item {
             if (paths.length === 0) {
                 return
             }
-            // The desktop's own icon dropped here is placed; other files are moved in.
+            // the desktop's own icon dropped here is placed, or slides back to its sorted slot
+            if (icons.carriedPath !== "" && paths.includes(icons.carriedPath) && icons.keepArranged) {
+                drop.accepted = false
+                return
+            }
             if (icons.carriedPath !== "" && paths.includes(icons.carriedPath)) {
                 icons.dropPicked(icons.carriedPath, drop.x - icons.heldOffset.x + icons.iconSize / 2,
                                  drop.y - icons.heldOffset.y + icons.iconSize / 2)
@@ -458,6 +612,8 @@ Item {
             duplicatePicked()
         } else if (control && event.key === Qt.Key_Backspace) {
             trashPicked()
+        } else if ((event.modifiers & Qt.MetaModifier) !== 0 && event.key === Qt.Key_J) {
+            toggleViewOptions()
         } else if (!control && (event.modifiers & (Qt.AltModifier | Qt.MetaModifier)) === 0
                    && event.text.trim() !== "") {
             typeToPick(event.text)
@@ -506,21 +662,19 @@ Item {
     function iconSourceOf(entry) {
         return themeIcons.path(entry.icon, entry.genericIcon)
     }
-    readonly property var nameLook: looks?.name ?? ({})
     readonly property var pickedIndices: entries.map((entry, index) => index)
                                                 .filter(index => pickedPaths.includes(entries[index].path))
     // the picked icons and the room their names can take, around which the drag picture is cut
     readonly property rect flockBox: {
-        const half = Math.max(iconSize, (nameLook.most_width ?? 110) + 2 * (nameLook.padding ?? 6)) / 2
-        const below = iconSize + (nameLook.gap ?? 4) + (nameLook.lines ?? 1) * (nameLook.height ?? 18) + 2
         if (pickedIndices.length === 0) {
             return Qt.rect(0, 0, 1, 1)
         }
-        const lefts = pickedIndices.map(index => iconX(index) + iconSize / 2 - half)
-        const tops = pickedIndices.map(index => iconY(index))
+        const lefts = pickedIndices.map(index => iconX(index) - inCell.pictureX - 2)
+        const tops = pickedIndices.map(index => iconY(index) - inCell.pictureY - 2)
         const left = Math.floor(Math.min(...lefts))
         const top = Math.floor(Math.min(...tops))
-        return Qt.rect(left, top, Math.ceil(Math.max(...lefts) + 2 * half) - left, Math.ceil(Math.max(...tops) + below) - top)
+        return Qt.rect(left, top, Math.ceil(Math.max(...lefts) + cell.width + 4) - left,
+                       Math.ceil(Math.max(...tops) + cell.height + 4) - top)
     }
     property string flockPicture: ""
     property point flockHold: Qt.point(0, 0)
@@ -562,6 +716,7 @@ Item {
                         anchors.fill: parent
                         entry: parent.entry
                         iconSource: icons.iconSourceOf(parent.entry)
+                        preview: icons.view.preview
                         frame: icons.looks?.preview_frame ?? null
                         linkEmblem: icons.linkEmblem
                         linkEmblemShare: icons.looks?.link_emblem?.share ?? 1
@@ -573,8 +728,16 @@ Item {
                         lit: true
                         picked: true
                         themeDirectory: icons.themeDirectory
-                        anchors.horizontalCenter: parent.horizontalCenter
-                        y: parent.height + (icons.nameLook.gap ?? 4)
+                        pixelSize: icons.view.textSize
+                        lineHeight: icons.lineHeight
+                        room: icons.nameRoom
+                        most: icons.nameLines
+                        alignLeft: icons.view.right
+                        info: icons.view.info ? icons.infoText(parent.entry) : ""
+                        infoPixelSize: infoMetrics.font.pixelSize
+                        infoHeight: icons.infoHeight
+                        x: icons.view.right ? icons.namePlace.x : (parent.width - width) / 2
+                        y: icons.namePlace.y
                     }
                 }
             }
@@ -673,6 +836,7 @@ Item {
 
             place: Qt.point(icons.iconX(index), icons.iconY(index))
             duration: icons.gliding ? icons.moveMs : 0
+            evenly: icons.glidesEvenly
             width: icons.iconSize
             height: icons.iconSize
 
@@ -688,6 +852,7 @@ Item {
                 anchors.fill: parent
                 entry: fileItem.modelData
                 iconSource: icons.iconSourceOf(fileItem.modelData)
+                preview: icons.view.preview
                 frame: icons.looks?.preview_frame ?? null
                 linkEmblem: icons.linkEmblem
                 linkEmblemShare: icons.looks?.link_emblem?.share ?? 1
@@ -704,8 +869,16 @@ Item {
                 away: !icons.frontmost
                 lettersShown: icons.renamingPath !== fileItem.modelData.path
                 themeDirectory: icons.themeDirectory
-                anchors.horizontalCenter: parent.horizontalCenter
-                y: parent.height + (fileItem.name.gap ?? 4)
+                pixelSize: icons.view.textSize
+                lineHeight: icons.lineHeight
+                room: icons.nameRoom
+                most: icons.nameLines
+                alignLeft: icons.view.right
+                info: icons.view.info ? icons.infoText(fileItem.modelData) : ""
+                infoPixelSize: infoMetrics.font.pixelSize
+                infoHeight: icons.infoHeight
+                x: icons.view.right ? icons.namePlace.x : (parent.width - width) / 2
+                y: icons.namePlace.y
             }
 
             // Drag data: the picked files' addresses, and their paths as plain text for
@@ -812,8 +985,9 @@ Item {
             MouseArea {
                 id: press
                 x: Math.min(0, namePlate.x)
-                width: Math.max(parent.width, namePlate.width)
-                height: namePlate.y + namePlate.height
+                y: Math.min(0, namePlate.y)
+                width: Math.max(parent.width, namePlate.x + namePlate.width) - x
+                height: Math.max(parent.height, namePlate.y + namePlate.height) - y
                 acceptedButtons: Qt.LeftButton | Qt.RightButton
                 drag.target: carried
 
@@ -824,7 +998,7 @@ Item {
                     const path = fileItem.modelData.path
                     armsRename = mouse.button === Qt.LeftButton && mouse.modifiers === Qt.NoModifier
                         && fileItem.picked && icons.pickedPaths.length === 1 && icons.frontmost
-                        && mouse.y >= namePlate.y
+                        && namePlate.contains(mapToItem(namePlate, mouse.x, mouse.y))
                     if (mouse.button === Qt.RightButton) {
                         // A file that is not picked becomes the only one picked.
                         if (!fileItem.picked) {
@@ -905,14 +1079,15 @@ Item {
                 readonly property var field: icons.looks?.name_field ?? ({})
                 readonly property var name: icons.looks?.name ?? ({})
                 readonly property var face: icons.fonts.desktop_icon ?? icons.fonts.interface
-                x: icons.iconX(icons.renamingIndex) + icons.iconSize / 2 - width / 2
+                x: icons.iconX(icons.renamingIndex) + (icons.view.right ? icons.namePlace.x
+                                                                         : icons.iconSize / 2 - width / 2)
                 // moved up when a long name's lines would reach past the screen
-                y: Math.max(0, Math.min(icons.iconY(icons.renamingIndex) + icons.iconSize + (name.gap ?? 4),
+                y: Math.max(0, Math.min(icons.iconY(icons.renamingIndex) + icons.namePlace.y,
                                         icons.height - height - 4))
                 // as wide as the text, up to the name's own width, then it wraps
                 width: Math.min(Math.max(fieldMetrics.advanceWidth(input.text) + 10, 60),
-                                (name.most_width ?? 110) + 2 * (name.padding ?? 6))
-                height: Math.max(name.height ?? 18, input.contentHeight + 2)
+                                icons.nameRoom + 2 * (name.padding ?? 6))
+                height: Math.max(icons.lineHeight, input.contentHeight + 2)
                 FontMetrics {
                     id: fieldMetrics
                     font: input.font
@@ -926,14 +1101,14 @@ Item {
                     anchors.centerIn: parent
                     width: parent.width - 10
                     wrapMode: TextInput.WrapAtWordBoundaryOrAnywhere
-                    horizontalAlignment: TextInput.AlignHCenter
+                    horizontalAlignment: icons.view.right ? TextInput.AlignLeft : TextInput.AlignHCenter
                     focus: true
                     text: icons.entries[icons.renamingIndex]?.name ?? ""
                     color: ThemeValues.color(parent.field.text_color ?? "#000000")
                     selectionColor: ThemeValues.color(parent.field.selection_color ?? "#b4d5fe")
                     selectedTextColor: color
                     font.family: parent.face.family
-                    font.pixelSize: parent.face.size
+                    font.pixelSize: icons.view.textSize
                     onAccepted: icons.finishRenaming(text)
                     Keys.onEscapePressed: icons.finishRenaming("")
                     // The name without its ending is selected, ready to be typed over; again
@@ -971,8 +1146,9 @@ Item {
         menuKind = "file"
     }
 
-    // The orders the desktop's menu offers, as the folder listing names them.
-    readonly property var orders: ["name", "kind", "modified", "added"]
+    // finder's sort by menu: free, the grid, then the orders, and the orders clean up by offers
+    readonly property var sortOrders: ["name", "kind", "modified", "created", "last_opened", "added", "size", "tags"]
+    readonly property var cleanUpOrders: ["name", "modified", "created", "last_opened", "added", "size", "kind", "tags"]
     readonly property int idNewFolder: 1
     readonly property int idBackground: 2
     readonly property int idOpen: 3
@@ -980,49 +1156,81 @@ Item {
     readonly property int idCleanUp: 5
     readonly property int idDuplicate: 6
     readonly property int idRename: 7
-    readonly property int idSnapToGrid: 8
-    readonly property int orderBase: 100
+    readonly property int idViewOptions: 8
+    readonly property int idCleanUpBy: 9
+    readonly property int idSortBy: 10
+    readonly property int sortBase: 100
+    readonly property int cleanUpBase: 200
+    readonly property var arrangements: ["none", "grid"].concat(sortOrders)
+
+    function orderWord(order) {
+        return words["order_" + order]
+    }
+
+    // every field the menu's box reads has to be there
+    function menuEntry(id, label, checked, enabled, children) {
+        return { id: id, label: label, separator: false, enabled: enabled ?? true,
+                 checkable: checked !== undefined && checked !== null, checked: checked ?? false,
+                 shortcut: [], children: children ?? [] }
+    }
+    readonly property var menuSeparator: ({ id: 0, label: "", separator: true, enabled: false,
+                                            checkable: false, checked: false, shortcut: [], children: [] })
+
+    // the view part of the desktop's menu, also given to the menu bar's view menu
+    readonly property var viewItems: {
+        const items = []
+        if (words.clean_up !== undefined) {
+            items.push(menuEntry(idCleanUp, words.clean_up, null, canCleanUp))
+        }
+        const cleanUpChoices = cleanUpOrders.filter(order => orderWord(order) !== undefined)
+            .map(order => menuEntry(cleanUpBase + cleanUpOrders.indexOf(order), orderWord(order)))
+        if (words.clean_up_by !== undefined && cleanUpChoices.length > 0) {
+            items.push(menuEntry(idCleanUpBy, words.clean_up_by, null, canCleanUp, cleanUpChoices))
+        }
+        const sortChoices = []
+        arrangements.forEach((by, number) => {
+            const word = by === "none" ? words.arrange_none : by === "grid" ? words.snap_to_grid : orderWord(by)
+            if (word === undefined) {
+                return
+            }
+            if (by === "name" && sortChoices.length > 0) {
+                sortChoices.push(menuSeparator)
+            }
+            sortChoices.push(menuEntry(sortBase + number, word, arrangeBy === by))
+            if (by === "none") {
+                sortChoices.push(menuSeparator)
+            }
+        })
+        if (words.sort_by !== undefined && sortChoices.length > 0) {
+            items.push(menuEntry(idSortBy, words.sort_by, null, true, sortChoices))
+        }
+        const viewOptionsWord = viewOptionsShown ? words.hide_view_options : words.show_view_options
+        if (viewOptionsWord !== undefined) {
+            items.push(menuEntry(idViewOptions, viewOptionsWord))
+        }
+        return items
+    }
 
     readonly property var menuItems: {
-        // Every field the menu's box reads has to be there.
-        const separator = { id: 0, label: "", separator: true, enabled: false,
-                            checkable: false, checked: false, shortcut: [], children: [] }
-        const entry = (id, label, checked) =>
-            ({ id: id, label: label, separator: false, enabled: true,
-               checkable: checked !== undefined, checked: checked ?? false, shortcut: [], children: [] })
         if (menuKind === "file") {
-            const items = [entry(idOpen, words.open ?? "Open")]
-            items.push(separator)
+            const items = [menuEntry(idOpen, words.open ?? "Open")]
+            items.push(menuSeparator)
             if (pickedPaths.length === 1 && (wishes.rename_command ?? []).length > 0) {
-                items.push(entry(idRename, words.rename ?? "Rename"))
+                items.push(menuEntry(idRename, words.rename ?? "Rename"))
             }
-            items.push(entry(idTrash, words.trash ?? "Move to Trash"))
+            items.push(menuEntry(idTrash, words.trash ?? "Move to Trash"))
             if ((wishes.duplicate_command ?? []).length > 0) {
-                items.push(separator)
-                items.push(entry(idDuplicate, words.duplicate ?? "Duplicate"))
+                items.push(menuSeparator)
+                items.push(menuEntry(idDuplicate, words.duplicate ?? "Duplicate"))
             }
             return items
         }
-        const items = [entry(idNewFolder, words.new_folder ?? "New Folder")]
+        const items = [menuEntry(idNewFolder, words.new_folder ?? "New Folder")]
         if ((wishes.background_command ?? []).length > 0) {
-            items.push(separator)
-            items.push(entry(idBackground, words.change_background ?? "Change Background…"))
+            items.push(menuSeparator)
+            items.push(menuEntry(idBackground, words.change_background ?? "Change Background…"))
         }
-        items.push(separator)
-        if (words.clean_up !== undefined) {
-            items.push(entry(idCleanUp, words.clean_up))
-        }
-        if (words.snap_to_grid !== undefined) {
-            items.push(entry(idSnapToGrid, words.snap_to_grid, snapToGrid))
-            items.push(separator)
-        }
-        for (let number = 0; number < orders.length; number++) {
-            const word = words["sort_by_" + orders[number]]
-            if (word !== undefined) {
-                items.push(entry(orderBase + number, word, icons.order === orders[number]))
-            }
-        }
-        return items
+        return viewItems.length > 0 ? items.concat([menuSeparator], viewItems) : items
     }
 
     function menuChosen(id) {
@@ -1035,22 +1243,23 @@ Item {
             openPicked()
         } else if (id === idTrash) {
             trashPicked()
-        } else if (id === idCleanUp) {
-            cleanUp()
-        } else if (id === idSnapToGrid) {
-            // the icons stay in their slots when it is turned off again
-            if (!snapToGrid) {
-                cleanUp()
-            }
-            userChoices.set("desktop_files", "snap_to_grid", !snapToGrid)
         } else if (id === idDuplicate) {
             duplicatePicked()
         } else if (id === idRename) {
             startRenaming()
-        } else if (id >= orderBase) {
-            glideNext()
-            userChoices.set("desktop_files", "places", ({}))
-            userChoices.set("desktop_files", "order", orders[id - orderBase])
+        } else {
+            viewChosen(id)
+        }
+    }
+    function viewChosen(id) {
+        if (id === idCleanUp && canCleanUp) {
+            cleanUp()
+        } else if (id === idViewOptions) {
+            toggleViewOptions()
+        } else if (id >= cleanUpBase && canCleanUp) {
+            cleanUpBy(cleanUpOrders[id - cleanUpBase])
+        } else if (id >= sortBase && id < cleanUpBase) {
+            arrange(arrangements[id - sortBase])
         }
     }
 

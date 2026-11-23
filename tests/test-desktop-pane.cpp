@@ -55,7 +55,7 @@ class TestDesktopPane : public QObject
   private slots:
     void bothAreOffAsTheConfigSays()
     {
-        start({{QStringLiteral("show"), true}, {QStringLiteral("snap_to_grid"), false},
+        start({{QStringLiteral("show"), true}, {QStringLiteral("arrange_by"), QStringLiteral("none")},
             {QStringLiteral("deselect_after_opening"), false}});
         Choices choices;
         DesktopPane pane(choices);
@@ -70,13 +70,28 @@ class TestDesktopPane : public QObject
         DesktopPane pane(choices);
         box(pane, QStringLiteral("Snap icons to grid"))->setChecked(true);
         box(pane, QStringLiteral("Deselect icons after opening"))->setChecked(true);
-        QCOMPARE(chosen(choices, "snap_to_grid"), QVariant(true));
+        QCOMPARE(chosen(choices, "arrange_by"), QVariant(QStringLiteral("grid")));
         QCOMPARE(chosen(choices, "deselect_after_opening"), QVariant(true));
+        box(pane, QStringLiteral("Snap icons to grid"))->setChecked(false);
+        QCOMPARE(chosen(choices, "arrange_by"), QVariant(QStringLiteral("none")));
+    }
+
+    // icons kept sorted are not on the free grid, and the old switch still counts until a choice is made
+    void onlySnapToGridTicksTheBox()
+    {
+        start({{QStringLiteral("show"), true}, {QStringLiteral("arrange_by"), QStringLiteral("name")}});
+        Choices sorted;
+        DesktopPane sortedPane(sorted);
+        QCOMPARE(box(sortedPane, QStringLiteral("Snap icons to grid"))->isChecked(), false);
+        start({{QStringLiteral("show"), true}, {QStringLiteral("snap_to_grid"), true}});
+        Choices old;
+        DesktopPane oldPane(old);
+        QCOMPARE(box(oldPane, QStringLiteral("Snap icons to grid"))->isChecked(), true);
     }
 
     void theyShowWhatIsChosen()
     {
-        start({{QStringLiteral("show"), true}, {QStringLiteral("snap_to_grid"), true},
+        start({{QStringLiteral("show"), true}, {QStringLiteral("arrange_by"), QStringLiteral("grid")},
             {QStringLiteral("deselect_after_opening"), true}});
         Choices choices;
         DesktopPane pane(choices);
@@ -104,7 +119,11 @@ class TestDesktopPane : public QObject
         {
             reset << key.table + QLatin1Char('.') + key.key;
         }
-        QVERIFY2(reset.contains(QStringLiteral("desktop_files.snap_to_grid")), qPrintable(reset.join(' ')));
+        for (const char* key : {"arrange_by", "snap_to_grid", "order", "icon_size", "grid_spacing", "text_size",
+                 "label_position", "show_item_info", "show_icon_preview", "view_options_place"})
+        {
+            QVERIFY2(reset.contains(QStringLiteral("desktop_files.") + QLatin1String(key)), qPrintable(reset.join(' ')));
+        }
         QVERIFY2(reset.contains(QStringLiteral("desktop_files.deselect_after_opening")), qPrintable(reset.join(' ')));
     }
 };

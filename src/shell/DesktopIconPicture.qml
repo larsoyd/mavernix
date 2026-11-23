@@ -11,19 +11,33 @@ Item {
     property string linkEmblem: ""
     property real linkEmblemShare: 1
 
-    readonly property bool isPicture: entry.icon.startsWith("image-")
+    // with finder's show icon preview off every file shows the icon for its kind
+    property bool preview: true
+
+    readonly property bool isPicture: preview && entry.icon.startsWith("image-")
+    // any other file's contents as the thumbnailers draw them, while there is a preview
+    readonly property bool hasContents: preview && !isPicture && !entry.isFolder && !entry.isLauncher
 
     FramedPicture {
-        id: preview
+        id: framed
         anchors.fill: parent
         visible: iconPicture.isPicture && !failed
         source: iconPicture.isPicture ? "file://" + encodeURI(iconPicture.entry.path) : ""
         frame: iconPicture.frame
     }
     Image {
+        id: contents
         anchors.fill: parent
-        // also for a picture in a format that cannot be read
-        visible: !preview.visible
+        visible: status === Image.Ready
+        asynchronous: true
+        fillMode: Image.PreserveAspectFit
+        sourceSize: Qt.size(width * Screen.devicePixelRatio, height * Screen.devicePixelRatio)
+        source: iconPicture.hasContents ? "image://thumbnail/" + encodeURIComponent(iconPicture.entry.path) : ""
+    }
+    Image {
+        anchors.fill: parent
+        // also for a picture in a format that cannot be read, and while contents load
+        visible: !framed.visible && !contents.visible
         sourceSize: Qt.size(width * Screen.devicePixelRatio, height * Screen.devicePixelRatio)
         source: iconPicture.iconSource
     }

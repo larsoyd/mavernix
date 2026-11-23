@@ -134,6 +134,14 @@ entries = [
     { label = "Find…", action = "search" },
 ]
 
+# { view = true } stands for the desktop's own view entries: Clean Up, Sort By
+# and View Options, worded by [desktop_files.words].
+[[desktop_menus.menus]]
+title = "View"
+entries = [
+    { view = true },
+]
+
 [[desktop_menus.menus]]
 title = "Go"
 entries = [
@@ -534,8 +542,21 @@ home_folder = "Home"
 # Files of a folder shown as icons on the desktop.
 show = true
 folder = "~/Desktop"
-# Icons sit in the slots of the grid, also when dropped between them.
-snap_to_grid = false
+# Finder's view options for the desktop, as its View Options panel sets them.
+# Icon size 16 to 128 in steps of 4, grid spacing 1 to 100, text size 10 to 16.
+icon_size = 64
+grid_spacing = 54
+text_size = 12
+# "bottom" or "right" of the icon.
+label_position = "bottom"
+# A line under the name: a folder's count, a picture's size, a sound's length.
+show_item_info = false
+# Pictures, films and documents show their contents in place of their icon.
+show_icon_preview = true
+# "none" leaves icons where they are put, "grid" puts them in the grid's
+# slots, and "name", "kind", "modified", "created", "last_opened", "added",
+# "size" or "tags" keeps them sorted that way.
+arrange_by = "none"
 # Opening icons leaves none picked.
 deselect_after_opening = false
 # Launchers placed on the desktop once, at a user's first login.
@@ -566,11 +587,35 @@ rename = "Rename"
 trash = "Move to Wastebasket"
 # Entries left out here are not offered.
 clean_up = "Tidy Up"
+clean_up_by = "Tidy Up By"
+sort_by = "Sort By"
+arrange_none = "None"
 snap_to_grid = "Snap to Grid"
-sort_by_name = "Sort by Name"
-sort_by_kind = "Sort by Kind"
-sort_by_modified = "Sort by Date Modified"
-sort_by_added = "Sort by Date Added"
+order_name = "Name"
+order_kind = "Kind"
+order_modified = "Date Modified"
+order_created = "Date Created"
+order_last_opened = "Date Last Opened"
+order_added = "Date Added"
+order_size = "Size"
+order_tags = "Tags"
+show_view_options = "Show View Options"
+hide_view_options = "Hide View Options"
+# Item info: %1 is the count.
+items_none = "No items"
+items_one = "1 item"
+items_many = "%1 items"
+# The View Options panel.
+view_options_title = "Desktop"
+icon_size = "Icon size:"
+grid_spacing = "Grid spacing:"
+text_size = "Text size:"
+label_position = "Label position:"
+label_bottom = "Bottom"
+label_right = "Right"
+show_item_info = "Show item info"
+show_icon_preview = "Show icon preview"
+sort_by_label = "Sort by:"
 
 [about]
 # The About This Computer window (mavernix-about). Its name is the window's

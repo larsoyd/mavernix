@@ -18,6 +18,8 @@ PanelWindow {
     property var soundPlayer: null
     // shown with its picture decoded
     readonly property bool drawn: backingWindowVisible && picture.ready
+    // the files' icons on the screen that shows them, else null
+    readonly property var icons: iconsLoader.item
 
     WlrLayershell.layer: WlrLayer.Background
     exclusionMode: ExclusionMode.Ignore

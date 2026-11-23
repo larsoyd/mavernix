@@ -4,7 +4,7 @@
 
 #include <memory>
 
-// slots 96 apart, first column left edge 916, first row top 30
+// cells 96 square from the right edge at 988, pictures 48 wide in their middle, first row top 30
 class TestDesktopPlaces : public QObject
 {
     Q_OBJECT
@@ -57,10 +57,12 @@ class TestDesktopPlaces : public QObject
         component.setData("import QtQml\n"
                           "import \"file://" SHELL_DIR "/DesktopPlaces.js\" as DesktopPlaces\n"
                           "QtObject {\n"
-                          "  readonly property var grid: ({ width: 1000, top: 30, rows: 5, edge: 60,\n"
-                          "                                 iconSize: 48, columnPitch: 96, rowPitch: 96 })\n"
+                          "  readonly property var grid: ({ right: 988, top: 30, rows: 5, cellWidth: 96,\n"
+                          "                                 cellHeight: 96, pictureX: 24, pictureY: 0, iconSize: 48 })\n"
                           "  function places(a) { return DesktopPlaces.places(grid, a[0], a[1]) }\n"
                           "  function onGrid(a) { return DesktopPlaces.onGrid(grid, a[0], a[1]) }\n"
+                          "  function first(g) { return DesktopPlaces.slotPlace(g, 0) }\n"
+                          "  function rescaled(a) { return DesktopPlaces.rescaled(a[0], a[1], a[2], a[3]) }\n"
                           "}\n",
             QUrl());
         probe.reset(component.create());
@@ -117,6 +119,60 @@ class TestDesktopPlaces : public QObject
     {
         QCOMPARE(text(call("onGrid", {QVariantList{}, QVariantList{at(500, 333), at(510, 340)}})),
             QStringLiteral("532,318 532,414"));
+    }
+
+    // the reference desktop at 1920 by 1080 under a 22 high menu bar, icon 64 then 32,
+    // grid spacing 54 then 100, read as icon middles 1500,600 then 1500,410 then 1289,410
+    static QVariantMap screenGrid(int iconSize, int cellWidth, int cellHeight)
+    {
+        return {{QStringLiteral("right"), 1916}, {QStringLiteral("top"), 26}, {QStringLiteral("rows"), 8},
+                {QStringLiteral("cellWidth"), cellWidth}, {QStringLiteral("cellHeight"), cellHeight},
+                {QStringLiteral("pictureX"), (cellWidth - iconSize) / 2}, {QStringLiteral("pictureY"), iconSize / 16},
+                {QStringLiteral("iconSize"), iconSize}};
+    }
+    QVariantList rescaled(const QVariantMap& from, const QVariantMap& to, const QVariantList& put)
+    {
+        const QVariantMap screen{{QStringLiteral("width"), 1920}, {QStringLiteral("height"), 1080}};
+        return call("rescaled", {QVariant(from), QVariant(to), QVariant(put), QVariant(screen)});
+    }
+
+    void aSmallerIconMovesAPutIconTowardTheFirstSlot()
+    {
+        QCOMPARE(text(rescaled(screenGrid(64, 114, 112), screenGrid(32, 114, 76), {at(1468, 568)})),
+            QStringLiteral("1484,394"));
+    }
+
+    void widerSpacingMovesAPutIconAwayFromTheFirstSlot()
+    {
+        QCOMPARE(text(rescaled(screenGrid(32, 114, 76), screenGrid(32, 172, 76), {at(1484, 394)})),
+            QStringLiteral("1273,394"));
+    }
+
+    void anIconRescaledOffTheScreenIsPlacedAgain()
+    {
+        const QVariantList result = rescaled(screenGrid(32, 84, 76), screenGrid(32, 172, 76), {at(10, 394)});
+        QCOMPARE(result.size(), 1);
+        QVERIFY2(result.at(0).isNull(), qPrintable(result.at(0).toString()));
+    }
+
+    void anIconNotPutByHandStaysUnplaced()
+    {
+        const QVariantList result = rescaled(screenGrid(64, 114, 112), screenGrid(32, 114, 76), {none()});
+        QVERIFY(result.at(0).isNull());
+    }
+
+    void aLooseIconStaysLooseWhenRescaled()
+    {
+        const QVariantList result = rescaled(screenGrid(64, 114, 112), screenGrid(32, 114, 76), {loose(1468, 568)});
+        QCOMPARE(result.at(0).toMap().value(QStringLiteral("loose")).toBool(), true);
+    }
+
+    void theFirstSlotOfTheReferenceDesktopIsWhereFinderPutsIt()
+    {
+        QVariant result;
+        QMetaObject::invokeMethod(probe.get(), "first", Q_RETURN_ARG(QVariant, result),
+                                  Q_ARG(QVariant, QVariant(screenGrid(64, 114, 112))));
+        QCOMPARE(text({result}), QStringLiteral("1827,30"));
     }
 };
 

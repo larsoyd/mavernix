@@ -39,6 +39,7 @@ dialog_title = { family = "DejaVu Sans", size = 13, bold = true }
 dialog_text  = { family = "DejaVu Sans", size = 12 }
 program_switcher = { family = "DejaVu Sans", size = 12 }
 desktop_icon = { family = "DejaVu Sans", size = 12 }
+view_options = { family = "DejaVu Sans", size = 11 }
 banner_title = { family = "DejaVu Sans", size = 13, bold = true }
 banner_text  = { family = "DejaVu Sans", size = 12 }
 notification_list = { family = "DejaVu Sans", size = 12 }
@@ -743,16 +744,12 @@ longest_ms = 10000
 background = { gradient = ["#5b6f82", "#34424f"] }
 
 [desktop.icons]
-# Desktop icons, in columns from the top corner.
-icon_size = 48
-row_pitch = 92
-column_pitch = 100
-top = 12
-edge_to_icon_middle = 58
+# Desktop icons, in columns from the top corner, kept margin from the screen's edges.
+margin = 8
 bottom_room = 90
 picked = { color = "#ffffff30", radius = 4 }
 picked_reach = 4
-name = { color = "#ffffff", shadow_color = "#000000c0", height = 18, padding = 5, gap = 4, most_width = 96, lines = 2, picked_background = { color = "#3a6ea5", radius = 4 } }
+name = { color = "#ffffff", shadow_color = "#000000c0", height = 18, padding = 5, picked_background = { color = "#3a6ea5", radius = 4 } }
 band = { color = "#3a6ea540", border_color = "#3a6ea5", border_width = 1 }
 drag_opacity = 0.85
 slide_back_ms = 250
@@ -760,3 +757,17 @@ drag_badge = { size = 18, fill = { color = "#d0312d" } }
 spring_ms = 700
 spring_blink_ms = 90
 link_emblem = { icon = "emblem-symbolic-link", share = 0.4 }
+
+# The desktop's View Options panel. Without pictures its controls are drawn
+# in these colours.
+[desktop.view_options]
+width = 201
+title_height = 18
+title_fill = { color = "#e4e4e4" }
+title_line = "#c0c0c0"
+title_color = "#505050"
+fill = "#efefef"
+text_color = "#202020"
+separator = "#c0c0c0"
+accent = "#3a6ea5"
+shadow = { color = "#00000055", offset = [0, 4], blur = 12 }

@@ -107,6 +107,16 @@ ShellRoot {
         }
     }
 
+    // the main screen's desktop icons, which own the view options
+    readonly property var desktopIcons: {
+        for (let index = 0; index < backgrounds.instances.length; index++) {
+            if (backgrounds.instances[index].icons) {
+                return backgrounds.instances[index].icons
+            }
+        }
+        return null
+    }
+
     // [desktop] picture: a full path, or a path inside the theme; empty for the
     // theme's background.
     readonly property string chosenPicture: userChoices.value("desktop", "picture") ?? ""
@@ -376,11 +386,13 @@ ShellRoot {
             shell.showClipboard()
         } else if (action === "emoji") {
             emojiPicker.toggle()
+        } else if (action === "view_options") {
+            desktopIcons?.toggleViewOptions()
         } else {
             console.warn("shell: the config asks for an action the shell does not have:", action,
                          "- known: app_grid, volume_up, volume_down, volume_mute, lock, notification_list,",
                          "search, window_overview, switch_program, switch_program_back, empty_trash, quit_app,",
-                         "clipboard_history, emoji")
+                         "clipboard_history, emoji, view_options")
         }
     }
 
