@@ -2,7 +2,7 @@
 # needs that QML cannot do by itself.
 
 # Private headers: icon-files.cpp uses Qt's internal icon lookup.
-qt_native = dependency('qt6', modules: ['Core', 'DBus', 'Gui', 'Network', 'Qml', 'Quick'],
+qt_native = dependency('qt6', modules: ['Concurrent', 'Core', 'DBus', 'Gui', 'Network', 'Qml', 'Quick'],
     private_headers: true)
 
 add_languages('c', native: false)
@@ -91,6 +91,7 @@ shared_module(
         'session-watch.cpp',
         'shortcut-pause.cpp',
         'sound-pack.cpp',
+        'thumbnails.cpp',
         'today.cpp',
         'typed-text.cpp',
         virtual_keyboard_header,

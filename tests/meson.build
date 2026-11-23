@@ -134,6 +134,13 @@ tests = {
         'include': test_sources / 'shell/native',
         'dependencies': [qt_native, librsvg],
     },
+    'thumbnails': {
+        'sources': [
+            test_sources / 'shell/native/thumbnails.cpp',
+        ],
+        'include': test_sources / 'shell/native',
+        'dependencies': [qt_native],
+    },
     'folder-contents': {
         'sources': [
             test_sources / 'shell/native/folder-contents.cpp',

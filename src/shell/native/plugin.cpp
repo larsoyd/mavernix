@@ -32,6 +32,7 @@
 #include "session-watch.hpp"
 #include "shortcut-pause.hpp"
 #include "sound-pack.hpp"
+#include "thumbnails.hpp"
 #include "typed-text.hpp"
 #include "window-attention.hpp"
 #include "window-games.hpp"
@@ -106,4 +107,5 @@ void ShellNativePlugin::initializeEngine(QQmlEngine* engine, const char* uri)
     engine->addImageProvider(QStringLiteral("theme-icon"), new ThemeIconProvider);
     engine->addImageProvider(QStringLiteral("fitted-icon"), new FittedIconProvider);
     engine->addImageProvider(QStringLiteral("date-page"), new DatePageProvider);
+    engine->addImageProvider(QStringLiteral("thumbnail"), new ThumbnailProvider);
 }
