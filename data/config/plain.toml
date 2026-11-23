@@ -633,7 +633,7 @@ groups = [
     ["general", "desktop", "dock", "clipboard", "desktops", "windows"],
     ["display", "energy", "keyboard", "mouse", "trackpad", "sound"],
     ["network", "bluetooth"],
-    ["datetime", "startup", "defaults", "icons"],
+    ["datetime", "calendar", "startup", "defaults", "icons"],
     ["extensions"],
 ]
 

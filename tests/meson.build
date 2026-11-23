@@ -164,6 +164,16 @@ tests = {
         'include': test_sources / 'apps/settings',
         'dependencies': [],
     },
+    'calendar-pane': {
+        'sources': [
+            test_sources / 'apps/settings/calendar-pane.cpp',
+            test_sources / 'apps/settings/pane-parts.cpp',
+            test_sources / 'apps/settings/choices.cpp',
+            qt.compile_moc(headers: test_sources / 'apps/settings/calendar-pane.hpp', dependencies: qt_widgets),
+        ],
+        'include': test_sources / 'apps/settings',
+        'dependencies': [qt_widgets],
+    },
     'datetime-pane': {
         'sources': [
             test_sources / 'apps/settings/datetime-pane.cpp',

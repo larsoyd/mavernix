@@ -46,6 +46,7 @@
 #include "extensions-pane.hpp"
 #include "general-pane.hpp"
 #include "icon-theme-boxes.hpp"
+#include "calendar-pane.hpp"
 #include "datetime-pane.hpp"
 #include "icons-pane.hpp"
 #include "mouse-pane.hpp"
@@ -114,6 +115,8 @@ static const KnownPane known_panes[] = {
     {"defaults", "applications-other", "Default Apps", "default programs browser mail open with"},
     {"startup", "preferences-system-startup", "Startup", "login autostart start programs items"},
     {"datetime", "preferences-system-time", "Date & Time", "clock time date 24 hour seconds menu bar"},
+    {"calendar", "almanac", "Calendar",
+        "almanac events week days hours holidays year default calendar clock dock icon date"},
     {"icons", "applications-other", "App Icons & Names", "application program icon picture change name rename"},
 };
 
@@ -236,7 +239,7 @@ SettingsWindow::SettingsWindow(Choices& choices) : choices(choices)
                     "mavernix-settings: the config asks for a pane \"%s\", "
                     "which this program does not have; known: general, desktop, dock, clipboard, icons, sound, trackpad, mouse, "
                     "energy, display, desktops, windows, extensions, network, bluetooth, keyboard, defaults, "
-                    "startup, datetime\n",
+                    "startup, datetime, calendar\n",
                     qPrintable(name));
                 continue;
             }
@@ -496,6 +499,10 @@ QWidget* SettingsWindow::makePane(const QString& name)
     if (name == QLatin1String("datetime"))
     {
         return new DateTimePane(choices);
+    }
+    if (name == QLatin1String("calendar"))
+    {
+        return new CalendarPane(choices);
     }
     if (name == QLatin1String("desktop"))
     {

@@ -38,6 +38,7 @@ To build it, check out `larsoyd` and follow [docs/building.md](../docs/building.
 - The app grid, the dock and Dolphin can make a desktop shortcut for any program or file.
 - A calendar page icon shows today's month and day, written as Mavericks' Calendar writes them on its dock tile, and turns over at midnight, in the dock, the app grid and everywhere else the icon shows.
 - Clicking the menu bar clock opens a small calendar with the month, the picked day's events from Almanac, and a way to open Almanac on that day. Settings can make the click open Almanac or the date line instead.
+- System Settings has a Calendar pane with Calendar's own options (days per week, first weekday, working hours, hours shown, holidays, events in the year view, default calendar) and what the clock opens and whether Almanac's icon shows today's date.
 
 ### Desktop
 
