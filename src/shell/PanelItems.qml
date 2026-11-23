@@ -9,6 +9,7 @@ import Quickshell
 import Quickshell.Wayland
 import "ApplicationName.js" as ApplicationName
 import "MenuBarClock.js" as MenuBarClock
+import "StartProgram.js" as StartProgram
 import "ThemeValues.js" as ThemeValues
 
 Row {
@@ -341,12 +342,30 @@ Row {
 
                 // A date line, if panel.clock_menu_date_format is set.
                 readonly property string dateFormat: row.panel.layout.clock_menu_date_format ?? ""
-                menuItems: dateFormat === "" ? [] : [{
+                // a click opens the calendar, Almanac itself or the date line, as [calendar] clock_click says
+                readonly property string click: row.panel.choices?.value("calendar", "clock_click") ?? "calendar"
+                menuItems: dateFormat === "" || click !== "date" ? [] : [{
                     id: 0,
                     label: clock.date.toLocaleDateString(Qt.locale(), dateFormat),
                     enabled: false, separator: false, checkable: false, checked: false,
                     shortcut: [], children: []
                 }]
+                popover: click === "calendar" ? calendarPopover : null
+                onActivated: {
+                    if (click === "app") {
+                        const almanac = DesktopEntries.applications.values.find(one => one.id === "almanac")
+                        if (almanac) {
+                            StartProgram.start(Quickshell, almanac, null)
+                        }
+                    }
+                }
+                Component {
+                    id: calendarPopover
+                    CalendarPopover {
+                        panel: row.panel
+                        title: clockTitle
+                    }
+                }
             }
         }
     }
