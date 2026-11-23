@@ -3,6 +3,7 @@
 #include <QGuiApplication>
 #include <QIcon>
 #include <QTemporaryDir>
+#include <QSignalSpy>
 #include <QtTest>
 
 #include "icon-files.hpp"
@@ -78,6 +79,35 @@ class TestThemeIconFiles : public QObject
         QCOMPARE(files.sourceFor(QStringLiteral("whole"), 0),
             QStringLiteral("image://svg-icon/") + folder.filePath(QStringLiteral("probe/scalable/apps/whole.svg")));
         QCOMPARE(colour_at(QStringLiteral("whole"), 300), QStringLiteral("#00ff00"));
+    }
+
+    // one switch for the whole shell, so every place an icon shows follows it
+    void every_lookup_hears_dates_switched_off()
+    {
+        IconFiles one;
+        IconFiles other;
+        QVERIFY(one.datePagesShown() && other.datePagesShown());
+        QSignalSpy heard(&other, &IconFiles::datePagesShownChanged);
+        one.setDatePagesShown(false);
+        one.setDatePagesShown(false);
+        QCOMPARE(heard.count(), 1);
+        QVERIFY(!other.datePagesShown());
+        other.setDatePagesShown(true);
+        QCOMPARE(heard.count(), 2);
+        QVERIFY(one.datePagesShown());
+    }
+
+    void a_page_is_known_by_its_name()
+    {
+        IconFiles files;
+        QVERIFY(files.isDatePage(QStringLiteral("almanac")));
+        QVERIFY(!files.isDatePage(QStringLiteral("whole")));
+    }
+
+    void the_day_is_todays()
+    {
+        IconFiles files;
+        QCOMPARE(files.today(), QDate::currentDate().toString(Qt::ISODate));
     }
 };
 

@@ -192,6 +192,11 @@ ShellRoot {
         settings: shell.settings
     }
 
+    // the one switch every icon lookup reads for dates on calendar pages
+    IconSource {
+        datePagesShown: userChoices.value("calendar", "icon_date") ?? true
+    }
+
     Extensions {
         id: extensions
         settings: shell.settings

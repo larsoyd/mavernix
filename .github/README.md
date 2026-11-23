@@ -36,6 +36,7 @@ To build it, check out `larsoyd` and follow [docs/building.md](../docs/building.
 - Files dropped on the dock's trash play the trash sound once they are in the trash, as the Mac dock does.
 - The app grid sizes its icons and spacing to the screen, as Launchpad does.
 - The app grid, the dock and Dolphin can make a desktop shortcut for any program or file.
+- A calendar page icon shows today's month and day, written as Mavericks' Calendar writes them on its dock tile, and turns over at midnight, in the dock, the app grid and everywhere else the icon shows.
 
 ### Desktop
 

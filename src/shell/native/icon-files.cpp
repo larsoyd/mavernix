@@ -1,6 +1,8 @@
 #include "icon-files.hpp"
 
+#include "date-page.hpp"
 #include "icon-fit.hpp"
+#include "today.hpp"
 
 #include <QFileInfo>
 #include <QGuiApplication>
@@ -21,6 +23,13 @@
 #include <librsvg/rsvg.h>
 
 static const int default_side = 128;
+
+// items ask once before they have a size
+static int asked_side(const QSize& requested)
+{
+    const int asked = qMax(requested.width(), requested.height());
+    return asked > 0 ? asked : default_side;
+}
 
 static bool is_drawing(const QString& file)
 {
@@ -191,11 +200,33 @@ IconFiles::IconFiles(QObject* parent) : QObject(parent)
     connect(&folders, &QFileSystemWatcher::directoryChanged, &settle, qOverload<>(&QTimer::start));
     connect(&folders, &QFileSystemWatcher::fileChanged, &settle, qOverload<>(&QTimer::start));
     watchFolders();
+    connect(Today::shared(), &Today::changed, this, &IconFiles::todayChanged);
+    connect(Today::shared(), &Today::shownChanged, this, &IconFiles::datePagesShownChanged);
 }
 
 int IconFiles::revision() const
 {
     return currentRevision;
+}
+
+QString IconFiles::today() const
+{
+    return Today::shared()->stamp();
+}
+
+bool IconFiles::datePagesShown() const
+{
+    return Today::shared()->shown();
+}
+
+void IconFiles::setDatePagesShown(bool shown)
+{
+    Today::shared()->setShown(shown);
+}
+
+bool IconFiles::isDatePage(const QString& name) const
+{
+    return is_date_page(name);
 }
 
 void IconFiles::watchFolders()
@@ -358,23 +389,64 @@ QImage FittedIconProvider::requestImage(const QString& address, QSize* size, con
 {
     // a name may be a file's path, with slashes
     const QString name = address.section(QLatin1Char('/'), 1);
-    const int side = qMax(requested_size.width(), requested_size.height()) > 0
-                         ? qMax(requested_size.width(), requested_size.height())
-                         : default_side;
-    QImage drawn = ThemeIconProvider::picture(name, QSize(side, side));
-
-    const IconFit fit = fit_icon(drawn, side);
-    if (fit.scale > 0)
+    const QImage drawn = picture(name, asked_side(requested_size));
+    if (size != nullptr)
     {
-        // drawn anew at the final size, so small art stays sharp
-        const int scaled_side = qRound(side * fit.scale);
-        const QImage scaled = ThemeIconProvider::picture(name, QSize(scaled_side, scaled_side));
-        QImage placed(side, side, QImage::Format_ARGB32_Premultiplied);
-        placed.fill(Qt::transparent);
-        QPainter painter(&placed);
-        painter.drawImage(fit.corner.toPoint(), scaled);
-        painter.end();
-        drawn = placed;
+        *size = drawn.size();
+    }
+    return drawn;
+}
+
+QImage FittedIconProvider::picture(const QString& name, int side, const std::function<void(QImage&)>& finish)
+{
+    QImage drawn = ThemeIconProvider::picture(name, QSize(side, side));
+    const IconFit fit = fit_icon(drawn, side);
+    if (fit.scale <= 0)
+    {
+        if (finish && !drawn.isNull())
+        {
+            drawn = drawn.convertToFormat(QImage::Format_ARGB32_Premultiplied);
+            finish(drawn);
+        }
+        return drawn;
+    }
+    // drawn anew at the final size, so small art stays sharp
+    const int scaled_side = qRound(side * fit.scale);
+    QImage scaled = ThemeIconProvider::picture(name, QSize(scaled_side, scaled_side));
+    if (finish)
+    {
+        scaled = scaled.convertToFormat(QImage::Format_ARGB32_Premultiplied);
+        finish(scaled);
+    }
+    QImage placed(side, side, QImage::Format_ARGB32_Premultiplied);
+    placed.fill(Qt::transparent);
+    QPainter painter(&placed);
+    painter.drawImage(fit.corner.toPoint(), scaled);
+    painter.end();
+    return placed;
+}
+
+DatePageProvider::DatePageProvider() : QQuickImageProvider(QQuickImageProvider::Image) {}
+
+QImage DatePageProvider::requestImage(const QString& address, QSize* size, const QSize& requested_size)
+{
+    const bool fitted = address.section(QLatin1Char('/'), 0, 0) == QLatin1String("fitted");
+    const QDate date = QDate::fromString(address.section(QLatin1Char('/'), 1, 1), Qt::ISODate);
+    const QString name = address.section(QLatin1Char('/'), 2);
+    const int side = asked_side(requested_size);
+    // the month reads in the desktop's language, whatever region its dates follow
+    const DatePageWords words = date_page_words(date, QLocale(QLocale::system().name()));
+    const auto write = [&words](QImage& page) { draw_date_page(page, words.month, words.day); };
+
+    QImage drawn;
+    if (fitted)
+    {
+        drawn = FittedIconProvider::picture(name, side, write);
+    }
+    else
+    {
+        drawn = ThemeIconProvider::picture(name, QSize(side, side)).convertToFormat(QImage::Format_ARGB32_Premultiplied);
+        write(drawn);
     }
     if (size != nullptr)
     {

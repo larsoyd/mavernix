@@ -102,11 +102,22 @@ tests = {
         'include': test_sources / 'shell/native',
         'dependencies': [qt_native],
     },
+    'today': {
+        'sources': [
+            test_sources / 'shell/native/today.cpp',
+            qt.compile_moc(headers: test_sources / 'shell/native/today.hpp', dependencies: qt_native),
+        ],
+        'include': test_sources / 'shell/native',
+        'dependencies': [qt_native],
+    },
     'fitted-icon': {
         'sources': [
             test_sources / 'shell/native/icon-fit.cpp',
             test_sources / 'shell/native/icon-files.cpp',
-            qt.compile_moc(headers: test_sources / 'shell/native/icon-files.hpp', dependencies: qt_native),
+            test_sources / 'shell/native/date-page.cpp',
+            test_sources / 'shell/native/today.cpp',
+            qt.compile_moc(headers: [test_sources / 'shell/native/icon-files.hpp',
+                                    test_sources / 'shell/native/today.hpp'], dependencies: qt_native),
         ],
         'include': test_sources / 'shell/native',
         'dependencies': [qt_native, librsvg],
@@ -115,7 +126,10 @@ tests = {
         'sources': [
             test_sources / 'shell/native/icon-fit.cpp',
             test_sources / 'shell/native/icon-files.cpp',
-            qt.compile_moc(headers: test_sources / 'shell/native/icon-files.hpp', dependencies: qt_native),
+            test_sources / 'shell/native/date-page.cpp',
+            test_sources / 'shell/native/today.cpp',
+            qt.compile_moc(headers: [test_sources / 'shell/native/icon-files.hpp',
+                                    test_sources / 'shell/native/today.hpp'], dependencies: qt_native),
         ],
         'include': test_sources / 'shell/native',
         'dependencies': [qt_native, librsvg],

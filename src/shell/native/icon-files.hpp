@@ -20,15 +20,24 @@
 #include <QString>
 #include <QTimer>
 
+#include <functional>
+
 class IconFiles : public QObject
 {
     Q_OBJECT
     Q_PROPERTY(int revision READ revision NOTIFY revisionChanged)
+    Q_PROPERTY(QString today READ today NOTIFY todayChanged)
+    Q_PROPERTY(bool datePagesShown READ datePagesShown WRITE setDatePagesShown NOTIFY datePagesShownChanged)
 
   public:
     explicit IconFiles(QObject* parent = nullptr);
 
     int revision() const;
+    // the day it is as 2026-11-23, for pictures that show it
+    QString today() const;
+    // whether calendar pages get the day written on them, one switch for every lookup
+    bool datePagesShown() const;
+    void setDatePagesShown(bool shown);
 
     // An Image source for the icon, or "" if the theme has none. `name` may
     // be a file path. Pass `revision` so the binding updates with it.
@@ -38,8 +47,13 @@ class IconFiles : public QObject
     // theme it inherits (hicolor, where programs put their own).
     Q_INVOKABLE bool isThemeOwn(const QString& name, int revision);
 
+    // a blank calendar page is shown with today's date on it
+    Q_INVOKABLE bool isDatePage(const QString& name) const;
+
   signals:
     void revisionChanged();
+    void todayChanged();
+    void datePagesShownChanged();
 
   private:
     void watchFolders();
@@ -72,6 +86,18 @@ class FittedIconProvider : public QQuickImageProvider
 {
   public:
     FittedIconProvider();
+    QImage requestImage(const QString& address, QSize* size, const QSize& requested_size) override;
+
+    // the fitted icon, with finish run on the art before it is placed
+    static QImage picture(const QString& name, int side, const std::function<void(QImage&)>& finish = {});
+};
+
+// "image://date-page/<fitted or plain>/<2026-11-23>/<name>": a blank calendar
+// page with that day written on it
+class DatePageProvider : public QQuickImageProvider
+{
+  public:
+    DatePageProvider();
     QImage requestImage(const QString& address, QSize* size, const QSize& requested_size) override;
 };
 

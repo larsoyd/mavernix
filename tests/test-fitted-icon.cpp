@@ -1,9 +1,12 @@
 // the picture the dock gets for a program's own icon, placed by its art and
 // drawn at the final size, from a drawing and from a picture file
 
+#include <QGuiApplication>
+#include <QPainter>
 #include <QTemporaryDir>
 #include <QtTest>
 
+#include "date-page.hpp"
 #include "icon-files.hpp"
 
 static const int art_alpha = 128;
@@ -39,6 +42,52 @@ class TestFittedIcon : public QObject
             qFatal("the provider reported a size other than the image's");
         }
         return image.convertToFormat(QImage::Format_ARGB32_Premultiplied);
+    }
+
+    // a grey page smaller than its picture and off its middle, so fitting moves and enlarges it
+    QString written_page()
+    {
+        QImage source(128, 128, QImage::Format_ARGB32_Premultiplied);
+        source.fill(Qt::transparent);
+        QPainter painter(&source);
+        painter.fillRect(12, 20, 96, 96, QColor(128, 128, 128));
+        painter.end();
+        const QString path = folder.filePath(QStringLiteral("almanac.png"));
+        if (!source.save(path))
+        {
+            qFatal("cannot write the page");
+        }
+        return path;
+    }
+
+    static QImage dated(const QString& address, int side = 128)
+    {
+        DatePageProvider provider;
+        QSize reported;
+        const QImage image = provider.requestImage(address, &reported, QSize(side, side));
+        if (reported != image.size())
+        {
+            qFatal("the provider reported a size other than the image's");
+        }
+        return image.convertToFormat(QImage::Format_ARGB32_Premultiplied);
+    }
+
+    // the box around the day's ink, which is darker than any page
+    static QRectF day_of(const QImage& image)
+    {
+        QRect ink;
+        for (int y = 0; y < image.height(); y++)
+        {
+            for (int x = 0; x < image.width(); x++)
+            {
+                const QRgb pixel = image.pixel(x, y);
+                if (qAlpha(pixel) >= art_alpha && qGray(pixel) < 60)
+                {
+                    ink |= QRect(x, y, 1, 1);
+                }
+            }
+        }
+        return ink;
     }
 
     static QRect art_of(const QImage& image)
@@ -165,7 +214,63 @@ class TestFittedIcon : public QObject
         QCOMPARE(image.size(), QSize(128, 128));
         QVERIFY(qAlpha(image.pixel(64, 64)) > 40);
     }
+
+    void a_page_gets_the_day_written_on_it()
+    {
+        const QString path = written_page();
+        QImage wanted = ThemeIconProvider::picture(path, QSize(128, 128)).convertToFormat(QImage::Format_ARGB32_Premultiplied);
+        draw_date_page(wanted, QStringLiteral("MAY"), QStringLiteral("31"));
+        QCOMPARE(dated(QStringLiteral("plain/2016-05-31/") + path), wanted);
+    }
+
+    void another_day_is_another_picture()
+    {
+        const QString path = written_page();
+        QVERIFY(dated(QStringLiteral("plain/2016-05-31/") + path) != dated(QStringLiteral("plain/2016-06-01/") + path));
+    }
+
+    void no_day_leaves_the_page_bare()
+    {
+        const QString path = written_page();
+        const QImage bare = ThemeIconProvider::picture(path, QSize(128, 128)).convertToFormat(QImage::Format_ARGB32_Premultiplied);
+        QCOMPARE(dated(QStringLiteral("plain/nonsense/") + path), bare);
+        QVERIFY(day_of(bare).isEmpty());
+    }
+
+    // the page is fitted as it is without a date, and the date is written where the page went
+    void a_fitted_page_carries_its_date_along()
+    {
+        const QString path = written_page();
+        const QRect bare = art_of(fitted(path));
+        const double scale = bare.width() / 96.0;
+        const QPointF corner = QPointF(bare.topLeft()) - QPointF(12, 20) * scale;
+        const QImage with = dated(QStringLiteral("fitted/2016-05-28/") + path);
+        QCOMPARE(with.size(), QSize(128, 128));
+        const QPointF plain_day = day_of(dated(QStringLiteral("plain/2016-05-28/") + path)).center();
+        const QPointF day = day_of(with).center();
+        QVERIFY2(scale > 1.05, qPrintable(QString::number(scale)));
+        expect_near(day.x(), corner.x() + plain_day.x() * scale, "day x");
+        expect_near(day.y(), corner.y() + plain_day.y() * scale, "day y");
+        expect_near(day_of(with).width(), day_of(dated(QStringLiteral("plain/2016-05-28/") + path)).width() * scale, "day width");
+    }
+
+    void a_page_without_art_to_fit_is_dated_as_it_is()
+    {
+        const QString mist = written_drawing(QStringLiteral("<rect x='0' y='0' width='128' height='128' fill='white' fill-opacity='0.2'/>"));
+        const QImage with = dated(QStringLiteral("fitted/2016-05-28/") + mist);
+        QCOMPARE(with.size(), QSize(128, 128));
+        QVERIFY(!day_of(with).isEmpty());
+    }
 };
 
-QTEST_GUILESS_MAIN(TestFittedIcon)
+int main(int argc, char** argv)
+{
+    // words follow the language, not the region's date forms
+    qputenv("LANG", "en_US.UTF-8");
+    qputenv("LC_TIME", "nb_NO.UTF-8");
+    qunsetenv("LC_ALL");
+    QGuiApplication app(argc, argv);
+    TestFittedIcon test;
+    return QTest::qExec(&test, argc, argv);
+}
 #include "test-fitted-icon.moc"

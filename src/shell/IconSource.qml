@@ -13,12 +13,21 @@ IconFiles {
     // The shell's UserChoices; null where a component shows no applications.
     property var choices: null
 
+    // a blank calendar page gets today written on it, while dates are shown
+    function dated(name, address, how) {
+        if (!source.datePagesShown || !source.isDatePage(name)) {
+            return address
+        }
+        return "image://date-page/" + how + "/" + source.today + "/" + name
+    }
+
     // The icon of this name, or "" if no icon theme has one.
     function find(name) {
         if ((name ?? "") === "") {
             return ""
         }
-        return source.sourceFor(name, source.revision)
+        const address = source.sourceFor(name, source.revision)
+        return address !== "" ? dated(name, address, "plain") : ""
     }
 
     // The icon of this name; if there is none, the icon named `fallback`;
@@ -65,7 +74,7 @@ IconFiles {
     // fitted to the theme's proportions unless the icon theme has it itself
     function fitted(name, fallback) {
         if (find(name) !== "" && !source.isThemeOwn(name, source.revision)) {
-            return "image://fitted-icon/" + source.revision + "/" + name
+            return dated(name, "image://fitted-icon/" + source.revision + "/" + name, "fitted")
         }
         return path(name, fallback)
     }

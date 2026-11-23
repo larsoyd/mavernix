@@ -105,4 +105,5 @@ void ShellNativePlugin::initializeEngine(QQmlEngine* engine, const char* uri)
     engine->addImageProvider(QStringLiteral("svg-icon"), new SvgIconProvider);
     engine->addImageProvider(QStringLiteral("theme-icon"), new ThemeIconProvider);
     engine->addImageProvider(QStringLiteral("fitted-icon"), new FittedIconProvider);
+    engine->addImageProvider(QStringLiteral("date-page"), new DatePageProvider);
 }
