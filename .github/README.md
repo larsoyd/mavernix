@@ -33,6 +33,7 @@ To build it, check out `larsoyd` and follow [docs/building.md](../docs/building.
 - An unkept program's tile grows in, bounces once, and shrinks away when the program quits. A closed minimised window's tile shrinks away too.
 - Dock icons are scaled down with Lanczos, and a program's own icon is fitted to the theme's proportions.
 - Steam games, Lutris games and Minecraft show their own names and icons.
+- Files dropped on the dock's trash play the trash sound once they are in the trash, as the Mac dock does.
 - The app grid sizes its icons and spacing to the screen, as Launchpad does.
 - The app grid, the dock and Dolphin can make a desktop shortcut for any program or file.
 

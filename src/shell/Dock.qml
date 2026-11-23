@@ -1001,7 +1001,20 @@ PanelWindow {
     function trashDropped(paths) {
         const command = config.trash_drop_command ?? []
         if (command.length > 0 && paths.length > 0) {
-            Quickshell.execDetached(command.concat(paths))
+            trashing.createObject(dock, { command: command.concat(paths) })
+        }
+    }
+    // the dock sounds once the files are in the trash, as the mac dock does
+    Component {
+        id: trashing
+        Process {
+            running: true
+            onExited: code => {
+                if (code === 0 && dock.sounds !== null) {
+                    dock.sounds.play("file-trash")
+                }
+                destroy()
+            }
         }
     }
 
