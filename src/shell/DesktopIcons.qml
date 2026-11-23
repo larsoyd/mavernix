@@ -662,21 +662,24 @@ Item {
     function iconSourceOf(entry) {
         return themeIcons.path(entry.icon, entry.genericIcon)
     }
-    readonly property var pickedIndices: entries.map((entry, index) => index)
-                                                .filter(index => pickedPaths.includes(entries[index].path))
+    // the icons the last press carries, so the drag picture is built per press and not per pick
+    property var flockIndices: []
     // the picked icons and the room their names can take, around which the drag picture is cut
     readonly property rect flockBox: {
-        if (pickedIndices.length === 0) {
+        if (flockIndices.length === 0) {
             return Qt.rect(0, 0, 1, 1)
         }
-        const lefts = pickedIndices.map(index => iconX(index) - inCell.pictureX - 2)
-        const tops = pickedIndices.map(index => iconY(index) - inCell.pictureY - 2)
+        const lefts = flockIndices.map(index => iconX(index) - inCell.pictureX - 2)
+        const tops = flockIndices.map(index => iconY(index) - inCell.pictureY - 2)
         const left = Math.floor(Math.min(...lefts))
         const top = Math.floor(Math.min(...tops))
         return Qt.rect(left, top, Math.ceil(Math.max(...lefts) + cell.width + 4) - left,
                        Math.ceil(Math.max(...tops) + cell.height + 4) - top)
     }
     property string flockPicture: ""
+    // a drag waits for its own press's picture, or past the deadline goes with the file's icon
+    property bool flockLate: false
+    readonly property bool flockReady: flockPicture !== "" || flockLate
     property point flockHold: Qt.point(0, 0)
     property point flockFrom: Qt.point(0, 0)
     property int heldIndex: -1
@@ -684,11 +687,28 @@ Item {
     property point heldOffset: Qt.point(iconSize / 2, iconSize / 2)
 
     function takeDragPicture(index, holdX, holdY) {
+        flockIndices = entries.map((entry, at) => at).filter(at => pickedPaths.includes(entries[at].path))
         heldIndex = index
         heldOffset = Qt.point(holdX - iconX(index), holdY - iconY(index))
         flockFrom = Qt.point(flockBox.x, flockBox.y)
         flockHold = Qt.point(holdX - flockBox.x, holdY - flockBox.y)
-        flock.grabToImage(result => { icons.flockPicture = result.url })
+        flockPicture = ""
+        flockLate = false
+        const asked = Date.now()
+        flockDeadline.restart()
+        flock.grabToImage(result => {
+            flockDeadline.stop()
+            icons.flockPicture = result.url
+            console.info(`[desktop] drag picture ready ms=${Date.now() - asked} icons=${icons.flockIndices.length}`)
+        })
+    }
+    Timer {
+        id: flockDeadline
+        interval: 150
+        onTriggered: {
+            icons.flockLate = true
+            console.warn(`[desktop] drag picture late ms=${interval} icons=${icons.flockIndices.length}`)
+        }
     }
 
     // drawn beside the screen, only its picture is ever shown
@@ -703,7 +723,7 @@ Item {
             opacity: icons.looks?.drag_opacity ?? 1
 
             Repeater {
-                model: icons.pickedIndices
+                model: icons.flockIndices
                 Item {
                     required property int modelData
                     readonly property var entry: icons.entries[modelData] ?? ({ icon: "", path: "", name: "" })
@@ -746,7 +766,7 @@ Item {
         Item {
             readonly property var look: icons.looks?.drag_badge ?? ({})
             readonly property real size: look.size ?? 18
-            visible: icons.pickedIndices.length > 1 && icons.heldIndex >= 0
+            visible: icons.flockIndices.length > 1 && icons.heldIndex >= 0
             width: Math.max(size, count.implicitWidth + size / 2)
             height: size
             x: icons.iconX(icons.heldIndex) - icons.flockBox.x + icons.iconSize - width + size / 4
@@ -760,7 +780,7 @@ Item {
             Text {
                 id: count
                 anchors.centerIn: parent
-                text: icons.pickedIndices.length
+                text: icons.flockIndices.length
                 color: ThemeValues.color(parent.look.text_color ?? "#ffffff")
                 font.family: (icons.fonts.desktop_icon ?? icons.fonts.interface).family
                 font.pixelSize: Math.round(parent.size * 0.65)
@@ -885,7 +905,7 @@ Item {
             // programs that take only text. Qt needs an item to move while dragging.
             Item {
                 id: carried
-                Drag.active: press.drag.active
+                Drag.active: press.drag.active && icons.flockReady
                 Drag.onActiveChanged: {
                     if (Drag.active) {
                         icons.carriedPath = fileItem.modelData.path
