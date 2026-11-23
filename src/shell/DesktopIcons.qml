@@ -157,9 +157,17 @@ Item {
             const commandAlone = held.super && !held.alt && !held.ctrl && !held.shift
             const snap = commandAlone ? !icons.snapToGrid : icons.snapToGrid
             const loose = drop.dropped.map(point => ({ x: point.x, y: point.y, loose: icons.snapToGrid }))
+            const decided = snap ? DesktopPlaces.onGrid(icons.grid, drop.kept, drop.dropped) : loose
             icons.glideNext()
-            icons.rememberPlaces(icons.placesByName(drop.names,
-                snap ? DesktopPlaces.onGrid(icons.grid, drop.kept, drop.dropped) : loose))
+            icons.rememberPlaces(icons.placesByName(drop.names, decided))
+            // a place the drop left as it was sends no change, so those icons are sent back by hand
+            drop.names.forEach((name, number) => {
+                const index = icons.entries.findIndex(entry => entry.name === name)
+                const now = icons.places[index]
+                if (now !== undefined && now.x === decided[number].x && now.y === decided[number].y) {
+                    iconItems.itemAt(index)?.settle()
+                }
+            })
         }
     }
 
@@ -605,9 +613,6 @@ Item {
             pointerPlace.ask()
         }
     }
-    DragHotSpot {
-        id: dragHotSpot
-    }
     PointerPlace {
         id: pointerPlace
         onFound: (x, y) => {
@@ -711,7 +716,6 @@ Item {
                 Drag.onActiveChanged: {
                     if (Drag.active) {
                         icons.carriedPath = fileItem.modelData.path
-                        dragHotSpot.send()
                     }
                 }
                 Drag.dragType: Drag.Automatic

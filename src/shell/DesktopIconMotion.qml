@@ -20,6 +20,16 @@ Item {
         glide.start()
     }
 
+    // back to its place when that place did not change, as after a small drop
+    function settle() {
+        if (x !== place.x || y !== place.y) {
+            glide.stop()
+            toX.to = place.x
+            toY.to = place.y
+            glide.start()
+        }
+    }
+
     function jump(point) {
         glide.stop()
         x = point.x
