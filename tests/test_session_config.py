@@ -1015,6 +1015,8 @@ class TestSeaLionFonts(unittest.TestCase):
             with self.subTest(path=path):
                 self.assertIn(path, taken)
         self.assertIn("System/Library/Fonts/Menlo.ttc", self.make_theme.TYPEFACE_FILES)
+        # calendar draws its views and its dock date in helvetica neue
+        self.assertIn("System/Library/Fonts/HelveticaNeue.dfont", self.make_theme.TYPEFACE_FILES)
 
     def test_older_themes_get_the_new_sizes(self):
         self.assertIn(19, self.updates)
@@ -1478,7 +1480,9 @@ class TestTypefaceWidths(unittest.TestCase):
         self.collection((-1003, [1000, 2000])).rename(fonts / "LucidaGrande.ttc")
         (fonts / "Helvetica.dfont").write_bytes(b"resources")
         (fonts / "Menlo.ttc").write_bytes(b"menlo")
+        (fonts / "HelveticaNeue.dfont").write_bytes(b"neue")
         self.make_theme.copy_typeface(self.folder / "root", self.folder / "theme")
+        self.assertEqual((self.folder / "theme" / "HelveticaNeue.dfont").read_bytes(), b"neue")
         self.assertEqual(self.averages(self.folder / "theme" / "LucidaGrande.ttc"), [1500])
         self.assertEqual((self.folder / "theme" / "Menlo.ttc").read_bytes(), b"menlo")
 

@@ -598,3 +598,9 @@ import_brings = [
 
 [update.settings."desktop.icons"]
 link_emblem = { icon = "emblem-alias-badge", share = 1 }
+
+[[update]]
+revision = 36
+import_brings = [
+    "Calendar pages show their date in Helvetica Neue, as on Mavericks.",
+]

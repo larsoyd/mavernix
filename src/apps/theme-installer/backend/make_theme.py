@@ -768,7 +768,9 @@ SYSTEM_FONT_FILE = "System/Library/Fonts/LucidaGrande.ttc"
 THEME_FONTS = "fonts"
 HELVETICA_FILE = "System/Library/Fonts/Helvetica.dfont"
 MENLO_FILE = "System/Library/Fonts/Menlo.ttc"
-TYPEFACE_FILES = (SYSTEM_FONT_FILE, HELVETICA_FILE, MENLO_FILE)
+# calendar's views and its dock date are set in it
+HELVETICA_NEUE_FILE = "System/Library/Fonts/HelveticaNeue.dfont"
+TYPEFACE_FILES = (SYSTEM_FONT_FILE, HELVETICA_FILE, MENLO_FILE, HELVETICA_NEUE_FILE)
 
 
 def font_table(data, face, tag):
