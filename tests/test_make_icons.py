@@ -389,5 +389,19 @@ class SideBarGlyphTests(unittest.TestCase):
             self.assertEqual({path: path.read_bytes() for path in theme.rglob("*") if path.is_file()}, before)
 
 
+class ProgramIconTests(unittest.TestCase):
+    def test_bandstand_takes_itunes(self):
+        self.assertEqual(make_icons.ICONS["bandstand"], ("apps", "Applications/iTunes.app"))
+
+    def test_kdenlive_drawn_at_every_size(self):
+        with tempfile.TemporaryDirectory() as folder:
+            theme = Path(folder)
+            written = make_icons.write_program_art(theme)
+            for size, _ in written:
+                picture = Image.open(theme / f"{size}x{size}" / "apps" / "kdenlive.png")
+                self.assertEqual(picture.size, (size, size), f"size={size}")
+            self.assertEqual({size for size, _ in written}, {16, 32, 48, 64, 128, 256, 512})
+
+
 if __name__ == "__main__":
     unittest.main()

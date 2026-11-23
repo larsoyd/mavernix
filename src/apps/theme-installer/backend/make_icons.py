@@ -267,6 +267,7 @@ ICONS = {
     "rhythmbox": ("apps", "Applications/iTunes.app"),
     "org.gnome.Rhythmbox3": ("apps", "Applications/iTunes.app"),
     "strawberry": ("apps", "Applications/iTunes.app"),
+    "bandstand": ("apps", "Applications/iTunes.app"),
     "vlc": ("apps", "Applications/QuickTime Player.app"),
     "mpv": ("apps", "Applications/QuickTime Player.app"),
     "totem": ("apps", "Applications/QuickTime Player.app"),
