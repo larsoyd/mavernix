@@ -176,10 +176,11 @@ def animation_sections(theme):
     # the login cover must hide the desktop from its first frame, not fade in over it
 
     # the dock slides between screens, a fade would leave it standing where it was
-    # the plate of layouts slides out from the top by itself
+    # the plate of layouts and a refused desktop drag slide by themselves
     animate = ["[animate]", 'enabled_for = type equals "toplevel"',
                'fade_enabled_for = type equals "overlay" & !(app_id equals "mavernix-entry")'
-               ' & !(app_id contains "mavernix-dock") & !(app_id equals "mavernix-zones")']
+               ' & !(app_id contains "mavernix-dock") & !(app_id equals "mavernix-zones")'
+               ' & !(app_id equals "mavernix-slide-back")']
     sections = [animate]
     plugins = []
 

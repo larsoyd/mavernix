@@ -550,9 +550,10 @@ class TestWindowAnimations(SessionTestCase):
         self.assertIn('enabled_for = type equals "toplevel"', sections[0])
         self.assertIn(["[themed-open-close]", "pop_duration = 200ms circle"], sections)
 
-        # the login cover, the dock and the plate of layouts leave the fade to other overlays
+        # overlays that move by themselves are left out of the fade
         self.assertIn('fade_enabled_for = type equals "overlay" & !(app_id equals "mavernix-entry")'
-                      ' & !(app_id contains "mavernix-dock") & !(app_id equals "mavernix-zones")', sections[0])
+                      ' & !(app_id contains "mavernix-dock") & !(app_id equals "mavernix-zones")'
+                      ' & !(app_id equals "mavernix-slide-back")', sections[0])
 
         # A desktop's [window] quick_open_close_ms keeps the curve.
         make_wayfire_config.shorten_open_and_close(sections, 120)
@@ -871,6 +872,16 @@ class TestSeaLionUpdates(unittest.TestCase):
             import updates
             self.assertTrue(updates.refresh_theme(theme_file, [self.updates[32]]))
             self.assertEqual(tomllib.loads(theme_file.read_text())["desktop"]["icons"]["name"], made)
+
+    def test_older_themes_get_the_imports_drag_picture(self):
+        import inspect
+        made = tomllib.loads(self.make_theme.DESKTOP_DRAG_LINES)
+        # measured on 10.9.5: page white 227 over the wallpaper, the slide back 283 ms, a 20 px badge
+        self.assertEqual((made["drag_opacity"], made["slide_back_ms"], made["drag_badge"]["size"]), (0.85, 280, 20))
+        self.assertIn(33, self.updates)
+        self.assertEqual(self.updates[33]["settings"], {"desktop.icons": made})
+        self.assertNotIn("themes", self.updates[33])
+        self.assertIn("{DESKTOP_DRAG_LINES}", inspect.getsource(self.make_theme.build_theme_text))
 
     @staticmethod
     def inline(value):

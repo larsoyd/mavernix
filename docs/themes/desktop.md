@@ -72,4 +72,12 @@ move_ms = 350
 # Optional: a program opened from its icon leaves a copy of the icon that
 # grows to twice its size as it fades away, over this long.
 launch_ms = 150
+# Optional: dragged icons. All picked icons follow the pointer with their names
+# lit, drag_opacity see-through. With several, a badge with their count sits at
+# the lower right of the one held: size is its height, fill any fill (rounded to
+# a circle), text_color its digits. A drop nothing takes slides back to the
+# icons over slide_back_ms, slowing down. Left out, the picture just vanishes.
+drag_opacity = 0.85
+slide_back_ms = 250
+drag_badge = { size = 18, fill = { color = "#d0312d" }, text_color = "#ffffff" }
 ```

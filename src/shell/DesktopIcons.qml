@@ -419,7 +419,8 @@ Item {
             }
             // The desktop's own icon dropped here is placed; other files are moved in.
             if (icons.carriedPath !== "" && paths.includes(icons.carriedPath)) {
-                icons.dropPicked(icons.carriedPath, drop.x, drop.y)
+                icons.dropPicked(icons.carriedPath, drop.x - icons.heldOffset.x + icons.iconSize / 2,
+                                 drop.y - icons.heldOffset.y + icons.iconSize / 2)
             } else {
                 icons.takeIn(paths)
             }
@@ -487,6 +488,164 @@ Item {
         }
     }
 
+    // --- What a drag carries -----------------------------------------------------------------
+
+    function iconSourceOf(entry) {
+        return themeIcons.path(entry.icon, entry.genericIcon)
+    }
+    readonly property var nameLook: looks?.name ?? ({})
+    readonly property var pickedIndices: entries.map((entry, index) => index)
+                                                .filter(index => pickedPaths.includes(entries[index].path))
+    // the picked icons and the room their names can take, around which the drag picture is cut
+    readonly property rect flockBox: {
+        const half = Math.max(iconSize, (nameLook.most_width ?? 110) + 2 * (nameLook.padding ?? 6)) / 2
+        const below = iconSize + (nameLook.gap ?? 4) + (nameLook.lines ?? 1) * (nameLook.height ?? 18) + 2
+        if (pickedIndices.length === 0) {
+            return Qt.rect(0, 0, 1, 1)
+        }
+        const lefts = pickedIndices.map(index => iconX(index) + iconSize / 2 - half)
+        const tops = pickedIndices.map(index => iconY(index))
+        const left = Math.floor(Math.min(...lefts))
+        const top = Math.floor(Math.min(...tops))
+        return Qt.rect(left, top, Math.ceil(Math.max(...lefts) + 2 * half) - left, Math.ceil(Math.max(...tops) + below) - top)
+    }
+    property string flockPicture: ""
+    property point flockHold: Qt.point(0, 0)
+    property point flockFrom: Qt.point(0, 0)
+    property int heldIndex: -1
+    // where in the held icon the pointer took it
+    property point heldOffset: Qt.point(iconSize / 2, iconSize / 2)
+
+    function takeDragPicture(index, holdX, holdY) {
+        heldIndex = index
+        heldOffset = Qt.point(holdX - iconX(index), holdY - iconY(index))
+        flockFrom = Qt.point(flockBox.x, flockBox.y)
+        flockHold = Qt.point(holdX - flockBox.x, holdY - flockBox.y)
+        flock.grabToImage(result => { icons.flockPicture = result.url })
+    }
+
+    // drawn beside the screen, only its picture is ever shown
+    Item {
+        id: flock
+        x: icons.width + 100
+        width: icons.flockBox.width
+        height: icons.flockBox.height
+
+        Item {
+            anchors.fill: parent
+            opacity: icons.looks?.drag_opacity ?? 1
+
+            Repeater {
+                model: icons.pickedIndices
+                Item {
+                    required property int modelData
+                    readonly property var entry: icons.entries[modelData] ?? ({ icon: "", path: "", name: "" })
+                    x: icons.iconX(modelData) - icons.flockBox.x
+                    y: icons.iconY(modelData) - icons.flockBox.y
+                    width: icons.iconSize
+                    height: icons.iconSize
+
+                    DesktopIconPicture {
+                        anchors.fill: parent
+                        entry: parent.entry
+                        iconSource: icons.iconSourceOf(parent.entry)
+                        frame: icons.looks?.preview_frame ?? null
+                    }
+                    DesktopName {
+                        look: icons.nameLook
+                        text: parent.entry.name
+                        face: icons.fonts.desktop_icon ?? icons.fonts.interface
+                        lit: true
+                        picked: true
+                        themeDirectory: icons.themeDirectory
+                        anchors.horizontalCenter: parent.horizontalCenter
+                        y: parent.height + (icons.nameLook.gap ?? 4)
+                    }
+                }
+            }
+        }
+        // the count, at the lower right of the icon the pointer holds
+        Item {
+            readonly property var look: icons.looks?.drag_badge ?? ({})
+            readonly property real size: look.size ?? 18
+            visible: icons.pickedIndices.length > 1 && icons.heldIndex >= 0
+            width: Math.max(size, count.implicitWidth + size / 2)
+            height: size
+            x: icons.iconX(icons.heldIndex) - icons.flockBox.x + icons.iconSize - width + size / 4
+            y: icons.iconY(icons.heldIndex) - icons.flockBox.y + icons.iconSize - height + size / 4
+
+            Fill {
+                anchors.fill: parent
+                fill: Object.assign({}, parent.look.fill ?? { color: "#e0201c" }, { radius: parent.size / 2 })
+                themeDirectory: icons.themeDirectory
+            }
+            Text {
+                id: count
+                anchors.centerIn: parent
+                text: icons.pickedIndices.length
+                color: ThemeValues.color(parent.look.text_color ?? "#ffffff")
+                font.family: (icons.fonts.desktop_icon ?? icons.fonts.interface).family
+                font.pixelSize: Math.round(parent.size * 0.65)
+                font.bold: true
+            }
+        }
+    }
+
+    // a drop nobody took slides the picture back to the icons, decelerating, as finder's does
+    readonly property int slideBackMs: looks?.slide_back_ms ?? 0
+    function slideBack() {
+        if (slideBackMs > 0 && flockPicture !== "") {
+            pointerPlace.ask()
+        }
+    }
+    DragHotSpot {
+        id: dragHotSpot
+    }
+    PointerPlace {
+        id: pointerPlace
+        onFound: (x, y) => {
+            slider.from = Qt.point(x - icons.screen.x - icons.flockHold.x, y - icons.screen.y - icons.flockHold.y)
+            slider.restart()
+        }
+    }
+    PanelWindow {
+        id: slider
+        property point from: Qt.point(0, 0)
+        property real done: 0
+        function restart() {
+            sliding.restart()
+        }
+        screen: icons.screen
+        visible: sliding.running
+        anchors {
+            left: true
+            right: true
+            top: true
+            bottom: true
+        }
+        exclusionMode: ExclusionMode.Ignore
+        WlrLayershell.layer: WlrLayer.Overlay
+        WlrLayershell.keyboardFocus: WlrKeyboardFocus.None
+        WlrLayershell.namespace: "mavernix-slide-back"
+        color: "transparent"
+        mask: Region {}
+
+        Image {
+            source: icons.flockPicture
+            x: slider.from.x + (icons.flockFrom.x - slider.from.x) * slider.done
+            y: slider.from.y + (icons.flockFrom.y - slider.from.y) * slider.done
+        }
+        NumberAnimation {
+            id: sliding
+            target: slider
+            property: "done"
+            from: 0
+            to: 1
+            duration: icons.slideBackMs
+            easing.type: Easing.OutSine
+        }
+    }
+
     // --- The icons -------------------------------------------------------------------------
 
     Repeater {
@@ -513,24 +672,11 @@ Item {
                 fill: icons.looks?.picked ?? ({ color: "#00000040", radius: 4 })
                 themeDirectory: icons.themeDirectory
             }
-            // A picture is shown as itself, small, in the theme's frame; everything
-            // else by the icon for its kind.
-            readonly property bool isPicture: modelData.icon.startsWith("image-")
-            readonly property string iconSource: themeIcons.path(modelData.icon, modelData.genericIcon)
-            FramedPicture {
-                id: preview
+            DesktopIconPicture {
                 anchors.fill: parent
-                visible: fileItem.isPicture && !failed
-                source: fileItem.isPicture ? "file://" + encodeURI(fileItem.modelData.path) : ""
+                entry: fileItem.modelData
+                iconSource: icons.iconSourceOf(fileItem.modelData)
                 frame: icons.looks?.preview_frame ?? null
-            }
-            Image {
-                id: picture
-                anchors.fill: parent
-                // Also for a picture in a format that cannot be read.
-                visible: !preview.visible
-                sourceSize: Qt.size(width * Screen.devicePixelRatio, height * Screen.devicePixelRatio)
-                source: fileItem.iconSource
             }
 
             // finder's name bubble shows while picked or while something is dragged over it
@@ -556,6 +702,7 @@ Item {
                 Drag.onActiveChanged: {
                     if (Drag.active) {
                         icons.carriedPath = fileItem.modelData.path
+                        dragHotSpot.send()
                     }
                 }
                 Drag.dragType: Drag.Automatic
@@ -564,24 +711,20 @@ Item {
                     "text/uri-list": icons.pickedPaths.map(path => "file://" + encodeURI(path)).join("\r\n") + "\r\n",
                     "text/plain": icons.pickedPaths.join("\n")
                 })
-                // What follows the pointer: a snapshot of the icon taken on press, else the
-                // icon for the file's kind.
-                Drag.imageSource: fileItem.dragPicture !== "" ? fileItem.dragPicture : fileItem.iconSource
-                Drag.imageSourceSize: Qt.size(icons.iconSize, icons.iconSize)
-                Drag.hotSpot: fileItem.dragPicture !== "" ? fileItem.dragHold
-                                                          : Qt.point(icons.iconSize / 2, icons.iconSize / 2)
-                Drag.onDragFinished: {
+                // what follows the pointer: the picked icons as taken on press, else the icon for the file's kind
+                Drag.imageSource: icons.flockPicture !== "" ? icons.flockPicture : icons.iconSourceOf(fileItem.modelData)
+                Drag.imageSourceSize: icons.flockPicture !== "" ? Qt.size(flock.width, flock.height)
+                                                                : Qt.size(icons.iconSize, icons.iconSize)
+                Drag.hotSpot: icons.flockPicture !== "" ? icons.flockHold
+                                                        : Qt.point(icons.iconSize / 2, icons.iconSize / 2)
+                Drag.onDragFinished: dropAction => {
                     x = 0
                     y = 0
                     icons.carriedPath = ""
+                    if (dropAction === Qt.IgnoreAction) {
+                        icons.slideBack()
+                    }
                 }
-            }
-
-            property string dragPicture: ""
-            property point dragHold: Qt.point(0, 0)
-            function takeDragPicture(holdX, holdY) {
-                dragHold = Qt.point(Math.max(0, Math.min(width, holdX)), Math.max(0, Math.min(height, holdY)))
-                fileItem.grabToImage(result => { fileItem.dragPicture = result.url })
             }
 
             // Files dropped on a program launcher are given to its program; files
@@ -637,10 +780,6 @@ Item {
                     armsRename = mouse.button === Qt.LeftButton && mouse.modifiers === Qt.NoModifier
                         && fileItem.picked && icons.pickedPaths.length === 1 && icons.frontmost
                         && mouse.y >= namePlate.y
-                    if (mouse.button === Qt.LeftButton) {
-                        const held = mapToItem(fileItem, mouse.x, mouse.y)
-                        fileItem.takeDragPicture(held.x, held.y)
-                    }
                     if (mouse.button === Qt.RightButton) {
                         // A file that is not picked becomes the only one picked.
                         if (!fileItem.picked) {
@@ -652,6 +791,10 @@ Item {
                         icons.togglePicked(path)
                     } else if (!fileItem.picked) {
                         icons.pickOnly(path)
+                    }
+                    if (mouse.button === Qt.LeftButton) {
+                        const held = mapToItem(icons, mouse.x, mouse.y)
+                        icons.takeDragPicture(fileItem.index, held.x, held.y)
                     }
                 }
                 // A press on one of several picked files keeps them all picked so they can

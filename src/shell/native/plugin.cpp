@@ -17,6 +17,7 @@
 #include "desktop-aside.hpp"
 #include "desktops.hpp"
 #include "dock-dig.hpp"
+#include "drag-hot-spot.hpp"
 #include "emoji-set.hpp"
 #include "file-kind.hpp"
 #include "folder-contents.hpp"
@@ -75,6 +76,7 @@ void ShellNativePlugin::registerTypes(const char* uri)
     qmlRegisterType<DesktopAside>(uri, major_version, minor_version, "DesktopAside");
     qmlRegisterType<Desktops>(uri, major_version, minor_version, "Desktops");
     qmlRegisterType<DockDig>(uri, major_version, minor_version, "DockDig");
+    qmlRegisterType<DragHotSpot>(uri, major_version, minor_version, "DragHotSpot");
     qmlRegisterType<EmojiSet>(uri, major_version, minor_version, "EmojiSet");
     qmlRegisterType<FileKind>(uri, major_version, minor_version, "FileKind");
     qmlRegisterType<FolderContents>(uri, major_version, minor_version, "FolderContents");

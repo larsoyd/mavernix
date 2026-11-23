@@ -571,3 +571,12 @@ table = "desktop.icons"
 key = "name"
 was = { color = "#ffffff", shadow_color = "#000000", shadow_blur = 2.5, shadow_drop = 1, shadow_passes = 3, height = 17, padding = 5, gap = 5, most_width = 110, picked_background = { color = "#3875d7", radius = 8.5 }, picked_edge = { color = "#0000004d", drop = 1 }, away_background = { color = "#d0d0d0", radius = 8.5 }, away_color = "#666666" }
 now = { color = "#ffffff", shadow_color = "#000000", shadow_blur = 2.5, shadow_drop = 1, shadow_passes = 3, height = 17, padding = 5, gap = 5, most_width = 101, lines = 2, picked_background = { color = "#3875d7", radius = 8.5 }, picked_edge = { color = "#0000004d", drop = 1 }, away_background = { color = "#d0d0d0", radius = 8.5 }, away_color = "#666666" }
+
+# Several picked desktop icons are dragged together with a count badge, and a drop nobody takes slides back.
+[[update]]
+revision = 33
+
+[update.settings."desktop.icons"]
+drag_opacity = 0.85
+slide_back_ms = 280
+drag_badge = { size = 20, fill = { gradient = ["#f06060", "#f01c1c", "#e01111", "#ca0606"], border = { color = "#ffffff", width = 1 } }, text_color = "#ffffff" }
