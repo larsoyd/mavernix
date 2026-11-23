@@ -36,6 +36,8 @@ PanelWindow {
 
     property real menuX: 0
     property real menuY: 0
+    // a popover centred on menuX rather than hanging from it
+    property bool centred: false
     // Whether the menu hangs from something along its whole top edge.
     property bool squareTop: false
     // `looks` overrides the theme's [menu]; `pointerScreenX` places a pointer
@@ -305,7 +307,7 @@ PanelWindow {
             visible: overlay.popover !== null
             width: popoverContents.item?.implicitWidth ?? 0
             height: popoverContents.item?.implicitHeight ?? 0
-            x: Math.max(0, Math.min(overlay.menuX, overlay.width - width))
+            x: Math.max(0, Math.min(overlay.centred ? Math.round(overlay.menuX - width / 2) : overlay.menuX, overlay.width - width))
             y: overlay.menuY
 
             BoxFrame {

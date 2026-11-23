@@ -33,6 +33,8 @@ Item {
     // box: an item that sets its implicitWidth and implicitHeight. It opens,
     // closes and is switched to by hovering like a menu (docs/extensions.md).
     property Component popover: null
+    // the popover stands centred under the title instead of hanging from its left edge
+    property bool popoverCentred: false
     readonly property bool opensMenu: menuItems.length > 0 || popover !== null
     signal opening()
     signal chosen(int id)

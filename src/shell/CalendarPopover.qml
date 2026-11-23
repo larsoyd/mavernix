@@ -136,9 +136,12 @@ FocusScope {
     Column {
         id: column
         x: box.looks.padding + 6
-        y: box.looks.padding + 4
+        y: box.looks.padding
         width: 7 * box.cell
         spacing: 4
+        // as much air under the last row as over the first
+        topPadding: 4
+        bottomPadding: 4
 
         // month and year with arrows either side
         Item {

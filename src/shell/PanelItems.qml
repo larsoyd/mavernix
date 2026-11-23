@@ -351,6 +351,8 @@ Row {
                     shortcut: [], children: []
                 }]
                 popover: click === "calendar" ? calendarPopover : null
+                // under a clock in the middle of the bar the calendar is centred, as nothing else lines up with it
+                popoverCentred: row.panel.clockPosition === "middle"
                 onActivated: {
                     if (click === "app") {
                         const almanac = DesktopEntries.applications.values.find(one => one.id === "almanac")

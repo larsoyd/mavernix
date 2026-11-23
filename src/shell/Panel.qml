@@ -382,8 +382,10 @@ PanelWindow {
         // The shown title's, so that it stays while it fades.
         popover: panel.shownTitle?.popover ?? null
 
-        // Hangs from the panel's inner edge, aligned with the title's box.
-        menuX: panel.shownTitle ? panel.shownTitle.mapToItem(null, 0, 0).x - panel.shownTitle.boxOverhang : 0
+        // hangs from the title's box, or centred under a title that asks for it
+        centred: panel.shownTitle?.popoverCentred ?? false
+        menuX: !panel.shownTitle ? 0 : centred ? panel.shownTitle.mapToItem(null, panel.shownTitle.width / 2, 0).x
+                                              : panel.shownTitle.mapToItem(null, 0, 0).x - panel.shownTitle.boxOverhang
         menuY: panel.atBottom ? screen.height - panel.height - menuHeight : panel.height
         squareTop: !panel.atBottom
         // a menu longer than the room beside the panel scrolls
