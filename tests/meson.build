@@ -97,6 +97,11 @@ tests = {
         'include': test_sources / 'shell/native',
         'dependencies': [],
     },
+    'date-page': {
+        'sources': [test_sources / 'shell/native/date-page.cpp'],
+        'include': test_sources / 'shell/native',
+        'dependencies': [qt_native],
+    },
     'fitted-icon': {
         'sources': [
             test_sources / 'shell/native/icon-fit.cpp',
