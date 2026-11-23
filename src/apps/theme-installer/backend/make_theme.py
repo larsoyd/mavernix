@@ -409,6 +409,27 @@ SOURCE_LISTS_LINE = 'source_lists = ["KFilePlacesView", "KateFileTree"]\n'
 
 # white at 15 % with a 50 % edge, gone 0.2 s after the drag ends
 DESKTOP_BAND_LINE = 'band = { color = "#ffffff26", border_color = "#ffffff91", border_width = 1, fade_ms = 200 }\n'
+# finder's view options panel for the desktop, measured on the reference: a 201 wide utility
+# panel, a 16 high title bar from 251 to 226 grey over a 167 line, a 237 body and 137 separators
+DESKTOP_VIEW_OPTIONS_TABLE = """
+[desktop.view_options]
+width = 201
+title_height = 16
+title_fill = { gradient = ["#fbfbfb", "#e2e2e2"] }
+title_line = "#a7a7a7"
+title_color = "#818181"
+fill = "#ededed"
+text_color = "#000000"
+separator = "#898989"
+shadow = { color = "#00000066", offset = [0, 6], blur = 16 }
+close = { normal = "images/controls/utility-close.png", hover = "images/controls/utility-close-hover.png", pressed = "images/controls/utility-close-pressed.png" }
+grid_small = "images/desktop/grid-small.png"
+grid_large = "images/desktop/grid-large.png"
+checkbox = { off = "images/controls/checkbox-off-small.png", off_pressed = "images/controls/checkbox-off-small-pressed.png", on = "images/controls/checkbox-on-small.png", on_pressed = "images/controls/checkbox-on-small-pressed.png" }
+radio = { off = "images/controls/radio-off-small.png", off_pressed = "images/controls/radio-off-small-pressed.png", on = "images/controls/radio-on-small.png", on_pressed = "images/controls/radio-on-small-pressed.png" }
+popup = { normal = "images/controls/popup-small.png", pressed = "images/controls/popup-small-pressed.png", slice = [6, 15, 6, 8], text_inset = 10 }
+slider = { track = "images/controls/slider-track-small.png", track_slice = [2, 3, 2, 3], thumb = "images/controls/slider-thumb-below-small.png", thumb_pressed = "images/controls/slider-thumb-below-small-pressed.png", tick = "images/controls/slider-ticks-small.png" }
+"""
 
 # finder moves desktop icons to their places over 350 ms, eased in and out
 # and grows a folder's or a document's window out of its icon in 200 ms
@@ -476,6 +497,7 @@ app_store_button  = {{ family = "{TITLE_FONT_FAMILY}", size = 9, bold = true }}
 program_switcher = {{ family = "{TITLE_FONT_FAMILY}", size = 14, bold = true }}
 zone_picker = {{ family = "{TITLE_FONT_FAMILY}", size = 14, bold = true }}
 desktop_icon = {{ family = "{TITLE_FONT_FAMILY}", size = 12, bold = true }}
+view_options = {{ family = "{TITLE_FONT_FAMILY}", size = 11 }}
 banner_title = {{ family = "{TITLE_FONT_FAMILY}", size = 13, bold = true }}
 banner_text  = {{ family = "{TITLE_FONT_FAMILY}", size = 11 }}
 app_grid_label = {{ family = "{TITLE_FONT_FAMILY}", size = 12, bold = true }}
@@ -639,6 +661,24 @@ CONTROL_PICTURES = {
     "tool-button": "tbsegments-active-regular",
     "tool-button-pressed": "tbsegments-pressed-regular",
     "tool-button-disabled": "tbsegments-disabled-regular",
+    # the small size finder's view options panel has, and its own close button
+    "checkbox-off-small": "checkbox-active-clear-off-small",
+    "checkbox-off-small-pressed": "checkbox-clear-off-pressed-small",
+    "checkbox-on-small": "checkbox-active-blue-onchecked-small",
+    "checkbox-on-small-pressed": "checkbox-blue-onchecked-pressed-small",
+    "radio-off-small": "radiobutton-active-clear-off-small",
+    "radio-off-small-pressed": "radiobutton-clear-off-pressed-small",
+    "radio-on-small": "radiobutton-active-blue-on-small",
+    "radio-on-small-pressed": "radiobutton-blue-on-pressed-small",
+    "popup-small": "popup-clear-rightsidebutton-small",
+    "popup-small-pressed": "popup-clear-pressed-rightsidebutton-small",
+    "slider-track-small": "sliders-active-horizontal-small-track",
+    "slider-thumb-below-small": "sliders-active-clear-small-south-thumb",
+    "slider-thumb-below-small-pressed": "sliders-clear-pressed-small-south-thumb",
+    "slider-ticks-small": "sliders-horizontal-small-ticks",
+    "utility-close": "titlebarcontrols-active-close-colorsryg-utilwin-variant1",
+    "utility-close-hover": "titlebarcontrols-close-colorsryg-rollover-utilwin-variant1",
+    "utility-close-pressed": "titlebarcontrols-close-colorsryg-pressed-utilwin-variant1",
 }
 # The push button's picture (48 by 32) has empty rows, 4 above the body and
 # 6 below. The shell's dialogs draw it whole, at its own height.
@@ -1128,6 +1168,20 @@ def convert_status_picture(pdf_file, target, density):
     )
     if result.returncode != 0:
         fail(f"pdftocairo could not convert {pdf_file}: {result.stderr.strip()}")
+
+
+# the black grids at the ends of finder's grid spacing slider
+FINDER_RESOURCES = "System/Library/CoreServices/Finder.app/Contents/Resources"
+GRID_GLYPHS = {"grid-small": "Grid16.pdf", "grid-large": "Grid25.pdf"}
+
+
+def make_view_options_pictures(root, images_dir):
+    """Writes images/desktop/grid-small.png and grid-large.png, at both densities."""
+    target = images_dir / "desktop"
+    target.mkdir(parents=True, exist_ok=True)
+    for name, source in GRID_GLYPHS.items():
+        for density, suffix in ((1, ""), (2, "@2x")):
+            convert_status_picture(root / FINDER_RESOURCES / source, target / f"{name}{suffix}.png", density)
 
 
 # The on-screen volume display's loudspeaker, white, as PDF.
@@ -2190,17 +2244,13 @@ background = {{ image = "{THEME_DESKTOP_PICTURES}/{DEFAULT_DESKTOP_PICTURE}", fi
 pictures = "{THEME_DESKTOP_PICTURES}"
 
 [desktop.icons]
-icon_size = 64
-row_pitch = 112
-column_pitch = 112
-top = 8
-edge_to_icon_middle = 62
+margin = 4
 bottom_room = 110
 picked = {{ color = "#0000004d", radius = 4, border = {{ color = "#96969682", width = 2 }} }}
 picked_reach = 4
 name = {{ color = "#ffffff", shadow_color = "#000000", shadow_blur = 2.5, shadow_drop = 1, shadow_passes = 3, height = 17, padding = 5, gap = 5, most_width = 101, lines = 2, picked_background = {{ color = "#3875d7", radius = 8.5 }}, picked_edge = {{ color = "#0000004d", drop = 1 }}, away_background = {{ color = "#d0d0d0", radius = 8.5 }}, away_color = "#666666" }}
 preview_frame = {{ color = "#ffffff", width = 3, share = 0.86, shadow_color = "#00000080", shadow_blur = 4, shadow_drop = 1 }}
-{DESKTOP_ICON_MOTION_LINES}{DESKTOP_LAUNCH_LINES}{DESKTOP_DRAG_LINES}{DESKTOP_SPRING_LINES}{DESKTOP_LINK_LINE}{DESKTOP_BAND_LINE}"""
+{DESKTOP_ICON_MOTION_LINES}{DESKTOP_LAUNCH_LINES}{DESKTOP_DRAG_LINES}{DESKTOP_SPRING_LINES}{DESKTOP_LINK_LINE}{DESKTOP_BAND_LINE}{DESKTOP_VIEW_OPTIONS_TABLE}"""
 
 
 def main():
@@ -2242,6 +2292,7 @@ def main():
     copy_typeface(root, arguments.output / THEME_FONTS)
     status_icons = make_status_pictures(root, images_dir)
     make_volume_display_pictures(root, images_dir)
+    make_view_options_pictures(root, images_dir)
     dialog_icons = make_dialog_pictures(root, images_dir)
     copy_about_picture(root, images_dir)
     banner_backgrounds = copy_notification_pictures(root, images_dir)

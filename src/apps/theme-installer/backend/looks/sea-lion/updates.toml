@@ -604,3 +604,34 @@ revision = 36
 import_brings = [
     "Calendar pages show their date in Helvetica Neue, as on Mavericks.",
 ]
+
+# The desktop's View Options panel, with Finder's small controls and the grids beside its spacing slider.
+[[update]]
+revision = 37
+import_brings = [
+    "The desktop's View Options panel uses Mavericks' small controls and grid pictures.",
+]
+
+[update.settings."desktop.icons"]
+margin = 4
+
+[update.settings.fonts]
+view_options = { family = ".Lucida Grande UI", size = 11 }
+
+[update.settings."desktop.view_options"]
+width = 201
+title_height = 16
+title_fill = { gradient = ["#fbfbfb", "#e2e2e2"] }
+title_line = "#a7a7a7"
+title_color = "#818181"
+fill = "#ededed"
+text_color = "#000000"
+separator = "#898989"
+shadow = { color = "#00000066", offset = [0, 6], blur = 16 }
+close = { normal = "images/controls/utility-close.png", hover = "images/controls/utility-close-hover.png", pressed = "images/controls/utility-close-pressed.png" }
+grid_small = "images/desktop/grid-small.png"
+grid_large = "images/desktop/grid-large.png"
+checkbox = { off = "images/controls/checkbox-off-small.png", off_pressed = "images/controls/checkbox-off-small-pressed.png", on = "images/controls/checkbox-on-small.png", on_pressed = "images/controls/checkbox-on-small-pressed.png" }
+radio = { off = "images/controls/radio-off-small.png", off_pressed = "images/controls/radio-off-small-pressed.png", on = "images/controls/radio-on-small.png", on_pressed = "images/controls/radio-on-small-pressed.png" }
+popup = { normal = "images/controls/popup-small.png", pressed = "images/controls/popup-small-pressed.png", slice = [6, 15, 6, 8], text_inset = 10 }
+slider = { track = "images/controls/slider-track-small.png", track_slice = [2, 3, 2, 3], thumb = "images/controls/slider-thumb-below-small.png", thumb_pressed = "images/controls/slider-thumb-below-small-pressed.png", tick = "images/controls/slider-ticks-small.png" }
