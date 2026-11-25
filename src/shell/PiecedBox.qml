@@ -40,7 +40,8 @@ Item {
 
     component Piece: Image {
         required property string piece
-        source: "file://" + box.themeDirectory + "/" + box.looks.pieces + "-" + piece + ".png"
+        // a hidden piece is not read, a theme may lack the side pointers
+        source: visible ? "file://" + box.themeDirectory + "/" + box.looks.pieces + "-" + piece + ".png" : ""
         fillMode: Image.Stretch
     }
 
@@ -59,7 +60,10 @@ Item {
         readonly property real pointerFrom: pointed ? box.pointerTop - box.innerTop : height
         Piece { piece: column.piece; width: parent.width; height: column.pointerFrom }
         Piece {
-            piece: column.piece + "t"
+            // without the side pointer picture the plain edge stands in
+            property bool missing: false
+            onStatusChanged: missing = missing || status === Image.Error
+            piece: column.piece + (missing ? "" : "t")
             visible: column.pointed
             y: column.pointerFrom
             width: parent.width

@@ -2203,8 +2203,14 @@ PanelWindow {
         const view = folders.viewOf(folder)
         return sideways && view === "fan" ? "grid" : view
     }
-    // an open folder's tile points the way its grid opens
-    readonly property var openFolderImage: looks.folder?.["open_image_" + side] ?? looks.folder?.open_image
+    // an open folder's tile points the way its grid opens, while the theme has that picture
+    readonly property string sideOpenImage: looks.folder?.["open_image_" + side] ?? ""
+    Image {
+        id: sideOpenProbe
+        visible: false
+        source: dock.sideOpenImage !== "" ? "file://" + dock.themeDirectory + "/" + dock.sideOpenImage : ""
+    }
+    readonly property var openFolderImage: sideOpenProbe.status === Image.Ready ? sideOpenImage : looks.folder?.open_image
 
     // The place whose fan or grid is open, -1 for none.
     property int folderIndex: -1
