@@ -1,9 +1,12 @@
 #include "dock-pane.hpp"
 
+#include <QButtonGroup>
 #include <QCheckBox>
 #include <QFileInfo>
 #include <QFileSystemWatcher>
 #include <QGuiApplication>
+#include <QHBoxLayout>
+#include <QRadioButton>
 #include <QScreen>
 #include <QSignalBlocker>
 #include <QSlider>
@@ -58,6 +61,28 @@ DockPane::DockPane(Choices& choices, QWidget* parent) : QWidget(parent), choices
         with_end_words(size, word("dock_size_small", "Small"), word("dock_size_large", "Large")));
     form->addRow(magnification,
         with_end_words(magnified_size, word("dock_magnification_min", "Min"), word("dock_magnification_max", "Max")));
+
+    // left, bottom and right side by side, as on the original
+    auto* sides = new QWidget;
+    auto* side_row = new QHBoxLayout(sides);
+    side_row->setContentsMargins(0, 0, 0, 0);
+    auto* side_group = new QButtonGroup(this);
+    const QStringList side_names = {QStringLiteral("left"), QStringLiteral("bottom"), QStringLiteral("right")};
+    const QStringList side_words = {word("dock_position_left", "Left"), word("dock_position_bottom", "Bottom"),
+        word("dock_position_right", "Right")};
+    for (int number = 0; number < side_names.size(); number++)
+    {
+        auto* button = new QRadioButton(side_words[number]);
+        keep_to_pitch(button);
+        side_group->addButton(button, number);
+        side_row->addWidget(button);
+        position_buttons.append(button);
+        connect(button, &QRadioButton::clicked, this, [this, name = side_names[number]]() {
+            this->choices.set(QStringLiteral("dock"), QStringLiteral("position"), name);
+        });
+    }
+    side_row->addStretch();
+    form->addRow(word("dock_position", "Position on screen:"), sides);
     form->addCheck(hides);
 
     auto* click_minimizes =
@@ -151,6 +176,10 @@ void DockPane::showCurrent()
     const QSignalBlocker magnification_blocker(magnification);
     const QSignalBlocker magnified_size_blocker(magnified_size);
     const QSignalBlocker hides_blocker(hides);
+
+    const QStringList side_names = {QStringLiteral("left"), QStringLiteral("bottom"), QStringLiteral("right")};
+    const int side = side_names.indexOf(choices.current(QStringLiteral("dock"), QStringLiteral("position")).toString());
+    position_buttons.value(side < 0 ? 1 : side)->setChecked(true);
 
     size->setValue(currentIconSize());
     magnification->setChecked(choices.current(QStringLiteral("dock"), QStringLiteral("magnification")).toBool());

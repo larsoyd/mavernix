@@ -234,6 +234,17 @@ tests = {
         'include': test_sources / 'apps/settings',
         'dependencies': [qt_widgets, dependency('qt6', modules: ['Concurrent'])],
     },
+    'dock-pane': {
+        'sources': [
+            test_sources / 'apps/settings/dock-pane.cpp',
+            test_sources / 'apps/settings/pane-resets.cpp',
+            test_sources / 'apps/settings/pane-parts.cpp',
+            test_sources / 'apps/settings/choices.cpp',
+            qt.compile_moc(headers: test_sources / 'apps/settings/dock-pane.hpp', dependencies: qt_widgets),
+        ],
+        'include': test_sources / 'apps/settings',
+        'dependencies': [qt_widgets],
+    },
     'startup-pane': {
         'sources': [
             test_sources / 'apps/settings/startup-pane.cpp',
@@ -395,6 +406,14 @@ dock_menus_test = executable(
     cpp_args: ['-DSHELL_DIR="' + (meson.project_source_root() / 'src' / 'shell') + '"'],
 )
 test('dock-menus', dock_menus_test, env: {'QT_QPA_PLATFORM': 'offscreen'})
+
+logo_menu_test = executable(
+    'test-logo-menu',
+    ['test-logo-menu.cpp', qt.compile_moc(sources: 'test-logo-menu.cpp', dependencies: qt_test)],
+    dependencies: [qt_test, dependency('qt6', modules: ['Core', 'Qml'])],
+    cpp_args: ['-DSHELL_DIR="' + (meson.project_source_root() / 'src' / 'shell') + '"'],
+)
+test('logo-menu', logo_menu_test, env: {'QT_QPA_PLATFORM': 'offscreen'})
 
 dock_screen_test = executable(
     'test-dock-screen',

@@ -3,11 +3,13 @@
 
 #pragma once
 
+#include <QList>
 #include <QWidget>
 
 class Choices;
 class QCheckBox;
 class QFileSystemWatcher;
+class QRadioButton;
 class QSlider;
 
 class DockPane : public QWidget
@@ -29,5 +31,7 @@ class DockPane : public QWidget
     QCheckBox* magnification = nullptr;
     QSlider* magnified_size = nullptr;
     QCheckBox* hides = nullptr;
+    // left, bottom and right
+    QList<QRadioButton*> position_buttons;
     QFileSystemWatcher* watcher = nullptr;
 };

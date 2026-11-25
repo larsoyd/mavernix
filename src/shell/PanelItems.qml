@@ -11,6 +11,7 @@ import "ApplicationName.js" as ApplicationName
 import "MenuBarClock.js" as MenuBarClock
 import "StartProgram.js" as StartProgram
 import "ThemeValues.js" as ThemeValues
+import "LogoMenu.js" as LogoMenu
 
 Row {
     id: row
@@ -233,16 +234,14 @@ Row {
                 openPicture: row.panel.looks.logo_highlighted ?? ""
                 boxOverhang: row.panel.looks.logo_highlight_overhang ?? row.spacing / 2
 
-                // An entry is { label, command, confirm? }, { label, action } or
-                // { separator = true }; its index is its id.
-                menuItems: parent.entries.map((entry, index) => ({
-                    id: index,
-                    label: entry.label ?? "",
-                    enabled: true,
-                    separator: entry.separator ?? false,
-                    checkable: false, checked: false, shortcut: [], children: []
-                }))
-                onChosen: id => row.panel.runEntry(parent.entries[id])
+                // an entry runs a command or an action, or holds entries of a submenu
+                menuItems: LogoMenu.items(parent.entries, state => row.panel.shell?.holds(state) ?? false)
+                onChosen: id => {
+                    const entry = LogoMenu.entryFor(parent.entries, id)
+                    if (entry !== undefined && (entry.entries ?? []).length === 0) {
+                        row.panel.runEntry(entry)
+                    }
+                }
             }
         }
     }

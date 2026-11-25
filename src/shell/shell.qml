@@ -388,12 +388,27 @@ ShellRoot {
             emojiPicker.toggle()
         } else if (action === "view_options") {
             desktopIcons?.toggleViewOptions()
+        } else if (action.startsWith("dock_position_")) {
+            userChoices.set("dock", "position", action.substring("dock_position_".length))
+        } else if (action === "dock_hiding") {
+            userChoices.set("dock", "autohide", !dock.hidesItself)
+        } else if (action === "dock_magnification") {
+            userChoices.set("dock", "magnification", !dock.magnificationWanted)
         } else {
             console.warn("shell: the config asks for an action the shell does not have:", action,
                          "- known: app_grid, volume_up, volume_down, volume_mute, lock, notification_list,",
                          "search, window_overview, switch_program, switch_program_back, empty_trash, quit_app,",
-                         "clipboard_history, emoji, view_options")
+                         "clipboard_history, emoji, view_options, dock_position_left, dock_position_bottom,",
+                         "dock_position_right, dock_hiding, dock_magnification")
         }
+    }
+
+    // a state a menu entry shows ticked or worded by
+    function holds(state) {
+        if (state.startsWith("dock_position_")) {
+            return dock.side === state.substring("dock_position_".length)
+        }
+        return state === "dock_hiding" ? dock.hidesItself : state === "dock_magnification" ? dock.magnificationWanted : false
     }
 
     // Asks every window of the active window's program to close; the

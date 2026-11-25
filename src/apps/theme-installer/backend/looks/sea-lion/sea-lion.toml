@@ -20,6 +20,16 @@ logo_menu = [
     { label = "About This PC", command = ["mavernix-about"] },
     { separator = true },
     { label = "System Preferences…", command = ["mavernix-settings"] },
+    { label = "Dock", entries = [
+        { label = "Turn Hiding On", label_on = "Turn Hiding Off", state = "dock_hiding", action = "dock_hiding" },
+        { label = "Turn Magnification On", label_on = "Turn Magnification Off", state = "dock_magnification", action = "dock_magnification" },
+        { separator = true },
+        { label = "Position on Left", ticked = "dock_position_left", action = "dock_position_left" },
+        { label = "Position on Bottom", ticked = "dock_position_bottom", action = "dock_position_bottom" },
+        { label = "Position on Right", ticked = "dock_position_right", action = "dock_position_right" },
+        { separator = true },
+        { label = "Dock Preferences…", command = ["mavernix-settings", "dock"] },
+    ] },
     { separator = true },
     { label = "Sleep", command = ["systemctl", "suspend"] },
     { label = "Restart…", command = ["systemctl", "reboot"], confirm = { title = "Are you sure you want to restart your computer now?", text = "If you do nothing, the computer will restart automatically in %1 seconds.", button = "Restart", cancel = "Cancel", icon = "system-reboot", seconds = 60 } },
@@ -294,6 +304,7 @@ dock_magnification = "Magnification:"
 dock_autohide = "Automatically hide and show the Dock"
 dock_magnification_min = "Min"
 dock_magnification_max = "Max"
+dock_position = "Position on screen:"
 windows_double_click = "Double-click a window’s title bar to"
 windows_double_click_none = "do nothing"
 windows_double_click_minimize = "minimize"

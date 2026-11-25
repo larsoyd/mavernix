@@ -29,7 +29,7 @@ To build it, check out `larsoyd` and follow [docs/building.md](../docs/building.
 
 ### Dock and app grid
 
-- The dock can sit on the left, bottom or right of the screen, chosen from its separator's menu. On a side it has Mavericks' flat glass, lights at the screen's edge, names beside the glass, and menus and stacks that open beside it.
+- The dock can sit on the left, bottom or right of the screen, chosen in Settings, from its separator's menu or from Apple menu > Dock. On a side it has Mavericks' flat glass, lights at the screen's edge, names beside the glass, and menus and stacks that open beside it.
 - Digging at the bottom edge of any screen brings the dock to that screen, sliding it out of the old one as on OS X 10.9. This also works over full screen windows.
 - An unkept program's tile grows in, bounces once, and shrinks away when the program quits. A closed minimised window's tile shrinks away too.
 - Dock icons are scaled down with Lanczos, and a program's own icon is fitted to the theme's proportions.

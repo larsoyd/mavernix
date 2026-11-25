@@ -98,6 +98,8 @@ There is one dock, on one screen at a time, as on OS X Mavericks. It starts on t
 
 A pointer that only brushes the edge, rests on it or slides along it does nothing. A held mouse button stops the push, and so do an open stack or dock menu and the application grid. A bottom edge with another screen under it does not count. Plugging in, unplugging or rearranging screens puts the dock back where it starts. `[dock] follows_dig = false` keeps it there for good.
 
+`[dock] position` puts the dock at the `"bottom"`, `"left"` or `"right"` of the screen. Settings, the dock's separator menu (Position on Screen) and, in Sea Lion, Apple menu > Dock change it while the desktop runs. A dock on the left or right starts on the outermost screen past the main one on that side, as on Mavericks, and stays there: only a bottom dock follows a push to another screen.
+
 Over a full screen window the dock is out of sight. The same push at its screen's bottom edge brings it up over the window, and it goes again when the pointer has left it. While the dock's screen shows a full screen window, resting the pointer at the bottom edge of a screen that does not is enough to bring the dock there.
 
 On a screen drawn at more than 100%, X11 programs look blurry by default: they draw at 100% and the compositor stretches the result. With `[display] sharp_x11 = true` (Settings, Displays), they're drawn at the pixels of the screen with the largest scale instead, and scaled down on the others, so a window keeps its size when it moves between screens. They're told that scale through `Xft.dpi` so they can size themselves. Qt, Chromium, Electron and GTK's text follow it, but only in programs started after the change. Some programs, games among them, ignore it and look small.
@@ -322,7 +324,9 @@ entries = [
 ]
 ```
 
-An entry either runs a `command` or one of the shell's `action`s. In a command, a leading `~` means your home folder, and adding a `confirm` table makes it ask first, like the logo menu does. The actions are `app_grid`, `window_overview`, `search`, `notification_list`, `lock`, `empty_trash` and `view_options`, which shows or hides the desktop's View Options panel.
+An entry either runs a `command` or one of the shell's `action`s. In a command, a leading `~` means your home folder, and adding a `confirm` table makes it ask first, like the logo menu does. The actions are `app_grid`, `window_overview`, `search`, `notification_list`, `lock`, `empty_trash` and `view_options`, which shows or hides the desktop's View Options panel. For the dock there are `dock_position_left`, `dock_position_bottom`, `dock_position_right`, `dock_hiding` and `dock_magnification`, which turn the last two on and off.
+
+In `[panel] logo_menu` an entry with its own `entries` list opens a submenu. An entry with `ticked = "dock_position_left"` (or another of the dock actions' names) shows a tick while that holds, and one with `state = "dock_hiding"` shows `label_on` instead of `label` while it holds, as Mavericks' Turn Hiding On and Off do.
 
 An entry `{ view = true }` stands for the desktop's own view entries, the ones its right-click menu has: Clean Up, Clean Up By, Sort By and Show View Options. Plain puts them in a View menu.
 
