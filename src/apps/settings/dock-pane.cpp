@@ -79,10 +79,19 @@ DockPane::DockPane(Choices& choices, QWidget* parent) : QWidget(parent), choices
         position_buttons.append(button);
         connect(button, &QRadioButton::clicked, this, [this, name = side_names[number]]() {
             this->choices.set(QStringLiteral("dock"), QStringLiteral("position"), name);
+            side_outermost->setEnabled(name != QStringLiteral("bottom"));
         });
     }
     side_row->addStretch();
     form->addRow(word("dock_position", "Position on screen:"), sides);
+
+    side_outermost = new QCheckBox(
+        word("dock_side_outermost", "On the left or right, use the outermost display on that side"));
+    connect(side_outermost, &QCheckBox::clicked, this, [this](bool on) {
+        this->choices.set(QStringLiteral("dock"), QStringLiteral("side_screen"),
+            on ? QStringLiteral("outermost") : QStringLiteral("main"));
+    });
+    form->addCheck(side_outermost);
     form->addCheck(hides);
 
     auto* click_minimizes =
@@ -180,6 +189,9 @@ void DockPane::showCurrent()
     const QStringList side_names = {QStringLiteral("left"), QStringLiteral("bottom"), QStringLiteral("right")};
     const int side = side_names.indexOf(choices.current(QStringLiteral("dock"), QStringLiteral("position")).toString());
     position_buttons.value(side < 0 ? 1 : side)->setChecked(true);
+    side_outermost->setEnabled(side == 0 || side == 2);
+    side_outermost->setChecked(
+        choices.current(QStringLiteral("dock"), QStringLiteral("side_screen")).toString() == QStringLiteral("outermost"));
 
     size->setValue(currentIconSize());
     magnification->setChecked(choices.current(QStringLiteral("dock"), QStringLiteral("magnification")).toBool());

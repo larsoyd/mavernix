@@ -40,12 +40,13 @@ ShellRoot {
         return screens.find(screen => screen.name === wanted) ?? leftmost ?? null
     }
 
-    // the dock's screen is its own: the outermost one past the main screen on
-    // the dock's side, until a dig at another's bottom edge brings a bottom dock there
+    // the dock's screen is its own: the outermost one past the main screen below it,
+    // or on its side when side_screen says so, until a dig brings a bottom dock elsewhere
 
     readonly property var screenBoxes: Array.from(Quickshell.screens).map(screen =>
         ({ name: screen.name, x: screen.x, y: screen.y, width: screen.width, height: screen.height }))
-    readonly property string dockHome: DockScreen.home(screenBoxes, mainScreen?.name ?? "", dock.side)
+    readonly property string dockSideScreen: userChoices.value("dock", "side_screen") ?? "main"
+    readonly property string dockHome: DockScreen.home(screenBoxes, mainScreen?.name ?? "", dock.side, dockSideScreen)
     readonly property string screenLayout: JSON.stringify(screenBoxes) + dockHome + dock.side
     // the screen dug at last, forgotten when the screens change
     property string dugScreen: ""

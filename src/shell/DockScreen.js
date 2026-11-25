@@ -18,14 +18,17 @@ function beyond(at, side) {
     return { x: at.x, y: at.y + at.height + 1, width: at.width, height: 2 }
 }
 
-// the main screen or the outermost of those past it on the dock's side
+// the main screen or the outermost past it, a side dock only if sideScreen is outermost
 // screens are { name, x, y, width, height }
-function home(screens, mainName, side) {
+function home(screens, mainName, side, sideScreen) {
     let at = screens.find(screen => screen.name === mainName)
     if (at === undefined) {
         return ""
     }
     const sideways = side === "left" || side === "right"
+    if (sideways && sideScreen !== "outermost") {
+        return at.name
+    }
     const firstFound = screens.slice().sort(sideways ? (a, b) => a.y - b.y || a.x - b.x
                                                      : (a, b) => a.x - b.x || a.y - b.y)
     for (let hops = 0; hops < screens.length; hops++) {

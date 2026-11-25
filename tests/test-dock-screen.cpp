@@ -18,11 +18,12 @@ class TestDockScreen : public QObject
             {QStringLiteral("width"), width}, {QStringLiteral("height"), height}};
     }
 
-    QString home(const QVariantList& screens, const QString& main, const QString& side = QStringLiteral("bottom"))
+    QString home(const QVariantList& screens, const QString& main, const QString& side = QStringLiteral("bottom"),
+        const QVariant& sideScreen = QStringLiteral("outermost"))
     {
         QVariant result;
         const bool called = QMetaObject::invokeMethod(probe.get(), "home", Q_RETURN_ARG(QVariant, result),
-            Q_ARG(QVariant, QVariant(screens)), Q_ARG(QVariant, main), Q_ARG(QVariant, side));
+            Q_ARG(QVariant, QVariant(screens)), Q_ARG(QVariant, main), Q_ARG(QVariant, side), Q_ARG(QVariant, sideScreen));
         return called ? result.toString() : QStringLiteral("[not called]");
     }
 
@@ -42,7 +43,7 @@ class TestDockScreen : public QObject
         component.setData("import QtQml\n"
                           "import \"file://" SHELL_DIR "/DockScreen.js\" as DockScreen\n"
                           "QtObject {\n"
-                          "  function home(screens, main, side) { return DockScreen.home(screens, main, side) }\n"
+                          "  function home(screens, main, side, sideScreen) { return DockScreen.home(screens, main, side, sideScreen) }\n"
                           "  function slideMs(travel) { return DockScreen.slideMs(travel) }\n"
                           "}\n",
             QUrl());
@@ -150,6 +151,26 @@ class TestDockScreen : public QObject
         const QVariantList screens = {main_screen, screen(QStringLiteral("b"), 1920, 540, 1280, 540),
             screen(QStringLiteral("a"), 1920, 0, 1280, 540)};
         QCOMPARE(home(screens, QStringLiteral("main"), QStringLiteral("right")), QStringLiteral("a"));
+    }
+
+    void aSideDockStaysOnTheMainScreenUnlessToldOtherwise()
+    {
+        const QVariantList screens = {screen(QStringLiteral("left"), -2560, 0, 2560, 1440), main_screen,
+            screen(QStringLiteral("right"), 1920, 0, 2560, 1440), screen(QStringLiteral("tv"), 4480, 0, 2560, 1440)};
+        QCOMPARE(home(screens, QStringLiteral("main"), QStringLiteral("right"), QStringLiteral("main")),
+            QStringLiteral("main"));
+        QCOMPARE(home(screens, QStringLiteral("main"), QStringLiteral("left"), QStringLiteral("main")),
+            QStringLiteral("main"));
+        QCOMPARE(home(screens, QStringLiteral("main"), QStringLiteral("right"), QVariant()), QStringLiteral("main"));
+        QCOMPARE(home(screens, QStringLiteral("main"), QStringLiteral("right"), QStringLiteral("outermost")),
+            QStringLiteral("tv"));
+    }
+
+    void theSideScreenChoiceLeavesABottomDockAlone()
+    {
+        const QVariantList screens = {main_screen, screen(QStringLiteral("under"), 0, 1080, 1920, 1080)};
+        QCOMPARE(home(screens, QStringLiteral("main"), QStringLiteral("bottom"), QStringLiteral("main")),
+            QStringLiteral("under"));
     }
 
     void theSlideGrowsWithTheLogOfTheWay()
