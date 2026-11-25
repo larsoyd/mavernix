@@ -9,6 +9,7 @@
 #                                                  a launcher in FOLDER for the program with desktop entry ID,
 #                                                  under NAME and with ICON if the user chose their own
 #   mavernix-file-action send-to-desktop FILE...   a launcher on the desktop for each file, a link for each folder
+#   mavernix-file-action rename FILE NAME          a launcher takes NAME inside and keeps its file, any other file is renamed
 set -eu
 
 # A path in FOLDER for NAME + EXTENSION that is not taken yet: NAME, then
@@ -108,6 +109,22 @@ is_program_entry() {
     awk '/^\[/ { in_entry = ($0 == "[Desktop Entry]") } in_entry && $0 == "Type=Application" { found = 1 } END { exit !found }' "$1"
 }
 
+is_launcher() {
+    [ -f "$1" ] && [ -x "$1" ] && is_program_entry "$1"
+}
+
+# NAME into a launcher's own Name, translations dropped, written beside it and moved over so a folder watcher sees it
+rename_launcher() {
+    temporary=$(mktemp "$(dirname "$1")/.rename.XXXXXX")
+    WANTED_NAME=$2 awk '
+        /^\[/ { in_entry = ($0 == "[Desktop Entry]") }
+        in_entry && /^Name\[/ { next }
+        in_entry && /^Name=/ { print "Name=" ENVIRON["WANTED_NAME"]; next }
+        { print }' "$1" > "$temporary" || { rm -f "$temporary"; exit 1; }
+    chmod "$(stat -c %a "$1")" "$temporary"
+    mv -f "$temporary" "$1"
+}
+
 action=${1:-}
 [ $# -gt 0 ] && shift
 case "$action" in
@@ -164,8 +181,20 @@ send-to-desktop)
         python3 "$(dirname "$0")/../file_shortcut.py" "$(realpath "$file")" "$(free_path "$folder" "$base" .desktop)" "$base"
     done
     ;;
+rename)
+    [ $# -eq 2 ] || { echo "usage: mavernix-file-action rename FILE NAME" >&2; exit 2; }
+    case "$2" in
+    *"
+"*) echo "mavernix-file-action: a name takes one line" >&2; exit 2 ;;
+    esac
+    if is_launcher "$1"; then
+        rename_launcher "$1" "$2"
+    else
+        gio rename "$1" "$2"
+    fi
+    ;;
 *)
-    echo "usage: mavernix-file-action new-folder|move-into|duplicate|shortcut|send-to-desktop ..." >&2
+    echo "usage: mavernix-file-action new-folder|move-into|duplicate|shortcut|send-to-desktop|rename ..." >&2
     exit 2
     ;;
 esac

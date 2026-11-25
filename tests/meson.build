@@ -506,6 +506,12 @@ test(
 )
 
 test(
+    'reveal',
+    python,
+    args: [files('test_reveal.py')],
+)
+
+test(
     'shell-frame-steps',
     python,
     args: [files('test_shell_frame_steps.py')],

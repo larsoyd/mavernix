@@ -581,10 +581,15 @@ open_command = ["gio", "open"]
 # grows out of and as what to open. Left out, open_command opens them.
 open_from_icon_command = ["mavernix-open", "--origin"]
 trash_command = ["gio", "trash"]
-rename_command = ["gio", "rename"]
+# A launcher keeps its file and takes the new name inside.
+rename_command = ["mavernix-file-action", "rename"]
 new_folder_command = ["mavernix-file-action", "new-folder"]
 move_in_command = ["mavernix-file-action", "move-into"]
 duplicate_command = ["mavernix-file-action", "duplicate"]
+# The file manager's info window, for the picked files or the desktop folder.
+info_command = ["mavernix-reveal", "info"]
+# The program a launcher starts, picked in its folder.
+show_original_command = ["mavernix-reveal", "original"]
 # Space shows the picked files with preview_command, given their paths. None
 # is set here, so Space does nothing.
 # preview_command = ["some-previewer"]
@@ -598,6 +603,9 @@ open = "Open"
 duplicate = "Duplicate"
 rename = "Rename"
 trash = "Move to Wastebasket"
+info = "Properties"
+show_original = "Show Program"
+open_desktop_folder = "Open Desktop Folder"
 # Entries left out here are not offered.
 clean_up = "Tidy Up"
 clean_up_by = "Tidy Up By"

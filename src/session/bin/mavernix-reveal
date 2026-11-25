@@ -1,0 +1,215 @@
+#!/usr/bin/env python3
+"""Shows files in the file manager, through its FileManager1 service.
+
+    mavernix-reveal info FILE...        the file manager's info window for the files
+    mavernix-reveal original LAUNCHER   the program a launcher starts, picked in its folder
+
+A Steam or Lutris game shows its own program or folder. A launcher whose
+program cannot be found is refused and nothing opens.
+"""
+
+import os
+import re
+import shutil
+import sqlite3
+import subprocess
+import sys
+from pathlib import Path
+
+TIMEOUT_SECONDS = 10
+VALUE_ESCAPES = {"s": " ", "n": "\n", "t": "\t", "r": "\r", "\\": "\\"}
+
+
+def refuse(reason, launcher=None):
+    where = f" launcher={launcher}" if launcher else ""
+    sys.exit(f"[reveal] refused: {reason}{where}")
+
+
+def entry_keys(path):
+    keys = {}
+    in_entry = False
+    for line in Path(path).read_text(errors="replace").splitlines():
+        if line.startswith("["):
+            in_entry = line.strip() == "[Desktop Entry]"
+        elif in_entry and "=" in line and not line.startswith("#"):
+            key, value = line.split("=", 1)
+            keys.setdefault(key.strip(), value.strip())
+    return keys
+
+
+def unescape_value(value):
+    return re.sub(r"\\(.)", lambda found: VALUE_ESCAPES.get(found.group(1), found.group(0)), value)
+
+
+def exec_words(value):
+    """Exec's words by the desktop entry rules."""
+    words, word, quoted, started = [], [], False, False
+    characters = iter(unescape_value(value))
+    for char in characters:
+        if quoted and char == "\\":
+            word.append(next(characters, ""))
+        elif char == '"':
+            quoted, started = not quoted, True
+        elif char.isspace() and not quoted:
+            if started:
+                words.append("".join(word))
+            word, started = [], False
+        else:
+            word.append(char)
+            started = True
+    if started:
+        words.append("".join(word))
+    return words
+
+
+def without_settings(words):
+    """The words after env and its NAME=VALUE settings, and those settings."""
+    settings = {}
+    if words and Path(words[0]).name == "env":
+        words = words[1:]
+    while words and re.match(r"^[A-Za-z_][A-Za-z0-9_]*=", words[0]):
+        name, value = words[0].split("=", 1)
+        settings[name] = value
+        words = words[1:]
+    return words, settings
+
+
+def case_blind(base, parts):
+    """BASE joined with PARTS, each matched without regard to case where the exact one is missing."""
+    path = base
+    for part in parts:
+        if (path / part).exists():
+            path = path / part
+            continue
+        try:
+            path = next(child for child in path.iterdir() if child.name.lower() == part.lower())
+        except (OSError, StopIteration):
+            return None
+    return path
+
+
+def as_file(word, settings, home):
+    if re.match(r"^[A-Za-z]:\\", word):
+        drive = Path(settings.get("WINEPREFIX") or home / ".wine") / f"drive_{word[0].lower()}"
+        return case_blind(drive, [part for part in word[3:].split("\\") if part])
+    if word.startswith("~/"):
+        word = str(home / word[2:])
+    if word.startswith("/") and os.path.lexists(word):
+        return Path(word)
+    return None
+
+
+def on_path(name):
+    """NAME on PATH, past the shims a login writes into the runtime folder."""
+    runtime = os.environ.get("XDG_RUNTIME_DIR")
+    folders = [folder for folder in os.environ.get("PATH", "").split(os.pathsep)
+               if folder and not (runtime and Path(folder).is_relative_to(runtime))]
+    found = shutil.which(name, path=os.pathsep.join(folders))
+    return Path(found) if found else None
+
+
+def steam_game(number, home):
+    for steam in (home / ".local" / "share" / "Steam", home / ".steam" / "steam"):
+        folders = steam / "steamapps" / "libraryfolders.vdf"
+        if not folders.is_file():
+            continue
+        for library in re.findall(r'"path"\s+"([^"]*)"', folders.read_text(errors="replace")):
+            apps = Path(library.replace("\\\\", "\\")) / "steamapps"
+            manifest = apps / f"appmanifest_{number}.acf"
+            if manifest.is_file():
+                found = re.search(r'"installdir"\s+"([^"]*)"', manifest.read_text(errors="replace"))
+                if found and (apps / "common" / found.group(1)).is_dir():
+                    return apps / "common" / found.group(1)
+    return None
+
+
+def lutris_game(number, home):
+    data = Path(os.environ.get("XDG_DATA_HOME") or home / ".local" / "share")
+    config = Path(os.environ.get("XDG_CONFIG_HOME") or home / ".config")
+    database = data / "lutris" / "pga.db"
+    if not database.is_file():
+        return None
+    try:
+        connection = sqlite3.connect(f"{database.as_uri()}?mode=ro", uri=True, timeout=TIMEOUT_SECONDS)
+        try:
+            row = connection.execute("select directory, configpath from games where id = ?", (number,)).fetchone()
+        finally:
+            connection.close()
+    except sqlite3.Error:
+        return None
+    if row is None or not row[0]:
+        return None
+    folder, slug = Path(row[0]), row[1] or ""
+    for games in (config / "lutris" / "games", data / "lutris" / "games"):
+        settings = games / f"{slug}.yml"
+        if slug and settings.is_file():
+            # the exe of the top level game block, not the one of the installer script
+            found = re.search(r"^game:\n(?:  .*\n)*?  exe: (.+)$", settings.read_text(errors="replace"), re.M)
+            program = folder / found.group(1).strip().strip("'\"") if found else None
+            if program is not None and program.exists():
+                return program
+    return folder if folder.is_dir() else None
+
+
+def game(word, launcher, home):
+    """(method, path) for a Steam or Lutris game link, None for any other word."""
+    for scheme, lookup in (("steam://rungameid/", steam_game), ("lutris:rungameid/", lutris_game)):
+        if word.startswith(scheme):
+            number = word[len(scheme):]
+            found = lookup(number, home)
+            if found is None:
+                refuse(f"no folder for {scheme.split(':')[0]} game {number}", launcher)
+            return ("ShowFolders" if found.is_dir() else "ShowItems"), found
+    return None
+
+
+def original(launcher):
+    """What to show for LAUNCHER: (method, path)."""
+    home = Path(os.environ.get("HOME", "~")).expanduser()
+    keys = entry_keys(launcher)
+    words, settings = without_settings(exec_words(keys.get("Exec", "")))
+    for word in words:
+        found = game(word, launcher, home)
+        if found is not None:
+            return found
+    # a wrapper or interpreter comes first, so the last word naming a file is the program or what it opens
+    for word in reversed(words[1:]):
+        found = as_file(word, settings, home)
+        if found is not None:
+            return "ShowItems", found
+    if words:
+        found = as_file(words[0], settings, home) or on_path(words[0])
+        if found is not None:
+            return "ShowItems", found
+    if keys.get("Path") and Path(keys["Path"]).is_dir():
+        return "ShowFolders", Path(keys["Path"])
+    refuse(f"no program found exec={keys.get('Exec', '')!r}", launcher)
+
+
+def ask(method, paths):
+    uris = "[" + ", ".join(f"'{Path(path).absolute().as_uri()}'" for path in paths) + "]"
+    command = ["gdbus", "call", "--session", "--timeout", str(TIMEOUT_SECONDS),
+               "--dest", "org.freedesktop.FileManager1", "--object-path", "/org/freedesktop/FileManager1",
+               "--method", f"org.freedesktop.FileManager1.{method}", uris, ""]
+    try:
+        result = subprocess.run(command, capture_output=True, text=True, timeout=TIMEOUT_SECONDS + 5,
+                                stdin=subprocess.DEVNULL)
+    except (OSError, subprocess.TimeoutExpired) as error:
+        refuse(f"file manager did not answer {method}: {error}")
+    if result.returncode != 0:
+        refuse(f"file manager refused {method}: {result.stderr.strip()}")
+    print(f"[reveal] {method} {' '.join(str(path) for path in paths)}")
+
+
+def main(arguments):
+    if len(arguments) >= 2 and arguments[0] == "info":
+        ask("ShowItemProperties", arguments[1:])
+    elif len(arguments) == 2 and arguments[0] == "original":
+        method, path = original(arguments[1])
+        ask(method, [path])
+    else:
+        sys.exit("usage: mavernix-reveal info FILE... | original LAUNCHER")
+
+
+if __name__ == "__main__":
+    main(sys.argv[1:])

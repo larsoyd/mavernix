@@ -503,7 +503,8 @@ Item {
     function finishRenaming(newName) {
         const path = renamingPath
         renamingPath = ""
-        const oldName = path.substring(path.lastIndexOf("/") + 1)
+        // places are kept by the name shown, and a launcher shows its Name and not its file's
+        const oldName = entries.find(entry => entry.path === path)?.name ?? path.substring(path.lastIndexOf("/") + 1)
         if (newName !== "" && newName !== oldName) {
             if (putByHand[oldName] !== undefined) {
                 const places = Object.assign({}, putByHand)
@@ -1147,7 +1148,7 @@ Item {
                     // The name without its ending is selected, ready to be typed over; again
                     // when the keyboard arrives, since its arrival clears the selection.
                     function markStem() {
-                        const dot = text.lastIndexOf(".")
+                        const dot = icons.entries[icons.renamingIndex]?.isLauncher ? -1 : text.lastIndexOf(".")
                         select(0, dot > 0 ? dot : text.length)
                     }
                     Component.onCompleted: {
@@ -1192,6 +1193,10 @@ Item {
     readonly property int idViewOptions: 8
     readonly property int idCleanUpBy: 9
     readonly property int idSortBy: 10
+    readonly property int idOpenDesktop: 11
+    readonly property int idDesktopInfo: 12
+    readonly property int idInfo: 13
+    readonly property int idShowOriginal: 14
     readonly property int sortBase: 100
     readonly property int cleanUpBase: 200
     readonly property var arrangements: ["none", "grid"].concat(sortOrders)
@@ -1252,13 +1257,26 @@ Item {
                 items.push(menuEntry(idRename, words.rename ?? "Rename"))
             }
             items.push(menuEntry(idTrash, words.trash ?? "Move to Trash"))
-            if ((wishes.duplicate_command ?? []).length > 0) {
-                items.push(menuSeparator)
-                items.push(menuEntry(idDuplicate, words.duplicate ?? "Duplicate"))
+            if ((wishes.info_command ?? []).length > 0) {
+                items.push(menuEntry(idInfo, words.info ?? "Get Info"))
             }
-            return items
+            const more = []
+            if ((wishes.duplicate_command ?? []).length > 0) {
+                more.push(menuEntry(idDuplicate, words.duplicate ?? "Duplicate"))
+            }
+            if (pickedPaths.length === 1 && isLauncher(pickedPaths[0]) && (wishes.show_original_command ?? []).length > 0) {
+                more.push(menuEntry(idShowOriginal, words.show_original ?? "Show Original"))
+            }
+            return more.length > 0 ? items.concat([menuSeparator], more) : items
         }
         const items = [menuEntry(idNewFolder, words.new_folder ?? "New Folder")]
+        if ((wishes.open_command ?? []).length > 0) {
+            items.push(menuEntry(idOpenDesktop, words.open_desktop_folder ?? "Open Desktop Folder"))
+        }
+        if ((wishes.info_command ?? []).length > 0) {
+            items.push(menuSeparator)
+            items.push(menuEntry(idDesktopInfo, words.info ?? "Get Info"))
+        }
         if ((wishes.background_command ?? []).length > 0) {
             items.push(menuSeparator)
             items.push(menuEntry(idBackground, words.change_background ?? "Change Background…"))
@@ -1280,6 +1298,14 @@ Item {
             duplicatePicked()
         } else if (id === idRename) {
             startRenaming()
+        } else if (id === idOpenDesktop) {
+            run(wishes.open_command, [folder])
+        } else if (id === idDesktopInfo) {
+            run(wishes.info_command, [folder])
+        } else if (id === idInfo) {
+            run(wishes.info_command, pickedPaths)
+        } else if (id === idShowOriginal) {
+            run(wishes.show_original_command, pickedPaths.slice(0, 1))
         } else {
             viewChosen(id)
         }

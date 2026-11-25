@@ -286,6 +286,72 @@ class SendToDesktop(unittest.TestCase):
         self.assertFalse(self.desktop.exists() and any(self.desktop.iterdir()))
 
 
+class Rename(unittest.TestCase):
+    def setUp(self):
+        self.scratch = tempfile.TemporaryDirectory()
+        self.folder = Path(self.scratch.name)
+
+    def tearDown(self):
+        self.scratch.cleanup()
+
+    def rename(self, path, name):
+        return subprocess.run([str(ACTION), "rename", str(path), name], env={"PATH": os.environ["PATH"]},
+                              capture_output=True, text=True, timeout=20)
+
+    def launcher(self, name="Paint Box.desktop", mode=0o755, text=ENTRY):
+        path = self.folder / name
+        path.write_text(text)
+        path.chmod(mode)
+        return path
+
+    def test_a_launcher_keeps_its_file_and_takes_the_new_name_inside(self):
+        launcher = self.launcher()
+        result = self.rename(launcher, "Dad's \\ & Art")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual([file.name for file in self.folder.iterdir()], ["Paint Box.desktop"])
+        lines = launcher.read_text().splitlines()
+        self.assertIn("Name=Dad's \\ & Art", lines)
+        self.assertNotIn("Name=Paint Box", lines)
+        self.assertEqual(launcher.stat().st_mode & 0o777, 0o755)
+
+    def test_a_launchers_translated_names_go_and_its_actions_keep_theirs(self):
+        launcher = self.launcher()
+        self.assertEqual(self.rename(launcher, "Art").returncode, 0)
+        lines = launcher.read_text().splitlines()
+        self.assertNotIn("Name[nb]=Malerskrin", lines)
+        self.assertIn("Name=New Picture", lines)
+        self.assertEqual([line for line in lines if line.startswith("Name=")], ["Name=Art", "Name=New Picture"])
+
+    def test_a_launcher_is_replaced_whole_so_the_folder_sees_the_change(self):
+        launcher = self.launcher()
+        before = launcher.stat().st_ino
+        self.assertEqual(self.rename(launcher, "Art").returncode, 0)
+        self.assertNotEqual(launcher.stat().st_ino, before)
+        self.assertEqual(len(list(self.folder.iterdir())), 1)
+
+    def test_a_desktop_file_that_may_not_run_is_renamed_as_a_file(self):
+        launcher = self.launcher(mode=0o644)
+        self.assertEqual(self.rename(launcher, "Art").returncode, 0)
+        self.assertEqual([file.name for file in self.folder.iterdir()], ["Art"])
+
+    def test_a_link_entry_is_renamed_as_a_file(self):
+        launcher = self.launcher(text="[Desktop Entry]\nType=Link\nName=Site\nURL=https://example.org\n")
+        self.assertEqual(self.rename(launcher, "Art").returncode, 0)
+        self.assertEqual([file.name for file in self.folder.iterdir()], ["Art"])
+
+    def test_a_plain_file_is_renamed(self):
+        (self.folder / "letter.txt").write_text("hi")
+        self.assertEqual(self.rename(self.folder / "letter.txt", "note.txt").returncode, 0)
+        self.assertEqual([file.name for file in self.folder.iterdir()], ["note.txt"])
+
+    def test_a_name_over_two_lines_is_refused_and_changes_nothing(self):
+        launcher = self.launcher()
+        result = self.rename(launcher, "Art\nExec=evil")
+        self.assertEqual(result.returncode, 2)
+        self.assertIn("one line", result.stderr)
+        self.assertEqual(launcher.read_text(), ENTRY)
+
+
 def windows_program_with_icon(*icons):
     """A PE file holding one icon group of (size, colour) pictures, laid out by hand from the PE format."""
     pngs = []

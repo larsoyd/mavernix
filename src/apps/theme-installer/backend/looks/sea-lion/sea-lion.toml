@@ -193,6 +193,8 @@ new_folder_name = "untitled folder"
 change_background = "Change Desktop Background…"
 clean_up = "Clean Up"
 clean_up_by = "Clean Up By"
+info = "Get Info"
+show_original = "Show Original"
 
 [settings]
 name = "System Preferences"
