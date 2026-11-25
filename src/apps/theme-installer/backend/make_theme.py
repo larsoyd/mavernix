@@ -813,6 +813,8 @@ DIALOG_PICTURES = {
     "system-suspend": "Sleep.tiff",
 }
 DIALOG_ICON_SIZE = 64
+# the padlock the password dialog shows, shared art at 128 and 256
+SECURITY_LOCK_ART_ENTRY = 297
 
 # The About window's picture, the logo over the system's name, in the same
 # folder: one file holding it at 428 by 248 and at 214 by 124.
@@ -1293,7 +1295,7 @@ def make_status_pictures(root, images_dir):
     return icons
 
 
-def make_dialog_pictures(root, images_dir):
+def make_dialog_pictures(root, artwork_dir, images_dir):
     """Writes the dialogs' pictures; returns {icon name: theme path}.
 
     The 128-pixel picture serves dense screens; ordinary ones get it halved.
@@ -1301,6 +1303,13 @@ def make_dialog_pictures(root, images_dir):
     dialog_dir = images_dir / "dialog"
     dialog_dir.mkdir(parents=True, exist_ok=True)
     icons = {}
+    lock = artwork_dir / "sartfile" / f"{SECURITY_LOCK_ART_ENTRY:03d}-1x.png"
+    if not lock.is_file():
+        fail(f"{lock} is missing. Decode SArtFile.bin first.")
+    dense = Image.open(lock).convert("RGBA")
+    dense.save(dialog_dir / "dialog-password@2x.png")
+    dense.resize((DIALOG_ICON_SIZE, DIALOG_ICON_SIZE), Image.LANCZOS).save(dialog_dir / "dialog-password.png")
+    icons["dialog-password"] = "images/dialog/dialog-password.png"
     for icon_name, file_name in DIALOG_PICTURES.items():
         source = root / DIALOG_PICTURES_DIR / file_name
         if not source.is_file():
@@ -2351,7 +2360,7 @@ def main():
     status_icons = make_status_pictures(root, images_dir)
     make_volume_display_pictures(root, images_dir)
     make_view_options_pictures(root, images_dir)
-    dialog_icons = make_dialog_pictures(root, images_dir)
+    dialog_icons = make_dialog_pictures(root, artwork_dir, images_dir)
     copy_about_picture(root, images_dir)
     banner_backgrounds = copy_notification_pictures(root, images_dir)
     copy_notification_list_pictures(root, images_dir)

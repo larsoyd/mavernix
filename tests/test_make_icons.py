@@ -143,6 +143,39 @@ class ActionIconTests(unittest.TestCase):
         self.assertNotIn("actions", dark)
 
 
+class DialogPictureTests(unittest.TestCase):
+    def setUp(self):
+        self.folder = tempfile.TemporaryDirectory()
+        work = Path(self.folder.name)
+        self.root, self.artwork, self.images = work / "root", work / "artwork", work / "images"
+        loginwindow = self.root / make_theme.DIALOG_PICTURES_DIR
+        loginwindow.mkdir(parents=True)
+        for file_name in make_theme.DIALOG_PICTURES.values():
+            Image.new("RGBA", (128, 128), (9, 9, 9, 255)).save(loginwindow / file_name)
+        (self.artwork / "sartfile").mkdir(parents=True)
+        for suffix, size, colour in (("1x", 128, (200, 150, 40, 255)), ("2x", 256, (40, 150, 200, 255))):
+            Image.new("RGBA", (size, size), colour).save(
+                self.artwork / "sartfile" / f"{make_theme.SECURITY_LOCK_ART_ENTRY:03d}-{suffix}.png")
+        self.images.mkdir()
+
+    def tearDown(self):
+        self.folder.cleanup()
+
+    def test_the_password_dialog_gets_the_lock_of_mavericks_own_password_dialog(self):
+        icons = make_theme.make_dialog_pictures(self.root, self.artwork, self.images)
+        self.assertEqual(icons["dialog-password"], "images/dialog/dialog-password.png")
+        small = Image.open(self.images / "dialog" / "dialog-password.png")
+        dense = Image.open(self.images / "dialog" / "dialog-password@2x.png")
+        self.assertEqual((small.size, dense.size), ((64, 64), (128, 128)))
+        self.assertEqual((small.getpixel((32, 32)), dense.getpixel((64, 64))), ((200, 150, 40, 255), (200, 150, 40, 255)))
+
+    def test_missing_lock_art_is_refused(self):
+        for found in (self.artwork / "sartfile").iterdir():
+            found.unlink()
+        with self.assertRaises(SystemExit):
+            make_theme.make_dialog_pictures(self.root, self.artwork, self.images)
+
+
 class EngravingTests(unittest.TestCase):
     def mask(self, size, box):
         mask = Image.new("L", (size, size), 0)

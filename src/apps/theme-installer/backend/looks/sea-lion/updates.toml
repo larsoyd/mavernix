@@ -705,3 +705,9 @@ themes = ["sea-lion-dark"]
 
 [update.settings."dock.side.shelf"]
 fill = "#3a3a3ab3"
+
+[[update]]
+revision = 41
+import_brings = [
+    "The password dialog shows Mavericks' padlock.",
+]

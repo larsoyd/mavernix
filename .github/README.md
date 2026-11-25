@@ -75,6 +75,7 @@ To build it, check out `larsoyd` and follow [docs/building.md](../docs/building.
 - GTK alerts and tabs are drawn as in Mavericks.
 - Sea Lion title bars have subpixel letters, and the menu bar's last row is softened.
 - Extra icons: LibreOffice, Kdenlive (a film reel), Bandstand (shown with the iTunes icon), text and markdown files, torrents, Nintendo 64 ROMs (shown as cartridges with the game's logo), and some games.
+- The password prompt shows Mavericks' padlock, taken from the installer by the Sea Lion import.
 - The pointer size you pick is kept across theme imports.
 - Theme import accepts a restored installer volume.
 
