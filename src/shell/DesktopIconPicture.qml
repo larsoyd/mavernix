@@ -39,7 +39,8 @@ Item {
         // also for a picture in a format that cannot be read, and while contents load
         visible: !framed.visible && !contents.visible
         sourceSize: Qt.size(width * Screen.devicePixelRatio, height * Screen.devicePixelRatio)
-        source: iconPicture.iconSource
+        // before its size is known it would draw the whole picture at full size
+        source: sourceSize.width > 0 ? iconPicture.iconSource : ""
     }
     Image {
         visible: iconPicture.entry.isLink === true && iconPicture.linkEmblem !== ""
@@ -48,6 +49,6 @@ Item {
         width: Math.round(parent.width * iconPicture.linkEmblemShare)
         height: width
         sourceSize: Qt.size(width * Screen.devicePixelRatio, height * Screen.devicePixelRatio)
-        source: visible ? iconPicture.linkEmblem : ""
+        source: visible && sourceSize.width > 0 ? iconPicture.linkEmblem : ""
     }
 }
