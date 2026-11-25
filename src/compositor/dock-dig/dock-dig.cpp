@@ -1,5 +1,5 @@
 // tells watchers when the pointer pushes against a screen's bottom edge: move for a screen
-// the dock is not on, reveal for its own under a full screen window, as on OS X 10.9
+// the dock is not on, reveal for its own edge under a full screen window, as on OS X 10.9
 
 #include <algorithm>
 #include <ctime>
@@ -35,6 +35,7 @@ class plugin_t : public wf::plugin_interface_t
     wf::shared_data::ref_ptr_t<wf::ipc::method_repository_t> repo;
     std::vector<wf::ipc::client_interface_t*> watchers;
     std::string dock_output;
+    side_t dock_side = side_t::bottom;
 
     struct edge_t
     {
@@ -86,9 +87,14 @@ class plugin_t : public wf::plugin_interface_t
             return {};
         }
         const bool dock_covered = covered(outputs[dock]);
-        if (on_bottom_row(screens[dock], at.x, at.y))
+        if (on_edge_row(screens[dock], dock_side, at.x, at.y))
         {
             return dock_covered ? edge_t{dock_output, "reveal", false} : edge_t{};
+        }
+        // only a bottom dock moves to another screen
+        if (dock_side != side_t::bottom)
+        {
+            return {};
         }
         const std::vector<bool> edges = edges_to_dig(screens, dock);
         for (size_t i = 0; i < outputs.size(); i++)
@@ -192,9 +198,14 @@ class plugin_t : public wf::plugin_interface_t
         {
             rest.move(at.x, at.y, now);
         }
-        else if (detect.move(signal->event->delta_x, signal->event->delta_y, now))
+        else
         {
-            tell();
+            const auto [dx, dy] = edge.kind == "reveal" ? inward(dock_side, signal->event->delta_x,
+                signal->event->delta_y) : std::pair<double, double>{signal->event->delta_x, signal->event->delta_y};
+            if (detect.move(dx, dy, now))
+            {
+                tell();
+            }
         }
         keep_time();
     };
@@ -219,6 +230,8 @@ class plugin_t : public wf::plugin_interface_t
             return wf::ipc::json_error("output must be a screen's name");
         }
         dock_output = data["output"].as_string();
+        dock_side = data.has_member("edge") && data["edge"].is_string() ? side_named(data["edge"].as_string())
+                                                                         : side_t::bottom;
         leave();
         detect = dig_detect_t();
         pushed_edge = {};

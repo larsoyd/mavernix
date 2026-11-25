@@ -36,4 +36,26 @@ std::vector<row_t> genie_rows(const box_t& window, const box_t& icon, double pro
 
 /** The scale shape at `progress`: two rows, top and bottom. */
 std::vector<row_t> scale_rows(const box_t& window, const box_t& icon, double progress);
+
+// where the dock's icon lies from the window, below it or beside a side dock
+enum class toward_t
+{
+    below,
+    left,
+    right,
+};
+
+// rows, or upright cuts whose y is their x, left and right their top and bottom
+// and picture height their share from the picture's left edge
+struct shape_t
+{
+    std::vector<row_t> rows;
+    bool columns = false;
+};
+
+// the genie towards a dock on the window's toward side
+shape_t genie_shape(const box_t& window, const box_t& icon, double progress, double row_step, toward_t toward);
+
+// the scale shape, the same towards any side
+shape_t scale_shape(const box_t& window, const box_t& icon, double progress);
 }

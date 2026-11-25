@@ -25,13 +25,10 @@ enum class effect_t
 class warp_transformer_t : public wf::scene::view_2d_transformer_t
 {
   public:
-    /**
-     * @param icon      The dock icon, in output-logical pixels; if empty, the
-     *                  middle of the output's bottom edge.
-     * @param duration  Its curve should be "linear": the shapes ease themselves.
-     */
+    // the icon in output pixels, empty for the middle of the dock's edge, toward the side the dock is on
+    // the duration's curve should be linear as the shapes ease themselves
     warp_transformer_t(wayfire_view view, effect_t effect,
-        wf::animation_description_t duration, wf::geometry_t icon);
+        wf::animation_description_t duration, wf::geometry_t icon, warp::toward_t toward = warp::toward_t::below);
     ~warp_transformer_t() override;
 
     void start(bool hiding);
@@ -41,7 +38,7 @@ class warp_transformer_t : public wf::scene::view_2d_transformer_t
     /** The window's rectangle, frame included, without its shadow. */
     wf::geometry_t window_frame(wf::geometry_t picture_area);
 
-    std::vector<warp::row_t> current_rows(wf::geometry_t window);
+    warp::shape_t current_shape(wf::geometry_t window);
 
     wf::geometry_t get_bounding_box() override;
     void gen_render_instances(std::vector<wf::scene::render_instance_uptr>& instances,
@@ -67,6 +64,7 @@ class warp_transformer_t : public wf::scene::view_2d_transformer_t
     wf::scene::node_ptr carrier;
     effect_t effect;
     wf::geometry_t icon;
+    warp::toward_t toward;
     // Runs from 0 (the window as it is) to 1 (inside the icon).
     wf::animation::simple_animation_t progress;
 };

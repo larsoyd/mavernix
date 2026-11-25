@@ -12,15 +12,20 @@ class DockDig : public QObject
 {
     Q_OBJECT
     Q_PROPERTY(QString output READ output WRITE setOutput NOTIFY outputChanged)
+    // bottom, left or right, the edge dug at to reveal the dock
+    Q_PROPERTY(QString edge READ edge WRITE setEdge NOTIFY edgeChanged)
 
   public:
     explicit DockDig(QObject* parent = nullptr);
 
     QString output() const { return outputName; }
     void setOutput(const QString& name);
+    QString edge() const { return edgeName; }
+    void setEdge(const QString& name);
 
   signals:
     void outputChanged();
+    void edgeChanged();
     void dug(const QString& output, const QString& kind);
 
   private:
@@ -28,4 +33,5 @@ class DockDig : public QObject
 
     CompositorSocket compositor;
     QString outputName;
+    QString edgeName = QStringLiteral("bottom");
 };

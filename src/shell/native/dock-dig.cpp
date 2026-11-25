@@ -36,11 +36,22 @@ void DockDig::setOutput(const QString& name)
     send();
 }
 
+void DockDig::setEdge(const QString& name)
+{
+    if (name == edgeName)
+    {
+        return;
+    }
+    edgeName = name;
+    emit edgeChanged();
+    send();
+}
+
 void DockDig::send()
 {
     if (outputName.isEmpty() || !compositor.isConnected())
     {
         return;
     }
-    compositor.request("dock-dig/configure", {{"output", outputName}}, [](const QJsonObject&) {});
+    compositor.request("dock-dig/configure", {{"output", outputName}, {"edge", edgeName}}, [](const QJsonObject&) {});
 }

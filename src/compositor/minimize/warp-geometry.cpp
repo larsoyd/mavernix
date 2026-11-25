@@ -104,6 +104,40 @@ std::vector<row_t> genie_rows(const box_t& window, const box_t& icon, double pro
     return rows;
 }
 
+namespace
+{
+// on its side, a funnel to the right runs down, one to the left runs down mirrored
+box_t turned(const box_t& box, toward_t toward)
+{
+    const double along = toward == toward_t::left ? -(box.x + box.width) : box.x;
+    return {box.y, along, box.height, box.width};
+}
+} // namespace
+
+shape_t genie_shape(const box_t& window, const box_t& icon, double progress, double row_step, toward_t toward)
+{
+    if (toward == toward_t::below)
+    {
+        return {genie_rows(window, icon, progress, row_step), false};
+    }
+    std::vector<row_t> cuts = genie_rows(turned(window, toward), turned(icon, toward), progress, row_step);
+    // turned, a row's y is the cut's x and its left and right are the cut's top and bottom
+    if (toward == toward_t::left)
+    {
+        for (row_t& cut : cuts)
+        {
+            cut.y = -cut.y;
+            cut.picture_height = 1.0 - cut.picture_height;
+        }
+    }
+    return {cuts, true};
+}
+
+shape_t scale_shape(const box_t& window, const box_t& icon, double progress)
+{
+    return {scale_rows(window, icon, progress), false};
+}
+
 std::vector<row_t> scale_rows(const box_t& window, const box_t& icon, double progress)
 {
     const double moved = ease(progress);

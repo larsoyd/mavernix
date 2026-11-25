@@ -42,7 +42,7 @@ class warp_animation_t : public wf::animate::animation_base_t
             icon = icon + wf::origin(dock->get_layout_geometry()) + -wf::origin(view->get_output()->get_layout_geometry());
         }
 
-        auto warp = std::make_shared<warp_transformer_t>(view, effect, duration, icon);
+        auto warp = std::make_shared<warp_transformer_t>(view, effect, duration, icon, dock_side());
         view->get_transformed_node()->add_transformer(warp, wf::TRANSFORMER_HIGHLEVEL + 1,
             TRANSFORMER_NAME);
         warp->start(type & WF_ANIMATE_HIDING_ANIMATION);
@@ -72,6 +72,25 @@ class warp_animation_t : public wf::animate::animation_base_t
     }
 
   private:
+    // a dock surface taller than wide stands on the left or right of its screen
+    static warp::toward_t dock_side()
+    {
+        for (auto other : wf::get_core().get_all_views())
+        {
+            if (other->get_app_id() == "mavernix-dock" && other->is_mapped() && other->get_output())
+            {
+                const wf::geometry_t box = other->get_bounding_box();
+                const wf::geometry_t screen = other->get_output()->get_relative_geometry();
+                if (box.height <= box.width)
+                {
+                    return warp::toward_t::below;
+                }
+                return box.x + box.width / 2 < screen.width / 2 ? warp::toward_t::left : warp::toward_t::right;
+            }
+        }
+        return warp::toward_t::below;
+    }
+
     static wf::output_t *dock_output()
     {
         for (auto other : wf::get_core().get_all_views())

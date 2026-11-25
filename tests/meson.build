@@ -33,6 +33,11 @@ tests = {
         'include': test_sources / 'compositor/dock-dig',
         'dependencies': [],
     },
+    'warp-geometry': {
+        'sources': [test_sources / 'compositor/minimize/warp-geometry.cpp'],
+        'include': test_sources / 'compositor/minimize',
+        'dependencies': [],
+    },
     'zone-picker': {
         'sources': [test_sources / 'compositor/zone-picker/zone-layout.cpp'],
         'include': test_sources / 'compositor/zone-picker',

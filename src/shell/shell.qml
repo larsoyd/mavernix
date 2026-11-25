@@ -55,6 +55,7 @@ ShellRoot {
 
     DockDig {
         output: dock.screen?.name ?? ""
+        edge: dock.side
         onDug: (output, kind) => {
             const moves = (userChoices.value("dock", "follows_dig") ?? true) && !dock.sideways
             if (kind === "move" && moves && (dock.busy || appGrid.open)) {
@@ -101,6 +102,7 @@ ShellRoot {
             fill: shell.desktopFill
             onPictureFailed: shell.unreadablePicture = shell.chosenPicture
             showsFiles: modelData === shell.mainScreen
+            dockOnRight: shell.dockOnRightOf(modelData)
             soundPlayer: sounds
             // (Not named `userChoices` there, which would shadow this id.)
             choices: userChoices
@@ -163,6 +165,7 @@ ShellRoot {
         choices: userChoices
         sounds: sounds
         onMinimizedWindowWanted: window => dock.bringBack(window)
+        dockOnRight: shell.dockOnRightOf(shell.mainScreen)
     }
 
     readonly property bool searchOpen: searchBox.open
@@ -195,6 +198,12 @@ ShellRoot {
         screen: shell.mainScreen
         settings: shell.settings
         banners: banners
+        dockOnRight: shell.dockOnRightOf(shell.mainScreen)
+    }
+
+    // what a dock on a screen's right keeps of it, for what stands along that edge
+    function dockOnRightOf(screen) {
+        return dock.side === "right" && dock.screen === screen && !dock.hidesItself ? dock.restingHeight : 0
     }
 
     UserChoices {

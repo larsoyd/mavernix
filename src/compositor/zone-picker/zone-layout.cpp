@@ -123,14 +123,15 @@ std::vector<layout_t> parse_layouts(const std::string& text)
 plate_t lay_out(int screen_width, int screen_height, const box_t& workarea, const std::vector<layout_t>& layouts,
     const metrics_t& metrics)
 {
-    plate_t plate{{screen_width / 2, workarea.y, 0, 0}, {}};
+    plate_t plate{{workarea.x + workarea.width / 2, workarea.y, 0, 0}, {}};
     int count = int(layouts.size());
     if ((count == 0) || (screen_width <= 0) || (screen_height <= 0))
     {
         return plate;
     }
 
-    const int room = screen_width - 2 * metrics.padding;
+    // over the room the panel and a side dock leave, the minis still in the screen's shape
+    const int room = workarea.width - 2 * metrics.padding;
     int mini_width = std::clamp(int(std::lround(screen_width * metrics.mini_share)), metrics.mini_min,
         metrics.mini_max);
     if (plate_width(count, mini_width, metrics) > room)
@@ -146,7 +147,7 @@ plate_t lay_out(int screen_width, int screen_height, const box_t& workarea, cons
 
     const int mini_height = std::max(int(std::lround(double(mini_width) * screen_height / screen_width)), 1);
     const int width = plate_width(count, mini_width, metrics);
-    plate.box = {(screen_width - width) / 2, workarea.y, width, 2 * metrics.padding + mini_height};
+    plate.box = {workarea.x + (workarea.width - width) / 2, workarea.y, width, 2 * metrics.padding + mini_height};
     for (int index = 0; index < count; index++)
     {
         mini_t mini;

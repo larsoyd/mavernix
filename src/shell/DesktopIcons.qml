@@ -31,6 +31,8 @@ Item {
     required property var settings
     required property var userChoices
     required property var screen
+    // a dock on the right keeps its room, as Finder lays the desktop out in the screen less the dock
+    property real dockOnRight: 0
     required property var sounds
 
     readonly property var looks: (settings.theme.desktop ?? ({})).icons ?? null
@@ -108,7 +110,7 @@ Item {
     readonly property int rows: Math.max(1, Math.floor((height - topRoom - margin - (looks?.bottom_room ?? 100)) / cell.height))
 
     readonly property var grid: ({
-        right: width - margin, top: topRoom + margin, rows: rows, cellWidth: cell.width, cellHeight: cell.height,
+        right: width - margin - dockOnRight, top: topRoom + margin, rows: rows, cellWidth: cell.width, cellHeight: cell.height,
         pictureX: inCell.pictureX, pictureY: inCell.pictureY, iconSize: iconSize
     })
 

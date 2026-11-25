@@ -343,6 +343,44 @@ class TestDockDig : public QObject
         QVERIFY(!on_bottom_row(RIGHT, 2560, 719.5));
         QVERIFY(!on_bottom_row(RIGHT, 1900, 720));
     }
+
+    // a dock on the left or right is dug at by its own side's last column
+    void a_side_docks_edge_is_its_outer_column()
+    {
+        QVERIFY(on_edge_row(RIGHT, side_t::left, 1280, 300));
+        QVERIFY(on_edge_row(RIGHT, side_t::left, 1280.9, 0));
+        QVERIFY(!on_edge_row(RIGHT, side_t::left, 1281, 300));
+        QVERIFY(!on_edge_row(RIGHT, side_t::left, 1280, 720));
+        QVERIFY(on_edge_row(RIGHT, side_t::right, 2559.996, 300));
+        QVERIFY(!on_edge_row(RIGHT, side_t::right, 2558.9, 300));
+        QVERIFY(!on_edge_row(RIGHT, side_t::right, 2560, 300));
+        QVERIFY(on_edge_row(RIGHT, side_t::bottom, 1900, 719.5));
+        QVERIFY(!on_edge_row(RIGHT, side_t::bottom, 1280, 300));
+    }
+
+    // a push towards the edge is a push down once turned
+    void a_push_is_turned_towards_the_dock_s_edge()
+    {
+        QCOMPARE(inward(side_t::bottom, 1, 4), (std::pair<double, double>{1, 4}));
+        QCOMPARE(inward(side_t::left, -4, 1), (std::pair<double, double>{1, 4}));
+        QCOMPARE(inward(side_t::right, 4, -1), (std::pair<double, double>{-1, 4}));
+        QCOMPARE(side_named("left"), side_t::left);
+        QCOMPARE(side_named("right"), side_t::right);
+        QCOMPARE(side_named("top"), side_t::bottom);
+    }
+
+    void a_push_at_the_left_edge_digs_as_one_down_does()
+    {
+        dig_detect_t detect;
+        detect.enter(0);
+        bool through = false;
+        for (int64_t now = 8; now <= 400 && !through; now += 8)
+        {
+            const auto [dx, dy] = inward(side_t::left, -4, 0.5);
+            through = detect.move(dx, dy, now);
+        }
+        QVERIFY(through);
+    }
 };
 
 QTEST_GUILESS_MAIN(TestDockDig)

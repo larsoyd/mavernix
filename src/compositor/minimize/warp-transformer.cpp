@@ -15,7 +15,7 @@ namespace
 // Distance between mesh rows, in logical pixels; close enough to look curved.
 const double MESH_ROW_STEP = 4.0;
 
-// With no icon, a window goes to a spot this size at the bottom middle.
+// with no icon a window goes to a spot this size in the middle of the dock's edge
 const double FALLBACK_ICON_WIDTH  = 64;
 const double FALLBACK_ICON_HEIGHT = 64;
 
@@ -223,8 +223,8 @@ void carrier_node_t::gen_render_instances(std::vector<wf::scene::render_instance
 }
 
 warp_transformer_t::warp_transformer_t(wayfire_view view, effect_t effect,
-    wf::animation_description_t duration, wf::geometry_t icon) :
-    wf::scene::view_2d_transformer_t(view), _view(view->weak_from_this()), effect(effect), icon(icon),
+    wf::animation_description_t duration, wf::geometry_t icon, warp::toward_t toward) :
+    wf::scene::view_2d_transformer_t(view), _view(view->weak_from_this()), effect(effect), icon(icon), toward(toward),
     progress(wf::create_option<wf::animation_description_t>(duration))
 {
     const bool icon_is_known = (icon.width > 0) && (icon.height > 0);
@@ -233,9 +233,11 @@ warp_transformer_t::warp_transformer_t(wayfire_view view, effect_t effect,
         if (auto output = view->get_output())
         {
             const wf::geometry_t screen = output->get_relative_geometry();
+            const bool beside = toward != warp::toward_t::below;
             this->icon = {
-                screen.width / 2 - FALLBACK_ICON_WIDTH / 2,
-                screen.height - FALLBACK_ICON_HEIGHT,
+                !beside ? screen.width / 2 - FALLBACK_ICON_WIDTH / 2
+                        : toward == warp::toward_t::left ? 0 : screen.width - FALLBACK_ICON_WIDTH,
+                beside ? screen.height / 2 - FALLBACK_ICON_HEIGHT / 2 : screen.height - FALLBACK_ICON_HEIGHT,
                 FALLBACK_ICON_WIDTH,
                 FALLBACK_ICON_HEIGHT,
             };
@@ -268,7 +270,8 @@ void warp_transformer_t::draw(const wf::scene::render_instruction_t& data, wf::g
     // only the window's frame flows into the icon, a shadow beyond it is left out
     const wf::geometry_t picture_area = get_children_bounding_box();
     const wf::geometry_t window = window_frame(picture_area);
-    const std::vector<warp::row_t> rows = current_rows(window);
+    const warp::shape_t shape = current_shape(window);
+    const std::vector<warp::row_t>& rows = shape.rows;
     if (rows.size() < 2)
     {
         return;
@@ -281,13 +284,29 @@ void warp_transformer_t::draw(const wf::scene::render_instruction_t& data, wf::g
         const double y = window.y + share_of_frame_height * window.height;
         return (float)((y - picture_area.y) / picture_area.height);
     };
+    auto share_of_picture_width = [&] (double share_of_frame_width)
+    {
+        const double x = window.x + share_of_frame_width * window.width;
+        return (float)((x - picture_area.x) / picture_area.width);
+    };
+    // in a texture height 0 is the bottom edge, in the geometry the top
+    const float frame_top = 1.0f - share_of_picture_height(0);
+    const float frame_bottom = 1.0f - share_of_picture_height(1);
 
-    // two points per row, left and right end, drawn as a triangle strip
+    // two points per row or upright cut, its two ends, drawn as a triangle strip
     std::vector<float> positions;
     std::vector<float> picture_positions;
     for (const warp::row_t& row : rows)
     {
-        // in a texture height 0 is the bottom edge, in the geometry the top
+        if (shape.columns)
+        {
+            const float texture_x = share_of_picture_width(row.picture_height);
+            positions.insert(positions.end(), {(float)row.y + offset.x, (float)row.left_x + offset.y});
+            picture_positions.insert(picture_positions.end(), {texture_x, frame_top});
+            positions.insert(positions.end(), {(float)row.y + offset.x, (float)row.right_x + offset.y});
+            picture_positions.insert(picture_positions.end(), {texture_x, frame_bottom});
+            continue;
+        }
         const float texture_height = 1.0f - share_of_picture_height(row.picture_height);
 
         positions.insert(positions.end(), {(float)row.left_x + offset.x, (float)row.y + offset.y});
@@ -384,7 +403,7 @@ wf::geometry_t warp_transformer_t::window_frame(wf::geometry_t picture_area)
     return picture_area;
 }
 
-std::vector<warp::row_t> warp_transformer_t::current_rows(wf::geometry_t window)
+warp::shape_t warp_transformer_t::current_shape(wf::geometry_t window)
 {
     affected_area = union_of(window, icon);
 
@@ -393,10 +412,10 @@ std::vector<warp::row_t> warp_transformer_t::current_rows(wf::geometry_t window)
 
     if (effect == effect_t::SCALE)
     {
-        return warp::scale_rows(window_box, icon_box, progress);
+        return warp::scale_shape(window_box, icon_box, progress);
     }
 
-    return warp::genie_rows(window_box, icon_box, progress, MESH_ROW_STEP);
+    return warp::genie_shape(window_box, icon_box, progress, MESH_ROW_STEP, toward);
 }
 
 wf::geometry_t warp_transformer_t::get_bounding_box()

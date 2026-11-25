@@ -18,6 +18,8 @@ Scope {
     // May be null.
     property var sounds: null
     property var screen: null
+    // the room a dock on the screen's right keeps, banners stand left of it
+    property real dockOnRight: 0
 
     readonly property var theme: settings.theme
     readonly property var looks: (theme.notifications ?? ({})).banner ?? ({})
@@ -169,7 +171,7 @@ Scope {
         WlrLayershell.keyboardFocus: WlrKeyboardFocus.None
         margins.bottom: (panelOnBottom ? (panelLooks.height ?? 0) : 0)
                         + (root.looks.bottom_gap ?? root.looks.top_gap ?? 8) - margin[2]
-        margins.right: (root.looks.edge_gap ?? 8) - margin[1]
+        margins.right: root.dockOnRight + (root.looks.edge_gap ?? 8) - margin[1]
         color: "transparent"
 
         implicitWidth: (root.looks.width ?? 320) + margin[1] + margin[3]

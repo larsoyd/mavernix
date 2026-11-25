@@ -75,6 +75,20 @@ class TestZonePicker : public QObject
         QCOMPARE(plate.box.x + plate.box.width - (plate.minis[3].box.x + 96), metrics.padding);
     }
 
+    // a dock on a side takes part of the screen, the plate stands over the rest
+    void the_plate_is_centred_over_the_room_a_side_dock_leaves()
+    {
+        const auto layouts = parse_layouts(DEFAULTS);
+        const metrics_t metrics;
+        const auto whole = plate_on(1920, 1080, layouts);
+        const auto left = lay_out(1920, 1080, {66, 22, 1854, 1058}, layouts, metrics);
+        const auto right = lay_out(1920, 1080, {0, 22, 1854, 1058}, layouts, metrics);
+        QCOMPARE(left.box.width, whole.box.width);
+        QCOMPARE(left.box.x, 66 + (1854 - left.box.width) / 2);
+        QCOMPARE(right.box.x, (1854 - right.box.width) / 2);
+        QCOMPARE(left.minis[0].box.x, left.box.x + metrics.padding);
+    }
+
     void a_wide_screen_gets_wide_minis_up_to_a_limit()
     {
         const auto layouts = parse_layouts(DEFAULTS);

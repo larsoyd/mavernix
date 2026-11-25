@@ -203,7 +203,7 @@ PanelWindow {
     readonly property real dockRoom: dock !== null && dock.screen === grid.screen ? dock.restingHeight : 0
     readonly property var fit: AppGridLayout.fitted(screen?.width ?? 0, screen?.height ?? 0, dockRoom,
                                                     Math.ceil(labelMetrics.height), columns, looks.rows ?? 4,
-                                                    looks.largest_icon_size ?? 128)
+                                                    looks.largest_icon_size ?? 128, dock?.side ?? "bottom")
     readonly property real labelGap: looks.label_gap ?? 18
 
     readonly property int columns: looks.columns ?? 6

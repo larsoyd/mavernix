@@ -25,6 +25,8 @@ PanelWindow {
 
     required property var settings
     required property var banners
+    // the room a dock on the screen's right keeps, the list stands left of it
+    property real dockOnRight: 0
 
     readonly property var theme: settings.theme
     readonly property var looks: (theme.notifications ?? ({})).list ?? ({})
@@ -85,6 +87,7 @@ PanelWindow {
         right: true
     }
     margins.top: theme.panel?.height ?? 0
+    margins.right: dockOnRight
     implicitWidth: looks.width ?? 300
     exclusionMode: ExclusionMode.Ignore
     WlrLayershell.layer: WlrLayer.Top

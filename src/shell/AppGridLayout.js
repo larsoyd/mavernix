@@ -30,18 +30,22 @@ function rowsFitted(height, dockRoom, unit, rows) {
 }
 
 // { rows, side, columnPitch, rowPitch, iconSize, firstIconTop, dotsAboveBottom }
-// for a screen of this size with dockRoom taken by the dock at its bottom
-function fitted(width, height, dockRoom, nameHeight, columns, rows, largestIcon) {
+// for a screen of this size with dockRoom taken by the dock on its dockSide, bottom by default
+function fitted(screenWidth, height, dockRoom, nameHeight, columns, rows, largestIcon, dockSide) {
+    const sideways = dockSide === "left" || dockSide === "right"
+    const width = screenWidth - (sideways ? dockRoom : 0)
     const unit = Math.floor(width / (2 * columns + 1))
-    // wider screens draw the columns together
-    const drawnIn = width > 1920 ? 0.6 : (width > 1680 ? 0.3 : (width > 1440 ? 0.2 : 0))
-    const side = Math.floor(Math.floor(unit / 2) + 0.2 * width * drawnIn)
-    const columnPitch = Math.trunc((width - 2 * side) / columns)
+    // wider screens draw the columns together, a little less beside a side dock
+    const drawnIn = (width > 1920 ? 0.6 : (width > 1680 ? 0.3 : (width > 1440 ? 0.2 : 0))) - (sideways ? 0.1 : 0)
+    const margin = Math.floor(Math.floor(unit / 2) + 0.2 * width * drawnIn)
+    const side = margin + (dockSide === "left" ? dockRoom : 0)
+    const columnPitch = Math.trunc((width - 2 * margin) / columns)
     const taken = nameHeight + nameGap + 24
 
-    let shown = rowsFitted(height, dockRoom, unit, rows)
+    const below = sideways ? 0 : dockRoom
+    let shown = rowsFitted(height, below, unit, rows)
     while (shown.rows > 1 && Math.min(columnPitch, shown.rowPitch) - taken < leastIcon) {
-        shown = rowsFitted(height, dockRoom, unit, shown.rows - 1)
+        shown = rowsFitted(height, below, unit, shown.rows - 1)
     }
     const room = Math.floor((Math.min(columnPitch, shown.rowPitch) - taken) / iconStep) * iconStep
     const iconSize = Math.max(20, Math.min(largestIcon, room))

@@ -12,11 +12,12 @@ class TestAppGridLayout : public QObject
     QQmlEngine engine;
     std::unique_ptr<QObject> probe;
 
-    QVariantMap fitted(double width, double height, double dockRoom, int rows = 5, int largest = 128)
+    QVariantMap fitted(double width, double height, double dockRoom, int rows = 5, int largest = 128,
+        const QString& dockSide = QStringLiteral("bottom"))
     {
         QVariant result;
         const bool called = QMetaObject::invokeMethod(probe.get(), "fitted", Q_RETURN_ARG(QVariant, result),
-            Q_ARG(QVariant, QVariant(QVariantList{width, height, dockRoom, 15, 7, rows, largest})));
+            Q_ARG(QVariant, QVariant(QVariantList{width, height, dockRoom, 15, 7, rows, largest, dockSide})));
         return called ? result.toMap() : QVariantMap{{QStringLiteral("error"), QStringLiteral("not called")}};
     }
 
@@ -32,11 +33,27 @@ class TestAppGridLayout : public QObject
         component.setData("import QtQml\n"
                           "import \"file://" SHELL_DIR "/AppGridLayout.js\" as AppGridLayout\n"
                           "QtObject {\n"
-                          "  function fitted(a) { return AppGridLayout.fitted(a[0], a[1], a[2], a[3], a[4], a[5], a[6]) }\n"
+                          "  function fitted(a) { return AppGridLayout.fitted(a[0], a[1], a[2], a[3], a[4], a[5], a[6], a[7]) }\n"
                           "}\n",
             QUrl());
         probe.reset(component.create());
         QVERIFY2(probe != nullptr, qPrintable(component.errorString()));
+    }
+
+    // a side dock takes its depth off the width, and Launchpad draws the columns in by 0.1 less
+    void aSideDockNarrowsTheGridAndKeepsItsHeight()
+    {
+        // rows as on a screen the dock's depth narrower, with no dock under them
+        const QVariantMap narrower = fitted(1856, 1080, 0);
+        const QVariantMap left = fitted(1920, 1080, 64, 5, 128, QStringLiteral("left"));
+        const QVariantMap right = fitted(1920, 1080, 64, 5, 128, QStringLiteral("right"));
+        // 1856 wide: unit 123, drawn in by 0.3 less 0.1, side 61 + 74 = 135, past a left dock 64 more
+        QCOMPARE(number(left, "side"), 64 + 135);
+        QCOMPARE(number(right, "side"), 135);
+        QCOMPARE(number(left, "columnPitch"), (1856 - 2 * 135) / 7);
+        QCOMPARE(number(right, "columnPitch"), number(left, "columnPitch"));
+        QCOMPARE(number(left, "rowPitch"), number(narrower, "rowPitch"));
+        QCOMPARE(number(left, "dotsAboveBottom"), number(narrower, "dotsAboveBottom"));
     }
 
     void aLaptopScreenGetsMidSizedIcons()

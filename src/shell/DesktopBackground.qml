@@ -10,6 +10,8 @@ PanelWindow {
 
     required property var settings
     property var fill: settings.theme.desktop.background
+    // how much of the screen's right side a dock there keeps, which the files keep clear of
+    property real dockOnRight: 0
     // The fill names a picture that cannot be read.
     signal pictureFailed()
     property bool showsFiles: false
@@ -55,6 +57,7 @@ PanelWindow {
         anchors.fill: parent
         active: background.showsFiles && background.choices !== null
         sourceComponent: DesktopIcons {
+            dockOnRight: background.dockOnRight
             settings: background.settings
             userChoices: background.choices
             screen: background.screen
