@@ -108,6 +108,7 @@ BluetoothPane::BluetoothPane(Choices& choices, QWidget* parent) : QWidget(parent
     buttons->addWidget(connect_button);
 
     auto* rows = new QVBoxLayout(this);
+    rows->setContentsMargins(0, 0, 0, 0);
     rows->addWidget(powered);
     rows->addWidget(devices);
     rows->addLayout(buttons);

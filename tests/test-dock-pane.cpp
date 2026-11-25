@@ -56,7 +56,7 @@ class TestDockPane : public QObject
 
     QCheckBox* outermost(QWidget& pane)
     {
-        const QString words = QStringLiteral("On the left or right, use the outermost display on that side");
+        const QString words = QStringLiteral("Put a side dock on the outermost display");
         for (QCheckBox* found : pane.findChildren<QCheckBox*>())
         {
             if (found->text() == words)

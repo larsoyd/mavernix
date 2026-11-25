@@ -134,6 +134,9 @@ SoundPane::SoundPane(Choices& choices, QWidget* parent) : QWidget(parent)
     // (a computer without a microphone) has its row greyed.
     const auto device_chooser = [this](SoundDevices::Kind kind) {
         auto* chooser = new QComboBox;
+        // a long device name is cut short in the box, the list shows it whole
+        chooser->setSizeAdjustPolicy(QComboBox::AdjustToMinimumContentsLengthWithIcon);
+        chooser->setMinimumContentsLength(28);
         for (const SoundDevices::Device& device : SoundDevices::all(kind))
         {
             chooser->addItem(device.description, device.name);

@@ -86,7 +86,7 @@ DockPane::DockPane(Choices& choices, QWidget* parent) : QWidget(parent), choices
     form->addRow(word("dock_position", "Position on screen:"), sides);
 
     side_outermost = new QCheckBox(
-        word("dock_side_outermost", "On the left or right, use the outermost display on that side"));
+        word("dock_side_outermost", "Put a side dock on the outermost display"));
     connect(side_outermost, &QCheckBox::clicked, this, [this](bool on) {
         this->choices.set(QStringLiteral("dock"), QStringLiteral("side_screen"),
             on ? QStringLiteral("outermost") : QStringLiteral("main"));

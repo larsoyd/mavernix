@@ -10,7 +10,7 @@ moc_sources = qt.compile_moc(
     dependencies: qt_widgets,
 )
 
-executable(
+settings_program = executable(
     'mavernix-settings',
     [
         'main.cpp',

@@ -1,6 +1,8 @@
 #include "settings-window.hpp"
 
+#include <QAbstractButton>
 #include <QActionGroup>
+#include <QApplication>
 #include <QHBoxLayout>
 #include <QIcon>
 #include <QLineEdit>
@@ -323,6 +325,49 @@ SettingsWindow::SettingsWindow(Choices& choices) : choices(choices)
     // Not resizable by hand: it takes each page's own height.
     setFixedWidth(overview->sizeHint().width());
     showOverview();
+}
+
+QStringList SettingsWindow::tooWide()
+{
+    QStringList found;
+    for (auto at = pane_pages.cbegin(); at != pane_pages.cend(); ++at)
+    {
+        QWidget* page = pages->widget(at.value());
+        const int need = page->minimumSizeHint().width();
+        if (need <= minimumWidth())
+        {
+            continue;
+        }
+        // only a page that is shown gets laid out
+        pages->setCurrentWidget(page);
+        QApplication::processEvents();
+        // its whole text would run past the window, or it was given less than its text
+        const auto cut = [this](const QWidget* widget) {
+            const int whole = widget->sizeHint().width();
+            return widget->width() < whole || widget->mapTo(this, QPoint(whole, 0)).x() > width();
+        };
+        QStringList clipped;
+        for (const QAbstractButton* button : page->findChildren<QAbstractButton*>())
+        {
+            if (!button->text().isEmpty() && cut(button))
+            {
+                clipped << QStringLiteral("\"%1\"").arg(button->text());
+            }
+        }
+        for (const QLabel* label : page->findChildren<QLabel*>())
+        {
+            if (!label->text().isEmpty() && !label->wordWrap() && cut(label))
+            {
+                clipped << QStringLiteral("\"%1\"").arg(label->text());
+            }
+        }
+        found << QStringLiteral("pane=%1 need=%2 room=%3 clipped=%4")
+                     .arg(at.key())
+                     .arg(need)
+                     .arg(minimumWidth())
+                     .arg(clipped.join(QLatin1Char(',')));
+    }
+    return found;
 }
 
 QString SettingsWindow::word(const char* key, const char* fallback) const

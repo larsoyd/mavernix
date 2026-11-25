@@ -1,6 +1,7 @@
 // The desktop's settings window.
 //
 //   mavernix-settings [PANE]
+//   mavernix-settings --check-fit   exits 1 if a pane is wider than the window
 //
 // Shows the overview of all panes, or the pane named ("dock", "desktop").
 // The session's settings are found through DESKTOP_SHELL_SETTINGS.
@@ -8,6 +9,8 @@
 #include <QApplication>
 #include <QTimer>
 #include <QFont>
+
+#include <cstdio>
 
 #include "choices.hpp"
 #include "network-pane.hpp"
@@ -30,6 +33,17 @@ int main(int argc, char** argv)
     }
     SettingsWindow window(choices);
     const QStringList arguments = application.arguments();
+    if (arguments.contains(QStringLiteral("--check-fit")))
+    {
+        window.show();
+        const QStringList too_wide = window.tooWide();
+        for (const QString& line : too_wide)
+        {
+            std::fprintf(stderr, "[settings] too_wide %s\n", qPrintable(line));
+        }
+        std::fprintf(stderr, "[settings] check_fit panes_too_wide=%lld\n", static_cast<long long>(too_wide.size()));
+        return too_wide.isEmpty() ? 0 : 1;
+    }
     if (arguments.size() > 1)
     {
         window.showPane(arguments[1]);

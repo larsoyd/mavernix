@@ -444,6 +444,20 @@ test(
     env: {'SESSION_SOURCE_DIR': meson.project_source_root() / 'src' / 'session'},
 )
 test(
+    'settings-fit',
+    python,
+    args: [files('test_settings_fit.py')],
+    env: {
+        'SETTINGS_PROGRAM': settings_program.full_path(),
+        'SESSION_SOURCE_DIR': meson.project_source_root() / 'src' / 'session',
+        'CONFIG_SOURCE_DIR': meson.project_source_root() / 'data' / 'config',
+        'THEMES_SOURCE_DIR': meson.project_source_root() / 'data' / 'themes',
+        'LOOKS_SOURCE_DIR': meson.project_source_root() / 'src' / 'apps' / 'theme-installer' / 'backend' / 'looks',
+    },
+    depends: settings_program,
+    timeout: 120,
+)
+test(
     'session-config',
     python,
     args: [files('test_session_config.py')],

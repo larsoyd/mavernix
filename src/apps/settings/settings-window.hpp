@@ -30,6 +30,9 @@ class SettingsWindow : public QMainWindow
 
     // Does nothing for a name the window has no pane for.
     void showPane(const QString& name);
+    // a line for each pane whose controls need more room than the fixed window gives
+    // it shows every pane in turn to lay it out
+    QStringList tooWide();
     void showOverview();
 
   protected:
