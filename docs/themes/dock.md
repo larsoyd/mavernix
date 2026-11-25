@@ -1,6 +1,6 @@
 # Dock
 
-The dock is a row of application icons standing on a shelf at the bottom of the screen. Which applications are in it, and whether icons grow under the pointer, is behaviour, so that's set in the config.
+The dock is a row of application icons standing on a shelf at the bottom of the screen, or down its left or right edge. Which applications are in it, where it goes and whether icons grow under the pointer is behaviour, so that's set in the config.
 
 Some sizes follow the tile size. You write those as a pair `[factor, offset]`, which means *factor × tile size + offset*.
 
@@ -104,6 +104,7 @@ pointer_width = 12        # a triangle under the bubble's middle; 0 for none
 pointer_height = 6
 gap = 28                  # from the tile's top up to the pointer's tip
 fade_out_ms = 167         # it appears instantly and fades away
+most_width = 320          # optional: a longer name is cut short at its end
 
 [dock.launch_bounce]      # while an application starts, or one of its windows asks for attention, its icon bounces up and falls back
 half_period_ms = 350      # time up, and time down
@@ -122,6 +123,8 @@ text_color = "#ffffff"
 pointer = { width = 24, height = 12 }   # optional: a triangle from the menu's bottom edge pointing at the tile, drawn in the menu's background and rim
 tile_gap = 4                   # between the menu (or its pointer's tip) and the tile's icon
 top_margin = 5                 # optional: how far below the panel a menu that scrolls ends
+side_tile_gap = 3              # optional: on a side dock, from the glass to the pointer's tip
+side_below_tip = 33            # optional: on a side dock, how far the menu reaches below its pointer's tip
 ```
 
 ## Minimised windows
@@ -256,4 +259,61 @@ outline_width = 1
 
 Translucent colours let the desktop show through the shelf.
 
-*Not supported yet:* a dock at the side of the screen, labels under the icons.
+## A dock on the left or right
+
+Laid out down the screen's edge, a dock reads `[dock]` as it does at the bottom, with "above the screen's edge" meaning "away from it". `[dock.side]` replaces any of `[dock]`'s keys and tables for it, table for table: a side dock with its own `shelf`, `indicator`, `separator` or `label` table takes that one whole. Reflections, floor shadows and icon shadows are left out on a side, and folders open as grids beside it rather than as fans.
+
+```toml
+[dock.side]
+base = [0.0, 8]
+headroom = 8
+end_padding = [0.4, 0]
+end_padding_most = 8      # optional, any dock: the most end_padding gives
+row_shift = 0
+end_trim = 0
+
+[dock.side.shelf]
+shape = "side_glass"      # any shape, or the flat side glass:
+height_above_base = [1.0, 8]
+corner_radius = [0.0520833, 1.28125]   # the corners away from the edge, of the glass's depth
+fill = "#dbdbdbb3"
+outline = "#00000026"     # a rim, open along the screen's edge
+inner_line = "#ffffff20"  # a line just inside the rim
+highlight = "#ffffff66"   # along the top, down its corner
+highlight_width = 1.25
+
+[dock.side.indicator]     # as the screen shows it, standing beside the icon
+fill = { image = "images/dock-indicator-side.png" }
+width = 6
+height = 16
+small_fill = { image = "images/dock-indicator-side-small.png" }
+small_height = 12         # optional, any light: the small light's height
+small_below_tile_size = 28
+center_height = 3
+along_offset = 1.5        # optional, any light: moved along the dock from the tile's middle
+
+[dock.side.separator]
+image = "images/dock-separator-side.png"
+unscaled = true           # optional, any separator: the picture keeps its size, cut to its box
+width = 0.5
+bottom = 4
+top_gap = 4
+
+[dock.side.label]         # beside the glass; no pointer
+background = "#1e1e1e99"
+text_color = "#ffffff"
+height = 20
+padding = 11
+pointer_width = 0
+pointer_height = 0
+gap = 7
+fade_out_ms = 167
+
+[dock.folder]
+open_image_left = "images/dock-folder-tile-open-left.png"    # optional: the open folder's tile on a left dock
+open_image_right = "images/dock-folder-tile-open-right.png"  # and on a right one
+```
+
+A folder's grid box beside a side dock takes its pointer from `PIECES-lt.png` on a left dock and `PIECES-rt.png` on a right one, each `pointer_width` high.
+
+*Not supported yet:* labels under the icons.

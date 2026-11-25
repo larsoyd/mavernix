@@ -1,6 +1,5 @@
-// Layout arithmetic for a dock at the bottom of the screen. Every number
-// comes from the theme's [dock] table. Positions along the dock are measured
-// from the screen's left edge, across it upwards from the bottom edge.
+// layout sums for a dock as at the bottom of the screen, which DockAxis.js turns onto a side
+// along the dock from its start, across it up from the screen's edge
 
 .pragma library
 
@@ -97,7 +96,7 @@ function tileEdges(restLeft, restWidth, now) {
 }
 
 function shelfEdges(looks, tileSize, rowStart, rowEnd, now) {
-    const endPadding = sized(looks.end_padding, tileSize)
+    const endPadding = Math.min(sized(looks.end_padding, tileSize), looks.end_padding_most ?? Infinity)
     const left = Math.floor(pushedPosition(rowStart, now) - endPadding + 0.5)
     const right = left + Math.floor(pushedPosition(rowEnd, now) + endPadding - looks.end_trim - left + 0.5)
     return { left: left, right: right }

@@ -380,6 +380,22 @@ desktop_keys_test = executable(
 )
 test('desktop-keys', desktop_keys_test, env: {'QT_QPA_PLATFORM': 'offscreen'})
 
+dock_axis_test = executable(
+    'test-dock-axis',
+    ['test-dock-axis.cpp', qt.compile_moc(sources: 'test-dock-axis.cpp', dependencies: qt_test)],
+    dependencies: [qt_test, dependency('qt6', modules: ['Core', 'Qml'])],
+    cpp_args: ['-DSHELL_DIR="' + (meson.project_source_root() / 'src' / 'shell') + '"'],
+)
+test('dock-axis', dock_axis_test, env: {'QT_QPA_PLATFORM': 'offscreen'})
+
+dock_menus_test = executable(
+    'test-dock-menus',
+    ['test-dock-menus.cpp', qt.compile_moc(sources: 'test-dock-menus.cpp', dependencies: qt_test)],
+    dependencies: [qt_test, dependency('qt6', modules: ['Core', 'Qml'])],
+    cpp_args: ['-DSHELL_DIR="' + (meson.project_source_root() / 'src' / 'shell') + '"'],
+)
+test('dock-menus', dock_menus_test, env: {'QT_QPA_PLATFORM': 'offscreen'})
+
 dock_screen_test = executable(
     'test-dock-screen',
     ['test-dock-screen.cpp', qt.compile_moc(sources: 'test-dock-screen.cpp', dependencies: qt_test)],

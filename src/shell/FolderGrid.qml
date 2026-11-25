@@ -30,8 +30,9 @@ Item {
     // { name, path, icon, genericIcon } each; `entries` too for a folder inside.
     property var entries: []
     property string openLabel: ""
-    // The pointer tip's distance from the box's left edge.
+    // the pointer tip's distance from the box's left edge, or from its top on a side edge
     property real pointerX: -1
+    property string pointerEdge: "bottom"
     // The free part of the screen: its width, and its height between the
     // panel and the dock.
     required property real freeWidth
@@ -293,6 +294,7 @@ Item {
             looks: grid.looks.box
             themeDirectory: grid.themeDirectory
             pointerX: grid.pointerX
+            pointerEdge: grid.pointerEdge
         }
     }
     Component {
@@ -300,6 +302,7 @@ Item {
         BoxFrame {
             looks: grid.plainBoxLooks
             pointerX: grid.pointerX
+            pointerEdge: grid.pointerEdge
         }
     }
 

@@ -1,8 +1,5 @@
-// The dock: application icons on a shelf at the bottom of the screen, with
-// shadows, reflections, running lights and separators between groups, and a
-// last group for minimised windows and the trash. Looks come from the theme's
-// [dock] tables, contents and behaviour from the config's [dock] table.
-// DockLayout.js counts up from the screen's bottom; `fromBottom()` gives QML's y.
+// the dock, laid out in its strip as at the bottom of the screen and turned onto its side
+// looks come from the theme's dock tables, contents and behaviour from the config's
 
 import QtQuick
 import QtCore
@@ -10,6 +7,7 @@ import Quickshell
 import Quickshell.Wayland
 import Quickshell.Io
 import Shell.Native
+import "DockAxis.js" as DockAxis
 import "DockLayout.js" as DockLayout
 import "DesktopShortcut.js" as DesktopShortcut
 import "DockScreen.js" as DockScreen
@@ -95,7 +93,7 @@ PanelWindow {
         const fromIsThere = from !== null && Quickshell.screens.some(screen => screen.name === from.name)
         // a dock out of sight has nothing to slide away
         const outOfSight = !visible || sunk >= 1 || (fullscreenApplication && !inOverlay)
-        if (changingScreen || !fromIsThere || to === null || outOfSight || switchMs <= 0) {
+        if (changingScreen || !fromIsThere || to === null || outOfSight || switchMs <= 0 || sideways) {
             arriveAtOnce()
             return
         }
@@ -321,13 +319,18 @@ PanelWindow {
     property var confirmDialog: null
     property var sounds: null
 
-    readonly property var looks: settings.theme.dock
+    // bottom, left or right, as the user chose
+    readonly property string side: DockAxis.sideOf(choices.value("dock", "position"))
+    readonly property bool sideways: DockAxis.sideways(side)
+    // a side dock takes the theme's [dock.side] over its [dock]
+    readonly property var looks: sideways
+        ? Object.assign({}, settings.theme.dock, settings.theme.dock.side ?? ({})) : settings.theme.dock
     readonly property var config: settings.config.dock
     readonly property string themeDirectory: settings.theme_directory
 
 
     // Publish shelf geometry as its size, screen or visibility changes.
-    readonly property bool windowReflections: choices.value("dock", "window_reflections") ?? false
+    readonly property bool windowReflections: !sideways && (choices.value("dock", "window_reflections") ?? false)
     readonly property string reflectedShelf: JSON.stringify({
         output: dock.screen?.name ?? "",
         x: Math.round(dock.shelfEdges.left),
@@ -445,20 +448,40 @@ PanelWindow {
         if (dragged === null) {
             dragged = { listedAs: asShellTile(listedAs), iconSource: iconSource, fromOutside: true }
         }
-        followDrag(screenX, screenY - (screen.height - height))
+        const origin = windowOrigin()
+        followDrag(screenX - origin.x, screenY - origin.y)
     }
 
-    // The dock's window spans the screen's width along its bottom edge.
-    function toScreenY(windowY) {
-        return screen.height - height + windowY
+    // the window's corner on its screen, it hangs along the dock's edge
+    function windowOrigin() {
+        return DockAxis.windowOrigin(side, screen?.width ?? 0, screen?.height ?? 0, width, height)
+    }
+    function toScreen(windowX, windowY) {
+        const origin = windowOrigin()
+        return { x: origin.x + windowX, y: origin.y + windowY }
+    }
+    // a point of the strip on the screen
+    function stripToScreen(alongX, acrossY) {
+        const point = strip.mapToItem(null, alongX, acrossY)
+        return toScreen(point.x, point.y)
+    }
+    // a rectangle of the strip in the window, as it rests
+    function stripRectInWindow(rect) {
+        const m = DockAxis.stripMatrix(side, thickness)
+        const xs = [m[0] * rect.x + m[1] * rect.y + m[2], m[0] * (rect.x + rect.width) + m[1] * (rect.y + rect.height) + m[2]]
+        const ys = [m[3] * rect.x + m[4] * rect.y + m[5], m[3] * (rect.x + rect.width) + m[4] * (rect.y + rect.height) + m[5]]
+        return Qt.rect(Math.min(xs[0], xs[1]), Math.min(ys[0], ys[1]), Math.abs(xs[1] - xs[0]), Math.abs(ys[1] - ys[0]))
     }
 
     function followDrag(windowX, windowY) {
-        dragScreenX = windowX
-        dragScreenY = toScreenY(windowY)
+        const onScreen = toScreen(windowX, windowY)
+        dragScreenX = onScreen.x
+        dragScreenY = onScreen.y
+        const point = strip.mapFromItem(null, windowX, windowY)
+        const alongX = point.x
 
-        const dockTop = height - restingHeight
-        draggedOut = windowY < dockTop - outDistanceInTiles * tileSize
+        const dockTop = thickness - restingHeight
+        draggedOut = point.y < dockTop - outDistanceInTiles * tileSize
 
         // Count the other kept tiles whose middle is left of the pointer, as
         // they are shown: pushed apart by magnification. (Their resting
@@ -472,7 +495,7 @@ PanelWindow {
             }
             const resting = row.tiles[number]
             const shown = DockLayout.tileEdges(resting.left, resting.width, pushNow)
-            if ((shown.left + shown.right) / 2 < windowX) {
+            if ((shown.left + shown.right) / 2 < alongX) {
                 before += 1
             }
         }
@@ -937,7 +960,7 @@ PanelWindow {
         // land, as for a tile dragged along the dock. Several files go to the
         // end of the last group, as before.
         function follow(drag) {
-            dock.dropOverTrash = dock.overTrash(drag.x)
+            dock.dropOverTrash = dock.overTrash(drag.x, drag.y)
             const paths = DroppedFiles.paths(drag)
             if (dock.dropOverTrash || paths.length !== 1) {
                 if (dock.dragged?.dropped ?? false) {
@@ -969,7 +992,7 @@ PanelWindow {
                 return
             }
             // Onto the trash, files go there; anywhere else they are kept.
-            if (dock.overTrash(drop.x)) {
+            if (dock.overTrash(drop.x, drop.y)) {
                 dock.trashDropped(paths)
                 drop.accept(Qt.MoveAction)
             } else if ((dock.dragged?.dropped ?? false) && !dock.draggedOut) {
@@ -986,14 +1009,14 @@ PanelWindow {
         }
     }
 
-    function overTrash(x) {
+    function overTrash(windowX, windowY) {
         const index = places.findIndex(place => place.isTrash)
         const tile = index >= 0 ? tileAt(index) : null
         if (tile === null) {
             return false
         }
-        const left = tile.mapToItem(null, 0, 0).x
-        return x >= left && x <= left + tile.width
+        const along = strip.mapFromItem(null, windowX, windowY).x
+        return along >= tile.x && along <= tile.x + tile.width
     }
 
     // Moves dropped files to the trash with [dock] trash_drop_command, which
@@ -1071,13 +1094,13 @@ PanelWindow {
     function iconRectangle(restingTile) {
         const left = Math.floor(restingTile.left + 0.5)
         const size = Math.floor(restingTile.width + 0.5) - 2 * tileMargin
-        return Qt.rect(left + tileMargin, fromBottom(base, size), size, size)
+        return stripRectInWindow(Qt.rect(left + tileMargin, fromBottom(base, size), size, size))
     }
 
     function tellWindowPlaces() {
         const units = rowWithOneMore.widths.reduce((sum, width) => sum + width, 0)
-        const futureTileSize = DockLayout.fittingTileSize(looks, wantedTileSize, units, width)
-        const futureRow = DockLayout.row(looks, rowWithOneMore.widths, futureTileSize, width)
+        const futureTileSize = DockLayout.fittingTileSize(looks, wantedTileSize, units, alongLength)
+        const futureRow = DockLayout.row(looks, rowWithOneMore.widths, futureTileSize, alongLength)
         const futureTile = futureRow.tiles[rowWithOneMore.newTile]
 
         for (const window of ToplevelManager.toplevels.values) {
@@ -1141,7 +1164,7 @@ PanelWindow {
     readonly property real wantedTileSize:
         DockLayout.iconSize(looks, sizeWishes, screen?.height ?? 0) + 2 * tileMargin
     readonly property real tileSize:
-        DockLayout.fittingTileSize(looks, wantedTileSize, rowUnits, screen?.width ?? width)
+        DockLayout.fittingTileSize(looks, wantedTileSize, rowUnits, sideways ? alongLength : screen?.width ?? width)
 
     // Space between the screen's edge and the line the tiles stand on.
     readonly property int base: DockLayout.sized(looks.base, tileSize)
@@ -1182,7 +1205,7 @@ PanelWindow {
     // `row` is where tiles rest; what is shown slides there when the row
     // changes, and magnification pushes tiles apart around the pointer.
 
-    readonly property var row: DockLayout.row(looks, placeWidths, tileSize, width)
+    readonly property var row: DockLayout.row(looks, placeWidths, tileSize, alongLength)
 
     readonly property var pushNow: DockLayout.pushNow(
         looks, tileSize, row.start, row.end,
@@ -1274,11 +1297,16 @@ PanelWindow {
 
     // --- The window ---------------------------------------------------------------
 
+    readonly property var edges: DockAxis.anchors(side)
     anchors {
-        left: true
-        right: true
-        bottom: true
+        left: dock.edges.left
+        right: dock.edges.right
+        top: dock.edges.top
+        bottom: dock.edges.bottom
     }
+    // how far the dock runs along its edge, and how deep the strip is across it
+    readonly property real alongLength: sideways ? height : width
+    readonly property real thickness: roomBase + tallestTile + Math.max(bounceRoom, labelRoom) + looks.headroom
 
     // Always as high as the tallest tile at the top of its bounce, so resizing
     // by hand never resizes the window: that made the drag uneven, as shell and
@@ -1286,11 +1314,15 @@ PanelWindow {
     // and only the mask takes the pointer, so the spare height costs nothing.
     readonly property real tallestTile: largestIconSize + 2 * tileMargin
     readonly property real bounceRoom: DockLayout.sized(looks.launch_bounce.height, tallestTile) + 1
-    readonly property real labelRoom: looks.label !== undefined
-        ? looks.label.gap + looks.label.pointer_height + looks.label.height : 0
+    // a side dock's name shows beside the tile, as wide as the longest name may be
+    readonly property real labelRoom: looks.label === undefined ? 0
+        : sideways ? looks.label.gap + labelMostWidth
+        : looks.label.gap + looks.label.pointer_height + looks.label.height
+    readonly property real labelMostWidth: looks.label?.most_width ?? 320
     // The base line rises a little with tile size; the largest tile's is taken.
     readonly property real roomBase: DockLayout.sized(looks.base, tallestTile)
-    implicitHeight: roomBase + tallestTile + Math.max(bounceRoom, labelRoom) + looks.headroom
+    implicitHeight: sideways ? 0 : thickness
+    implicitWidth: sideways ? thickness : 0
 
     // Windows keep clear of the resting dock only, and during a resize by
     // hand they keep the height from its start.
@@ -1327,20 +1359,28 @@ PanelWindow {
             easing.type: ThemeValues.easing(dock.hideMotion.curve ?? "ease-in-out")
         }
     }
-    // The contents move down, not the window: moving the window by a negative
+    // The contents move past the edge, not the window: moving the window by a negative
     // margin goes through the compositor at every step and comes out jerky.
+    readonly property real sunkBy: sunk * restingHeight
     Binding {
         target: dock.contentItem
         property: "y"
-        value: dock.sunk * dock.restingHeight
+        value: dock.side === "bottom" ? dock.sunkBy : 0
+    }
+    Binding {
+        target: dock.contentItem
+        property: "x"
+        value: dock.side === "left" ? -dock.sunkBy : dock.side === "right" ? dock.sunkBy : 0
     }
 
     Item {
         id: screenEdge
         readonly property real rows: 2
-        width: parent.width
-        height: rows
-        y: parent.height - dock.sunk * dock.restingHeight - rows
+        readonly property rect place: dock.stripRectInWindow(Qt.rect(0, dock.thickness - rows, dock.alongLength, rows))
+        x: place.x - dock.contentItem.x
+        y: place.y - dock.contentItem.y
+        width: place.width
+        height: place.height
 
         HoverHandler {
             id: atScreenEdge
@@ -1352,12 +1392,24 @@ PanelWindow {
     color: "transparent"
     // A sunk dock takes the pointer only on the screen's last rows.
     mask: Region {
-        item: dock.sunk > 0 ? screenEdge : pointerArea
+        item: dock.sunk > 0 ? screenEdge : pointerInWindow
+    }
+    // the pointer's area as the window sees it, the strip being turned on a side dock
+    Item {
+        id: pointerInWindow
+        readonly property rect place: dock.stripRectInWindow(
+            Qt.rect(pointerArea.x, pointerArea.y, pointerArea.width, pointerArea.height))
+        x: place.x
+        y: place.y
+        width: place.width
+        height: place.height
     }
 
-    // The pointer's x in window coordinates, not the watching item's: that item
+    // The pointer along the dock in strip coordinates, not the watching item's: that item
     // moves with the shelf's end as icons grow.
-    readonly property real pointerX: pointer.point.scenePosition.x
+    readonly property real pointerX:
+        DockAxis.toStrip(side, thickness, pointer.point.scenePosition.x - contentItem.x,
+                         pointer.point.scenePosition.y - contentItem.y).x
     // not pointed at on its way to another screen, or it comes up swollen under the pointer
     readonly property bool pointerInside: pointer.hovered && !changingScreen
 
@@ -1383,7 +1435,7 @@ PanelWindow {
     readonly property real pointerAlongDock: menuHoldsPointer ? heldPointer : pointerX
 
     function fromBottom(bottom, itemHeight) {
-        return height - bottom - itemHeight
+        return thickness - bottom - itemHeight
     }
 
     // how far down the window the middle of a tile's icon is
@@ -1391,81 +1443,8 @@ PanelWindow {
         return fromBottom(base + (tile?.lift ?? 0) + (tile?.iconSize ?? 0) / 2, 0)
     }
 
-    Item {
-        id: pointerArea
-        x: dock.shelfEdges.left
-        width: dock.shelfEdges.right - dock.shelfEdges.left
-        height: dock.restingHeight + (dock.largestTileSize - dock.tileSize) * dock.magnificationRamp
-        y: parent.height - height
-        // Above the tiles so it always hears the pointer; presses still reach them.
-        z: 1
-
-        HoverHandler {
-            id: pointer
-        }
-
-        // Follows and ends a tile's drag. The tile cannot: a non-running program's
-        // tile pulled out of the dock loses its place and is destroyed while the
-        // button is still held. This only watches; the press still goes to the tile.
-        PointHandler {
-            id: dragEnd
-            acceptedButtons: Qt.LeftButton
-            onPointChanged: {
-                if (active && dock.dragged !== null && !dock.dragged.fromOutside) {
-                    dock.followDrag(point.scenePosition.x, point.scenePosition.y)
-                }
-            }
-            onActiveChanged: {
-                if (!active) {
-                    dock.endDrag()
-                }
-            }
-        }
-    }
-
-    // --- Layers, from the lowest to the highest -----------------------------------
-
-    Repeater {
-        model: dock.windowReflections ? null : placeModel
-        DockIconEffect {
-            drawnWidth: dock.drawnIconSize
-            required property int index
-            required property string modelData
-            readonly property var place: dock.placeOf(modelData)
-            readonly property var tile: dock.tileOf(modelData)
-
-            visible: !place.isSeparator && dock.looks.icon_shadow !== undefined
-            iconSource: tile?.iconSource ?? ""
-            tint: dock.looks.icon_shadow?.color ?? "#00000000"
-            opacity: tile?.shownShare ?? 1
-            blurRadius: dock.looks.icon_shadow?.blur ?? 0
-
-            x: tile?.iconX ?? 0
-            iconScale: tile?.iconScale ?? 1
-            iconMiddle: dock.iconMiddle(tile)
-            width: tile?.iconSize ?? 0
-            y: dock.fromBottom(dock.base + (tile?.lift ?? 0) + (dock.looks.icon_shadow?.raise ?? 0), height)
-        }
-    }
-
-    Loader {
-        id: shelf
-        visible: !dock.windowReflections
-        // The shelf's finish is independent of the menu bar's translucency.
-        opacity: (dock.choices.value("blur", "dock_shelf") ?? false)
-                 && (dock.choices.value("blur", "dock")
-                  ?? dock.settings.theme.blur?.dock ?? false)
-                 ? Math.max(0, Math.min(1, dock.choices.value("blur", "dock_opacity")
-                    ?? dock.settings.theme.blur?.dock_opacity ?? 1)) : 1
-        x: dock.shelfEdges.left
-        width: dock.shelfEdges.right - dock.shelfEdges.left
-        height: dock.shelfHeight
-        y: dock.fromBottom(0, height)
-        sourceComponent: dock.shelfIsSlab ? slabShelf : boxShelf
-    }
-
-    // The glass has its own surface so native reflections can be painted
-    // above it while the original icon, shadow and icon-reflection layers stay above both.
+    // the glass has its own surface so native reflections go above it
+    // and the icon, shadow and icon reflection layers above both
     PanelWindow {
         id: glassWindow
         screen: dock.screen
@@ -1476,7 +1455,7 @@ PanelWindow {
         WlrLayershell.layer: WlrLayer.Overlay
         color: "transparent"
         mask: Region {}
-        // With the dock: under a fullscreen window, unless the dock is raised above it.
+        // with the dock, under a fullscreen window unless the dock is raised above it
         visible: dock.visible && dock.windowReflections && dock.inOverlay && glassKeepShown.canShow
         KeepShown { id: glassKeepShown; target: glassWindow }
         Binding {
@@ -1514,108 +1493,57 @@ PanelWindow {
             height: dock.shelfHeight
             y: glassWindow.height - height
             opacity: shelf.opacity
+            active: dock.windowReflections
             sourceComponent: dock.shelfIsSlab ? slabShelf : boxShelf
         }
     }
 
-    Component {
-        id: slabShelf
-        SlabShelf {
-            looks: Object.assign({}, dock.looks.shelf, {
-                back_outline: dock.choices.value("dock", "rear_outline") ?? dock.looks.shelf.back_outline ?? true
-            })
-        }
-    }
-
-    Component {
-        id: boxShelf
-        Fill {
-            fill: dock.looks.shelf.background
-            themeDirectory: dock.themeDirectory
-        }
-    }
-
-    Repeater {
-        model: placeModel
-        Item {
-            id: separator
-            required property int index
-            required property string modelData
-            readonly property var place: dock.placeOf(modelData)
-            readonly property var tile: dock.tileOf(modelData)
-            readonly property var looks: dock.looks.separator
-
-            visible: place.isSeparator
-            // A separator is the dock's handle: dragging it resizes the icons; a
-            // secondary press opens the dock's menu.
-            MouseArea {
-                anchors.fill: parent
-                acceptedButtons: Qt.LeftButton | Qt.RightButton
-                // The pointer shows it can be dragged up and down, as over
-                // the Dock's divider on a Mac.
-                hoverEnabled: true
-                cursorShape: Qt.SizeVerCursor
-
-                property real heightAtPress: 0
-                property real iconSizeAtPress: 0
-                function heightAboveBottom(mouse) {
-                    return dock.height - mapToItem(null, mouse.x, mouse.y).y
-                }
-
-                onPressed: mouse => {
-                    if (mouse.button === Qt.LeftButton) {
-                        heightAtPress = heightAboveBottom(mouse)
-                        iconSizeAtPress = dock.tileSize - 2 * dock.tileMargin
-                    }
-                }
-                onPositionChanged: mouse => {
-                    if (pressedButtons & Qt.LeftButton) {
-                        dock.resizeTo(iconSizeAtPress + heightAboveBottom(mouse) - heightAtPress)
-                    }
-                }
-                onReleased: dock.endResize()
-                onCanceled: dock.endResize()
-                onClicked: mouse => {
-                    if (mouse.button === Qt.RightButton) {
-                        dock.openMenu(separator.index)
-                    }
-                }
-            }
-            height: dock.shelfHeight - looks.bottom - looks.top_gap
-            width: tile?.width ?? 0
-            x: tile ? Math.floor(tile.x + tile.width / 2 + 0.5) - width / 2 : 0
-            y: dock.fromBottom(looks.bottom, height)
-
-            Image {
-                anchors.fill: parent
-                visible: separator.looks.image !== undefined
-                source: visible ? "file://" + dock.themeDirectory + "/" + separator.looks.image : ""
-                fillMode: Image.PreserveAspectFit
-            }
-
-            Rectangle {
-                anchors.horizontalCenter: parent.horizontalCenter
-                visible: separator.looks.color !== undefined
-                width: separator.looks.line_width ?? 1
-                height: parent.height
-                color: ThemeValues.color(separator.looks.color)
-            }
-        }
-    }
-
-    // Reflections in the shelf, cut off before its front face.
+    // every layer as on a bottom dock, turned onto the dock's side
     Item {
-        id: reflections
-        readonly property var looks: dock.looks.reflection
-        visible: looks !== undefined
-        clip: true
-        x: 0
-        width: parent.width
-        height: dock.shelfHeight - (looks?.clip_bottom ?? 0)
-        y: dock.fromBottom(looks?.clip_bottom ?? 0, height)
+        id: strip
+        width: dock.alongLength
+        height: dock.thickness
+        transform: Matrix4x4 {
+            matrix: Qt.matrix4x4(DockAxis.matrix4(DockAxis.stripMatrix(dock.side, dock.thickness)))
+        }
+
+        Item {
+            id: pointerArea
+            x: dock.shelfEdges.left
+            width: dock.shelfEdges.right - dock.shelfEdges.left
+            height: dock.restingHeight + (dock.largestTileSize - dock.tileSize) * dock.magnificationRamp
+            y: parent.height - height
+            // Above the tiles so it always hears the pointer; presses still reach them.
+            z: 1
+
+            HoverHandler {
+                id: pointer
+            }
+
+            // Follows and ends a tile's drag. The tile cannot: a non-running program's
+            // tile pulled out of the dock loses its place and is destroyed while the
+            // button is still held. This only watches; the press still goes to the tile.
+            PointHandler {
+                id: dragEnd
+                acceptedButtons: Qt.LeftButton
+                onPointChanged: {
+                    if (active && dock.dragged !== null && !dock.dragged.fromOutside) {
+                        dock.followDrag(point.scenePosition.x, point.scenePosition.y)
+                    }
+                }
+                onActiveChanged: {
+                    if (!active) {
+                        dock.endDrag()
+                    }
+                }
+            }
+        }
+
+        // --- Layers, from the lowest to the highest -----------------------------------
 
         Repeater {
-            model: reflections.visible ? placeModel : null
+            // the flat glass of a side dock casts and mirrors nothing
+            model: dock.windowReflections || dock.sideways ? null : placeModel
             DockIconEffect {
                 drawnWidth: dock.drawnIconSize
                 required property int index
@@ -1623,215 +1551,405 @@ PanelWindow {
                 readonly property var place: dock.placeOf(modelData)
                 readonly property var tile: dock.tileOf(modelData)
 
-                visible: !place.isSeparator
+                visible: !place.isSeparator && dock.looks.icon_shadow !== undefined
                 iconSource: tile?.iconSource ?? ""
-                upsideDown: true
-                blurRadius: reflections.looks.blur * width
-                contrast: reflections.looks.contrast
-                brightness: reflections.looks.brightness
-                opacity: reflections.looks.opacity * (tile?.shownShare ?? 1)
+                tint: dock.looks.icon_shadow?.color ?? "#00000000"
+                opacity: tile?.shownShare ?? 1
+                blurRadius: dock.looks.icon_shadow?.blur ?? 0
 
                 x: tile?.iconX ?? 0
                 iconScale: tile?.iconScale ?? 1
-                iconMiddle: dock.iconMiddle(tile) - reflections.y
+                iconMiddle: dock.iconMiddle(tile)
                 width: tile?.iconSize ?? 0
-                // Its top edge starts a little above the icon's lower edge,
-                // hidden behind the icon, and it moves down as the icon rises.
-                readonly property real topAboveScreenEdge:
-                    dock.base + reflections.looks.overlap - (tile?.lift ?? 0)
-                y: reflections.height + reflections.looks.clip_bottom - topAboveScreenEdge
+                y: dock.fromBottom(dock.base + (tile?.lift ?? 0) + (dock.looks.icon_shadow?.raise ?? 0), height)
             }
         }
-    }
 
-    Repeater {
-        model: dock.looks.floor_shadow !== undefined ? placeModel : null
-        DockIconEffect {
-            drawnWidth: dock.drawnIconSize
-            required property int index
-            required property string modelData
-            readonly property var place: dock.placeOf(modelData)
-            readonly property var tile: dock.tileOf(modelData)
-            readonly property real iconSize: tile?.iconSize ?? 0
-
-            visible: !place.isSeparator
-            iconSource: tile?.iconSource ?? ""
-            tint: dock.looks.floor_shadow.color
-            opacity: tile?.shownShare ?? 1
-            blurRadius: dock.looks.floor_shadow.blur * iconSize
-
-            x: tile?.iconX ?? 0
-            iconScale: tile?.iconScale ?? 1
-            iconMiddle: dock.iconMiddle(tile)
-            width: iconSize
-            // The documented value where a theme leaves it out.
-            heightShare: dock.looks.floor_shadow.height ?? 0.5
-            // Centred a quarter of the icon's height above its lower edge.
-            y: dock.fromBottom(dock.base + iconSize / 4 - height / 2, height)
+        Loader {
+            id: shelf
+            visible: !dock.windowReflections
+            // The shelf's finish is independent of the menu bar's translucency.
+            opacity: (dock.choices.value("blur", "dock_shelf") ?? false)
+                     && (dock.choices.value("blur", "dock")
+                      ?? dock.settings.theme.blur?.dock ?? false)
+                     ? Math.max(0, Math.min(1, dock.choices.value("blur", "dock_opacity")
+                        ?? dock.settings.theme.blur?.dock_opacity ?? 1)) : 1
+            x: dock.shelfEdges.left
+            width: dock.shelfEdges.right - dock.shelfEdges.left
+            height: dock.shelfHeight
+            y: dock.fromBottom(0, height)
+            sourceComponent: dock.sideways && dock.looks.shelf.shape === "side_glass" ? sideShelf
+                : dock.shelfIsSlab ? slabShelf : boxShelf
         }
-    }
 
-    // Lights under running programs; a theme may give a smaller one for small tiles.
-    Repeater {
-        model: placeModel
-        Fill {
-            required property int index
-            required property string modelData
-            readonly property var place: dock.placeOf(modelData)
-            readonly property var tile: dock.tileOf(modelData)
-            readonly property var looks: dock.looks.indicator
-            readonly property bool small: looks.small_fill !== undefined
-                                          && dock.tileSize < looks.small_below_tile_size
-
-            // on at once, a kept program's light fades as the program goes
-            // and one on a leaving tile is gone at once
-            readonly property bool lit: !place.isSeparator && (tile?.running ?? false)
-            readonly property bool leaving: place.leaving ?? false
-            opacity: 0
-            visible: opacity > 0
-            NumberAnimation on opacity {
-                id: lightFade
-                running: false
-                to: 0
-                duration: dock.leaveMs
-                easing.type: Easing.InOutSine
-            }
-            function light() {
-                lightFade.stop()
-                if (leaving) {
-                    opacity = 0
-                } else if (lit) {
-                    opacity = 1
-                } else {
-                    lightFade.start()
+        Component {
+            id: sideShelf
+            DockUpright {
+                side: dock.side
+                SideShelf {
+                    width: parent.width
+                    height: parent.height
+                    looks: dock.looks.shelf
+                    mirrored: dock.side === "right"
                 }
             }
-            onLitChanged: light()
-            onLeavingChanged: light()
-            Component.onCompleted: light()
-            fill: small ? looks.small_fill : looks.fill
-            themeDirectory: dock.themeDirectory
-            width: small ? looks.small_width : looks.width
-            height: looks.height
-
-            x: tile ? Math.trunc(tile.x + tile.width / 2 - width / 2) : 0
-            y: dock.fromBottom(Math.trunc(looks.center_height - height / 2), height)
         }
-    }
 
-    Repeater {
-        id: tiles
-        model: placeModel
-        onItemAdded: dock.tilesRevision += 1
-        onItemRemoved: dock.tilesRevision += 1
-
-        DockTile {
-            required property int index
-            required property string modelData
-            readonly property var place: dock.placeOf(modelData)
-            readonly property var resting: dock.row.tiles[index]
-            property real restLeft: resting?.left ?? 0
-            // Slides only once placed, so a new tile does not slide in from the edge.
-            property bool placed: false
-            Component.onCompleted: Qt.callLater(() => placed = true)
-            Behavior on restLeft {
-                enabled: dock.slides && placed
-                Slide {}
+        Component {
+            id: slabShelf
+            SlabShelf {
+                looks: Object.assign({}, dock.looks.shelf, {
+                    back_outline: dock.choices.value("dock", "rear_outline") ?? dock.looks.shelf.back_outline ?? true
+                })
             }
-            // whole and centred on its slot, however narrow the slot
-            readonly property real wholeWidth:
-                place.isSeparator ? resting?.width ?? 0 : dock.tileSize
-            readonly property var edges: DockLayout.tileEdges(
-                restLeft + ((resting?.width ?? 0) - wholeWidth) / 2, wholeWidth, dock.pushNow)
+        }
 
-            opensSlot: place.kept === false || (place.leaving ?? false)
-            leaving: place.leaving ?? false
-            leaveDuration: dock.leaveMs
-            onLeftDock: dock.dropLeft(modelData)
-            entry: place.entry
-            appId: place.appId ?? ""
-            choices: dock.choices
-            minimizedWindow: place.window
-            readonly property var custom: place.custom ?? null
-            readonly property bool showsOpenFolder: index === dock.folderIndex
-                && dock.looks.folder?.open_image !== undefined && !folders.isClipboard(custom)
-            // A minimised window's tile is empty while its picture is being made.
-            pictureComing: place.window !== null && dock.showsWindowPictures
-                && dock.windowPictureComing(place.window)
-            picture: {
-                if (place.window !== null && dock.showsWindowPictures) {
-                    return dock.windowPicture(place.window, place.entry)
-                }
-                if (place.isTrash) {
-                    return dock.trashPicture
-                }
-                if (showsOpenFolder) {
-                    return "file://" + dock.themeDirectory + "/" + dock.looks.folder.open_image
-                }
-                if (custom === null) {
-                    return ""
-                }
-                // Not every icon theme has "folder-applications".
-                return dock.iconPicture(custom.icon ?? "", folders.isProgramFolder(custom) ? "folder"
-                                                           : folders.isClipboard(custom) ? "edit-paste" : undefined)
+        Component {
+            id: boxShelf
+            Fill {
+                fill: dock.looks.shelf.background
+                themeDirectory: dock.themeDirectory
             }
-            opensFolder: custom?.folder !== undefined || folders.isProgramFolder(custom) || folders.isClipboard(custom)
-            onFolderWanted: dock.showFolder(index)
-            onMinimizedWindowWanted: window => dock.bringBack(window)
-            // read anew at each size they kept the shell busy decoding through a resize
-            drawnIconSize: dock.drawnIconSize
-            name: place.isTrash ? (dock.config.trash_label ?? "") : (custom?.name ?? "")
-            command: place.isTrash ? (dock.config.trash_command ?? []) : (custom?.command ?? [])
-            shellAction: custom?.shell ?? ""
-            onShellActionWanted: action => dock.shell?.run(action)
-            onMenuWanted: dock.openMenu(index)
-            // Not a program in front already; nor the tile of a minimised
-            // window, which shows that window, not the program.
-            wantsAttention: minimizedWindow === null && !windows.some(window => window.activated)
-                            && windows.some(window => attention.asks(window.appId, attention.revision))
-            onMenuDragged: (windowX, windowY) => placeMenu.markAt(windowX, dock.toScreenY(windowY))
-            onMenuReleased: (windowX, windowY) => placeMenu.chooseAt(windowX, dock.toScreenY(windowY))
-            onMenuGivenUp: dock.closeMenu()
-            draggable: place.listedAs !== undefined
-            lifted: dock.dragged !== null && place.listedAs !== undefined
-                    && dock.entryText(place.listedAs) === dock.entryText(dock.dragged.listedAs)
-            onDragMoved: (windowX, windowY) => dock.dragTo(index, windowX, windowY)
-            margin: dock.tileMargin
-            bounce: dock.looks.launch_bounce
-            pressedDarken: dock.looks.pressed_darken
-            // A tile that joins a dock already on screen grows into place.
-            appearDuration: dock.settled ? dock.looks.tile_appear_ms : 0
-            smallestAppearScale: dock.looks.tile_appear_scale ?? 1
+        }
 
-            // Not while a menu is open: its place needs no label.
-            pointerOver: (dock.dropOverTrash && place.isTrash)
-                         || (dock.menuIndex < 0 && dock.folderIndex < 0 && dock.dragged === null
-                             && dock.pointerInside
-                             && dock.pointerX >= x && dock.pointerX < x + width)
+        Repeater {
+            model: placeModel
+            Item {
+                id: separator
+                required property int index
+                required property string modelData
+                readonly property var place: dock.placeOf(modelData)
+                readonly property var tile: dock.tileOf(modelData)
+                readonly property var looks: dock.looks.separator
 
-            // The last tile pointed at keeps the label while it fades out.
-            onHoveredChanged: {
-                if (hovered) {
-                    dock.labelledTile = this
+                visible: place.isSeparator
+                // A separator is the dock's handle: dragging it resizes the icons; a
+                // secondary press opens the dock's menu.
+                MouseArea {
+                    anchors.fill: parent
+                    acceptedButtons: Qt.LeftButton | Qt.RightButton
+                    // the pointer shows it drags away from the edge and back
+                    // as over the divider on a Mac
+                    hoverEnabled: true
+                    cursorShape: dock.sideways ? Qt.SizeHorCursor : Qt.SizeVerCursor
+
+                    property real heightAtPress: 0
+                    property real iconSizeAtPress: 0
+                    function heightAboveBottom(mouse) {
+                        return dock.thickness - mapToItem(strip, mouse.x, mouse.y).y
+                    }
+
+                    onPressed: mouse => {
+                        if (mouse.button === Qt.LeftButton) {
+                            heightAtPress = heightAboveBottom(mouse)
+                            iconSizeAtPress = dock.tileSize - 2 * dock.tileMargin
+                        }
+                    }
+                    onPositionChanged: mouse => {
+                        if (pressedButtons & Qt.LeftButton) {
+                            dock.resizeTo(iconSizeAtPress + heightAboveBottom(mouse) - heightAtPress)
+                        }
+                    }
+                    onReleased: dock.endResize()
+                    onCanceled: dock.endResize()
+                    onClicked: mouse => {
+                        if (mouse.button === Qt.RightButton) {
+                            dock.openMenu(separator.index)
+                        }
+                    }
                 }
-            }
+                height: dock.shelfHeight - looks.bottom - looks.top_gap
+                width: tile?.width ?? 0
+                x: tile ? Math.floor(tile.x + tile.width / 2 + 0.5) - width / 2 : 0
+                y: dock.fromBottom(looks.bottom, height)
 
-            // Once the pointer rests on it (pointerRests), a tile that runs a
-            // shell action lets the shell get ready for it, and a folder
-            // shown as a grid or fan gets its window made.
-            function getReady() {
-                if (shellAction !== "") {
-                    dock.shell?.prepare(shellAction)
+                DockUpright {
+                    anchors.fill: parent
+                    side: dock.side
+                    // a side dock's line keeps its size, cut to the glass
+                    clip: separator.looks.unscaled ?? false
+                    Image {
+                        id: separatorPicture
+                        width: parent.width
+                        height: parent.height
+                        visible: separator.looks.image !== undefined
+                        source: visible ? "file://" + dock.themeDirectory + "/" + separator.looks.image : ""
+                        fillMode: (separator.looks.unscaled ?? false) ? Image.Pad : Image.PreserveAspectFit
+                    }
+                    Rectangle {
+                        visible: separatorPicture.status === Image.Error && dock.sideways
+                        anchors.centerIn: parent
+                        width: parent.width
+                        height: 1
+                        color: "#24000000"
+                    }
                 }
-                if (opensFolder && folders.viewOf(custom) !== "list") {
-                    folderOverlay.warmUp()
+
+                Rectangle {
+                    anchors.horizontalCenter: parent.horizontalCenter
+                    visible: separator.looks.color !== undefined
+                    width: separator.looks.line_width ?? 1
+                    height: parent.height
+                    color: ThemeValues.color(separator.looks.color)
                 }
             }
+        }
 
-            x: edges.left
-            width: edges.right - edges.left
-            height: width
-            y: dock.fromBottom(dock.base + lift, height)
+        // Reflections in the shelf, cut off before its front face.
+        Item {
+            id: reflections
+            readonly property var looks: dock.looks.reflection
+            visible: looks !== undefined && !dock.sideways
+            clip: true
+            x: 0
+            width: parent.width
+            height: dock.shelfHeight - (looks?.clip_bottom ?? 0)
+            y: dock.fromBottom(looks?.clip_bottom ?? 0, height)
+
+            Repeater {
+                model: reflections.visible ? placeModel : null
+                DockIconEffect {
+                    drawnWidth: dock.drawnIconSize
+                    required property int index
+                    required property string modelData
+                    readonly property var place: dock.placeOf(modelData)
+                    readonly property var tile: dock.tileOf(modelData)
+
+                    visible: !place.isSeparator
+                    iconSource: tile?.iconSource ?? ""
+                    upsideDown: true
+                    blurRadius: reflections.looks.blur * width
+                    contrast: reflections.looks.contrast
+                    brightness: reflections.looks.brightness
+                    opacity: reflections.looks.opacity * (tile?.shownShare ?? 1)
+
+                    x: tile?.iconX ?? 0
+                    iconScale: tile?.iconScale ?? 1
+                    iconMiddle: dock.iconMiddle(tile) - reflections.y
+                    width: tile?.iconSize ?? 0
+                    // Its top edge starts a little above the icon's lower edge,
+                    // hidden behind the icon, and it moves down as the icon rises.
+                    readonly property real topAboveScreenEdge:
+                        dock.base + reflections.looks.overlap - (tile?.lift ?? 0)
+                    y: reflections.height + reflections.looks.clip_bottom - topAboveScreenEdge
+                }
+            }
+        }
+
+        Repeater {
+            model: dock.looks.floor_shadow !== undefined && !dock.sideways ? placeModel : null
+            DockIconEffect {
+                drawnWidth: dock.drawnIconSize
+                required property int index
+                required property string modelData
+                readonly property var place: dock.placeOf(modelData)
+                readonly property var tile: dock.tileOf(modelData)
+                readonly property real iconSize: tile?.iconSize ?? 0
+
+                visible: !place.isSeparator
+                iconSource: tile?.iconSource ?? ""
+                tint: dock.looks.floor_shadow.color
+                opacity: tile?.shownShare ?? 1
+                blurRadius: dock.looks.floor_shadow.blur * iconSize
+
+                x: tile?.iconX ?? 0
+                iconScale: tile?.iconScale ?? 1
+                iconMiddle: dock.iconMiddle(tile)
+                width: iconSize
+                // The documented value where a theme leaves it out.
+                heightShare: dock.looks.floor_shadow.height ?? 0.5
+                // Centred a quarter of the icon's height above its lower edge.
+                y: dock.fromBottom(dock.base + iconSize / 4 - height / 2, height)
+            }
+        }
+
+        // Lights under running programs; a theme may give a smaller one for small tiles.
+        Repeater {
+            model: placeModel
+            DockUpright {
+                id: lamp
+                side: dock.side
+                required property int index
+                required property string modelData
+                readonly property var place: dock.placeOf(modelData)
+                readonly property var tile: dock.tileOf(modelData)
+                readonly property var looks: dock.looks.indicator
+                readonly property bool small: looks.small_fill !== undefined
+                                              && dock.tileSize < looks.small_below_tile_size
+
+                // on at once, a kept program's light fades as the program goes
+                // and one on a leaving tile is gone at once
+                readonly property bool lit: !place.isSeparator && (tile?.running ?? false)
+                readonly property bool leaving: place.leaving ?? false
+                opacity: 0
+                visible: opacity > 0
+                NumberAnimation on opacity {
+                    id: lightFade
+                    running: false
+                    to: 0
+                    duration: dock.leaveMs
+                    easing.type: Easing.InOutSine
+                }
+                function light() {
+                    lightFade.stop()
+                    if (leaving) {
+                        opacity = 0
+                    } else if (lit) {
+                        opacity = 1
+                    } else {
+                        lightFade.start()
+                    }
+                }
+                onLitChanged: light()
+                onLeavingChanged: light()
+                Component.onCompleted: light()
+                Fill {
+                    id: lightFill
+                    width: parent.width
+                    height: parent.height
+                    fill: (lamp.small ? lamp.looks.small_fill : lamp.looks.fill) ?? ({})
+                    themeDirectory: dock.themeDirectory
+                }
+                // a theme imported before the side lights came names pictures it lacks
+                Rectangle {
+                    visible: lightFill.missing
+                    anchors.centerIn: parent
+                    width: Math.min(parent.width, 2)
+                    height: Math.min(parent.height, 12)
+                    color: "#ffffff"
+                }
+                // as it shows on the screen, turned into the strip below
+                readonly property real lightWidth: small ? looks.small_width ?? looks.width : looks.width
+                readonly property real lightHeight: small ? looks.small_height ?? looks.height : looks.height
+                width: sideways ? lightHeight : lightWidth
+                height: sideways ? lightWidth : lightHeight
+
+                x: tile ? Math.trunc(tile.x + tile.width / 2 - width / 2 + (looks.along_offset ?? 0)) : 0
+                y: dock.fromBottom(Math.trunc(looks.center_height - height / 2), height)
+            }
+        }
+
+        Repeater {
+            id: tiles
+            model: placeModel
+            onItemAdded: dock.tilesRevision += 1
+            onItemRemoved: dock.tilesRevision += 1
+
+            DockTile {
+                required property int index
+                required property string modelData
+                readonly property var place: dock.placeOf(modelData)
+                readonly property var resting: dock.row.tiles[index]
+                property real restLeft: resting?.left ?? 0
+                // Slides only once placed, so a new tile does not slide in from the edge.
+                property bool placed: false
+                Component.onCompleted: Qt.callLater(() => placed = true)
+                Behavior on restLeft {
+                    enabled: dock.slides && placed
+                    Slide {}
+                }
+                // whole and centred on its slot, however narrow the slot
+                readonly property real wholeWidth:
+                    place.isSeparator ? resting?.width ?? 0 : dock.tileSize
+                readonly property var edges: DockLayout.tileEdges(
+                    restLeft + ((resting?.width ?? 0) - wholeWidth) / 2, wholeWidth, dock.pushNow)
+
+                opensSlot: place.kept === false || (place.leaving ?? false)
+                leaving: place.leaving ?? false
+                leaveDuration: dock.leaveMs
+                onLeftDock: dock.dropLeft(modelData)
+                entry: place.entry
+                appId: place.appId ?? ""
+                choices: dock.choices
+                minimizedWindow: place.window
+                readonly property var custom: place.custom ?? null
+                readonly property bool showsOpenFolder: index === dock.folderIndex
+                    && dock.openFolderImage !== undefined && !folders.isClipboard(custom)
+                // A minimised window's tile is empty while its picture is being made.
+                pictureComing: place.window !== null && dock.showsWindowPictures
+                    && dock.windowPictureComing(place.window)
+                picture: {
+                    if (place.window !== null && dock.showsWindowPictures) {
+                        return dock.windowPicture(place.window, place.entry)
+                    }
+                    if (place.isTrash) {
+                        return dock.trashPicture
+                    }
+                    if (showsOpenFolder) {
+                        return "file://" + dock.themeDirectory + "/" + dock.openFolderImage
+                    }
+                    if (custom === null) {
+                        return ""
+                    }
+                    // Not every icon theme has "folder-applications".
+                    return dock.iconPicture(custom.icon ?? "", folders.isProgramFolder(custom) ? "folder"
+                                                               : folders.isClipboard(custom) ? "edit-paste" : undefined)
+                }
+                opensFolder: custom?.folder !== undefined || folders.isProgramFolder(custom) || folders.isClipboard(custom)
+                onFolderWanted: dock.showFolder(index)
+                onMinimizedWindowWanted: window => dock.bringBack(window)
+                // read anew at each size they kept the shell busy decoding through a resize
+                drawnIconSize: dock.drawnIconSize
+                name: place.isTrash ? (dock.config.trash_label ?? "") : (custom?.name ?? "")
+                command: place.isTrash ? (dock.config.trash_command ?? []) : (custom?.command ?? [])
+                shellAction: custom?.shell ?? ""
+                onShellActionWanted: action => dock.shell?.run(action)
+                onMenuWanted: dock.openMenu(index)
+                // Not a program in front already; nor the tile of a minimised
+                // window, which shows that window, not the program.
+                wantsAttention: minimizedWindow === null && !windows.some(window => window.activated)
+                                && windows.some(window => attention.asks(window.appId, attention.revision))
+                onMenuDragged: (windowX, windowY) => {
+                    const point = dock.toScreen(windowX, windowY)
+                    placeMenu.markAt(point.x, point.y)
+                }
+                onMenuReleased: (windowX, windowY) => {
+                    const point = dock.toScreen(windowX, windowY)
+                    placeMenu.chooseAt(point.x, point.y)
+                }
+                onMenuGivenUp: dock.closeMenu()
+                draggable: place.listedAs !== undefined
+                lifted: dock.dragged !== null && place.listedAs !== undefined
+                        && dock.entryText(place.listedAs) === dock.entryText(dock.dragged.listedAs)
+                onDragMoved: (windowX, windowY) => dock.dragTo(index, windowX, windowY)
+                margin: dock.tileMargin
+                side: dock.side
+                bounce: dock.looks.launch_bounce
+                pressedDarken: dock.looks.pressed_darken
+                // A tile that joins a dock already on screen grows into place.
+                appearDuration: dock.settled ? dock.looks.tile_appear_ms : 0
+                smallestAppearScale: dock.looks.tile_appear_scale ?? 1
+
+                // Not while a menu is open: its place needs no label.
+                pointerOver: (dock.dropOverTrash && place.isTrash)
+                             || (dock.menuIndex < 0 && dock.folderIndex < 0 && dock.dragged === null
+                                 && dock.pointerInside
+                                 && dock.pointerX >= x && dock.pointerX < x + width)
+
+                // The last tile pointed at keeps the label while it fades out.
+                onHoveredChanged: {
+                    if (hovered) {
+                        dock.labelledTile = this
+                    }
+                }
+
+                // Once the pointer rests on it (pointerRests), a tile that runs a
+                // shell action lets the shell get ready for it, and a folder
+                // shown as a grid or fan gets its window made.
+                function getReady() {
+                    if (shellAction !== "") {
+                        dock.shell?.prepare(shellAction)
+                    }
+                    if (opensFolder && folders.viewOf(custom) !== "list") {
+                        folderOverlay.warmUp()
+                    }
+                }
+
+                x: edges.left
+                width: edges.right - edges.left
+                height: width
+                y: dock.fromBottom(dock.base + lift, height)
+            }
         }
     }
 
@@ -1866,6 +1984,8 @@ PanelWindow {
         words: dock.words
         dockFolders: folders
         magnificationWanted: dock.magnificationWanted
+        hidesItself: dock.hidesItself
+        side: dock.side
         trashIsEmpty: dock.trashIsEmpty
         shortcutsOffered: DesktopShortcut.offered(dock.settings, dock.choices)
         addableFolders: dock.addableFolders
@@ -1939,6 +2059,8 @@ PanelWindow {
             folders.openEntry(place.custom, listedFiles[id - menus.fileBaseId].path)
         } else if (id === menus.openFolderId) {
             folders.openWhole(place.custom)
+        } else if (id >= menus.positionBaseId && id < menus.positionBaseId + menus.sides.length) {
+            choices.set("dock", "position", menus.sides[id - menus.positionBaseId])
         } else if (id >= menus.sizeBaseId) {
             const changed = Object.assign({}, place.custom, { size: StackSize.names[id - menus.sizeBaseId] })
             choices.set("dock", "groups", groupsReplacing(place.listedAs, changed))
@@ -1979,6 +2101,8 @@ PanelWindow {
             emptyTrash()
         } else if (id === menus.magnificationId) {
             choices.set("dock", "magnification", !magnificationWanted)
+        } else if (id === menus.hidingId) {
+            choices.set("dock", "autohide", !hidesItself)
         } else if (id === menus.originalSizeId) {
             // Left out of the user's file, the size is the desktop's again.
             choices.set("dock", "icon_size", undefined)
@@ -1997,20 +2121,21 @@ PanelWindow {
         open: dock.menuIndex >= 0
         items: dock.menuItems
 
-        // Above its place, centred, its pointer ending just above the icon.
-        // Its tile is looked up on every opening (tiles are made anew when
-        // the dock's places change), and measured while the menu is open; as
-        // it fades out after closing, it stays where it was, though the tile
-        // may be gone by then (taken out of the dock, say).
+        // above its tile and centred, or beside a side dock's glass rising from its pointer
+        // the tile is measured while the menu is open and the menu stays put as it fades
         readonly property var openTile: dock.menuIndex >= 0 ? tiles.itemAt(dock.menuIndex) : null
-        property real placeMiddle: 0
-        property real placeHeight: dock.tileSize
+        // where the pointer's tip is on the screen
+        property point tip: Qt.point(0, 0)
         function measurePlace() {
             if (openTile === null) {
                 return
             }
-            placeMiddle = openTile.x + openTile.width / 2
-            placeHeight = (dock.places[dock.menuIndex]?.isSeparator ?? false) ? dock.tileSize : openTile.width
+            const placeHeight = (dock.places[dock.menuIndex]?.isSeparator ?? false) ? dock.tileSize : openTile.width
+            const fromEdge = dock.sideways
+                ? Math.max(dock.restingHeight, dock.base + placeHeight) + (dock.menuLooks.side_tile_gap ?? 3)
+                : dock.base + placeHeight - dock.tileMargin + (dock.menuLooks.tile_gap ?? 4)
+            const point = dock.stripToScreen(openTile.x + openTile.width / 2, dock.fromBottom(fromEdge, 0))
+            tip = Qt.point(Math.round(point.x), Math.round(point.y))
         }
         onOpenTileChanged: measurePlace()
         Connections {
@@ -2018,17 +2143,23 @@ PanelWindow {
             function onXChanged() { placeMenu.measurePlace() }
             function onWidthChanged() { placeMenu.measurePlace() }
         }
-        readonly property real iconTopAboveBottom: dock.base + placeHeight - dock.tileMargin
         readonly property real pointerLength: dock.menuLooks.pointer?.height ?? 0
+        readonly property real highest: (dock.settings.theme.panel?.height ?? 0) + (dock.menuLooks.top_margin ?? 0)
 
-        pointerScreenX: Math.round(placeMiddle)
-        menuX: Math.round(placeMiddle - menuWidth / 2)
-        readonly property real bottomEdge: screen.height - iconTopAboveBottom - (dock.menuLooks.tile_gap ?? 4)
-                                           - pointerLength
-        menuY: bottomEdge - menuHeight
+        pointerEdge: dock.sideways ? dock.side : "bottom"
+        pointerScreenX: tip.x
+        pointerScreenY: tip.y
+        menuX: dock.side === "left" ? tip.x + pointerLength
+            : dock.side === "right" ? tip.x - pointerLength - menuWidth
+            : Math.round(tip.x - menuWidth / 2)
+        // the lowest the box reaches
+        readonly property real bottomEdge: dock.sideways
+            ? tip.y + (dock.menuLooks.side_below_tip ?? Math.round((dock.menuLooks.pointer?.width ?? 0) + 8))
+            : tip.y - pointerLength
+        menuY: Math.max(dock.sideways ? highest : -Infinity, bottomEdge - menuHeight)
         // a long menu scrolls below the panel and opens at its end by the dock
         // and the clipboard's list keeps to its size
-        readonly property real room: bottomEdge - (dock.settings.theme.panel?.height ?? 0) - (dock.menuLooks.top_margin ?? 0)
+        readonly property real room: bottomEdge - highest
         mostMenuHeight: dock.menuSize === "" ? room
             : StackSize.listHeight(dock.menuSize, dock.menuLooks.icon_item_height ?? dock.menuLooks.item_height,
                                    dock.menuLooks.padding ?? 0, room)
@@ -2067,6 +2198,14 @@ PanelWindow {
         shell: dock.shell
     }
 
+    // a fan rises from a bottom dock only, beside one it opens as a grid
+    function folderView(folder) {
+        const view = folders.viewOf(folder)
+        return sideways && view === "fan" ? "grid" : view
+    }
+    // an open folder's tile points the way its grid opens
+    readonly property var openFolderImage: looks.folder?.["open_image_" + side] ?? looks.folder?.open_image
+
     // The place whose fan or grid is open, -1 for none.
     property int folderIndex: -1
 
@@ -2076,7 +2215,7 @@ PanelWindow {
     function showFolder(index) {
         const folder = places[index].custom
         folders.listedFolder = folder
-        const view = folders.viewOf(folder)
+        const view = folderView(folder)
         if (view === "grid" || view === "fan") {
             heldPointer = pointerInside ? pointerX : -1
             folderIndex = index
@@ -2122,7 +2261,7 @@ PanelWindow {
         settings: dock.settings
         plainBoxLooks: dock.menuLooks
         open: dock.folderIndex >= 0
-        view: folders.viewOf(folders.listedFolder)
+        view: dock.folderView(folders.listedFolder)
         title: folders.listedFolder?.name ?? ""
         entries: folders.listedEntries
         readonly property bool clipboard: folders.isClipboard(folders.listedFolder)
@@ -2135,19 +2274,22 @@ PanelWindow {
 
         readonly property var tile: dock.folderIndex >= 0 ? tiles.itemAt(dock.folderIndex) : null
         // (The last place is kept while they go away.)
-        property real lastAnchorX: 0
-        property real lastAnchorY: 0
-        property real lastMiddleY: 0
+        property point lastAnchor: Qt.point(0, 0)
+        property point lastMiddle: Qt.point(0, 0)
         onTileChanged: {
             if (tile !== null) {
-                lastAnchorX = Math.round(tile.x + tile.width / 2)
-                lastAnchorY = screen.height - (dock.base + tile.width - dock.tileMargin)
-                lastMiddleY = Math.round(screen.height - dock.base - tile.width / 2)
+                const along = tile.x + tile.width / 2
+                const anchor = dock.stripToScreen(along, dock.fromBottom(dock.base + tile.width - dock.tileMargin, 0))
+                const middle = dock.stripToScreen(along, dock.fromBottom(dock.base + tile.width / 2, 0))
+                lastAnchor = Qt.point(Math.round(anchor.x), Math.round(anchor.y))
+                lastMiddle = Qt.point(Math.round(middle.x), Math.round(middle.y))
             }
         }
-        anchorX: lastAnchorX
-        anchorY: lastAnchorY
-        tileMiddleY: lastMiddleY
+        side: dock.side
+        anchorX: lastAnchor.x
+        anchorY: lastAnchor.y
+        tileMiddleX: lastMiddle.x
+        tileMiddleY: lastMiddle.y
         dockThickness: dock.restingHeight
 
         // Once its window is let go, the folder's entries are too, so that a
@@ -2177,17 +2319,30 @@ PanelWindow {
     // The name of the tile under the pointer.
     property var labelledTile: null
 
-    DockLabel {
-        visible: dock.looks.label !== undefined && opacity > 0
-        looks: dock.looks.label ?? ({})
-        font: dock.settings.theme.fonts.dock_label ?? ({})
-        text: dock.labelledTile?.labelText ?? ""
-        // Not during a resize, when tiles pass under the pointer unpointed.
-        wanted: (dock.labelledTile?.hovered ?? false) && dock.draggedIconSize === 0
+    // above the tile, or beside the glass on a side dock
+    DockUpright {
+        parent: strip
+        side: dock.side
+        visible: dock.looks.label !== undefined && label.opacity > 0
+        readonly property var tile: dock.labelledTile
+        readonly property real gap: dock.looks.label?.gap ?? 0
+        // how far from the screen's edge the label's near side is
+        readonly property real fromEdge: tile === null ? 0
+            : dock.sideways ? Math.max(dock.restingHeight, dock.thickness - tile.y) + gap
+            : dock.thickness - tile.y + gap
+        width: dock.sideways ? label.height : label.width
+        height: dock.sideways ? label.width : label.height
+        x: tile ? Math.round(tile.x + tile.width / 2 - width / 2) : 0
+        y: dock.fromBottom(fromEdge, height)
 
-        x: dock.labelledTile
-            ? Math.round(dock.labelledTile.x + dock.labelledTile.width / 2 - width / 2) : 0
-        y: dock.labelledTile
-            ? dock.labelledTile.y - (dock.looks.label?.gap ?? 0) - height : 0
+        DockLabel {
+            id: label
+            looks: dock.looks.label ?? ({})
+            font: dock.settings.theme.fonts.dock_label ?? ({})
+            mostWidth: dock.labelMostWidth
+            text: dock.labelledTile?.labelText ?? ""
+            // Not during a resize, when tiles pass under the pointer unpointed.
+            wanted: (dock.labelledTile?.hovered ?? false) && dock.draggedIconSize === 0
+        }
     }
 }

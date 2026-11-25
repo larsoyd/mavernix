@@ -740,6 +740,17 @@ half_period_ms = 200
 height = [0.15, 0.0]
 longest_ms = 10000
 
+[dock.side]
+# On the left or right: the same box down the edge, its light standing upright.
+base = [0.0, 8]
+headroom = 8
+
+[dock.side.indicator]
+fill = { color = "#ffffff", radius = 1 }
+width = 3
+height = 16
+center_height = 4
+
 [desktop]
 background = { gradient = ["#5b6f82", "#34424f"] }
 

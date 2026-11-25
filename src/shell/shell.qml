@@ -40,13 +40,13 @@ ShellRoot {
         return screens.find(screen => screen.name === wanted) ?? leftmost ?? null
     }
 
-    // the dock's screen is its own: the lowest one under the main screen
-    // until a dig at another's bottom edge brings it there
+    // the dock's screen is its own: the outermost one past the main screen on
+    // the dock's side, until a dig at another's bottom edge brings a bottom dock there
 
     readonly property var screenBoxes: Array.from(Quickshell.screens).map(screen =>
         ({ name: screen.name, x: screen.x, y: screen.y, width: screen.width, height: screen.height }))
-    readonly property string dockHome: DockScreen.home(screenBoxes, mainScreen?.name ?? "")
-    readonly property string screenLayout: JSON.stringify(screenBoxes) + dockHome
+    readonly property string dockHome: DockScreen.home(screenBoxes, mainScreen?.name ?? "", dock.side)
+    readonly property string screenLayout: JSON.stringify(screenBoxes) + dockHome + dock.side
     // the screen dug at last, forgotten when the screens change
     property string dugScreen: ""
     onScreenLayoutChanged: dugScreen = ""
@@ -56,7 +56,7 @@ ShellRoot {
     DockDig {
         output: dock.screen?.name ?? ""
         onDug: (output, kind) => {
-            const moves = userChoices.value("dock", "follows_dig") ?? true
+            const moves = (userChoices.value("dock", "follows_dig") ?? true) && !dock.sideways
             if (kind === "move" && moves && (dock.busy || appGrid.open)) {
                 console.info("[dock] dig refused: " + (appGrid.open ? "app grid open" : "dock busy") + " output=" + output)
             } else if (kind === "move" && moves) {

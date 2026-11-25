@@ -45,6 +45,8 @@ Item {
     // The pointer tip's x along the bottom edge, from the menu's left edge;
     // negative, or no `pointer` in the looks, for none.
     property real pointerX: -1
+    // bottom, or left or right with pointerX counted from the top
+    property string pointerEdge: "bottom"
     readonly property var font: settings.theme.fonts.menu
 
     // -1 for none.
@@ -385,6 +387,7 @@ Item {
         squareTopLeft: menu.squareTopLeft
         squareTopRight: menu.squareTopRight
         pointerX: menu.pointerX
+        pointerEdge: menu.pointerEdge
     }
 
     // The rows, cut off where they leave the menu's room and where an arrow

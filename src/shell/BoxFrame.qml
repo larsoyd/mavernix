@@ -16,10 +16,16 @@ Item {
     property bool squareTopLeft: false
     property bool squareTopRight: false
 
-    // The pointer tip's distance from the box's left edge; negative for no
-    // pointer.
+    // the pointer tip's distance from the box's left edge, or from its top on a side edge
+    // negative for none
     property real pointerX: -1
+    // bottom, left or right
+    property string pointerEdge: "bottom"
     readonly property bool hasPointer: pointerX >= 0 && looks.pointer !== undefined
+    // the pointer is drawn for the bottom edge and turned onto its edge
+    readonly property real pointerTurn: pointerEdge === "left" ? 90 : pointerEdge === "right" ? -90 : 0
+    readonly property point pointerBase: pointerEdge === "left" ? Qt.point(0, pointerX)
+        : pointerEdge === "right" ? Qt.point(width, pointerX) : Qt.point(pointerX, height)
 
     anchors.fill: parent
 
@@ -74,8 +80,10 @@ Item {
         visible: frame.hasPointer
         readonly property real halfWidth: (frame.looks.pointer?.width ?? 0) / 2
         readonly property real length: frame.looks.pointer?.height ?? 0
-        x: frame.pointerX
-        y: frame.height
+        x: frame.pointerBase.x
+        y: frame.pointerBase.y
+        rotation: frame.pointerTurn
+        transformOrigin: Item.TopLeft
         preferredRendererType: Shape.CurveRenderer
 
         ShapePath {
@@ -95,9 +103,12 @@ Item {
         Shape {
             required property int index
             required property string modelData
-            x: frame.pointerX
             // Half a pixel more puts the one-pixel line on whole pixels.
-            y: frame.height + index + 0.5
+            readonly property real out: index + 0.5
+            x: frame.pointerBase.x + (frame.pointerEdge === "left" ? -out : frame.pointerEdge === "right" ? out : 0)
+            y: frame.pointerBase.y + (frame.pointerEdge === "bottom" ? out : 0)
+            rotation: frame.pointerTurn
+            transformOrigin: Item.TopLeft
             preferredRendererType: Shape.CurveRenderer
 
             ShapePath {

@@ -635,3 +635,73 @@ checkbox = { off = "images/controls/checkbox-off-small.png", off_pressed = "imag
 radio = { off = "images/controls/radio-off-small.png", off_pressed = "images/controls/radio-off-small-pressed.png", on = "images/controls/radio-on-small.png", on_pressed = "images/controls/radio-on-small-pressed.png" }
 popup = { normal = "images/controls/popup-small.png", pressed = "images/controls/popup-small-pressed.png", slice = [6, 15, 6, 8], text_inset = 10 }
 slider = { track = "images/controls/slider-track-small.png", track_slice = [2, 3, 2, 3], thumb = "images/controls/slider-thumb-below-small.png", thumb_pressed = "images/controls/slider-thumb-below-small-pressed.png", tick = "images/controls/slider-ticks-small.png" }
+
+# The dock on the left or right of the screen, with the side dock's own glass, lights, line and stacks.
+[[update]]
+revision = 38
+import_brings = [
+    "A dock on the left or right shows Mavericks' side lights, its line between groups and its stacks' side pointers.",
+]
+
+[update.settings."dock.folder"]
+open_image_left = "images/dock-folder-tile-open-left.png"
+open_image_right = "images/dock-folder-tile-open-right.png"
+
+[update.settings."dock.side"]
+base = [0.0, 8]
+headroom = 8
+end_padding = [0.4, 0]
+end_padding_most = 8
+row_shift = 0
+end_trim = 0
+
+[update.settings."dock.side.shelf"]
+shape = "side_glass"
+height_above_base = [1.0, 8]
+corner_radius = [0.0520833, 1.28125]
+outline = "#00000026"
+inner_line = "#ffffff20"
+highlight = "#ffffff66"
+highlight_width = 1.25
+
+[update.settings."dock.side.indicator"]
+fill = { image = "images/dock-indicator-side.png" }
+width = 6
+height = 16
+small_fill = { image = "images/dock-indicator-side-small.png" }
+small_height = 12
+small_below_tile_size = 28
+center_height = 3
+along_offset = 1.5
+
+[update.settings."dock.side.separator"]
+image = "images/dock-separator-side.png"
+unscaled = true
+width = 0.5
+bottom = 4
+top_gap = 4
+
+[update.settings."dock.side.label"]
+background = "#1e1e1e99"
+text_color = "#ffffff"
+height = 20
+padding = 11
+pointer_width = 0
+pointer_height = 0
+gap = 7
+fade_out_ms = 167
+
+# The side glass's grey, light in Sea Lion and dark in Sea Lion Dark as its import makes it.
+[[update]]
+revision = 39
+themes = ["sea-lion"]
+
+[update.settings."dock.side.shelf"]
+fill = "#dbdbdbb3"
+
+[[update]]
+revision = 40
+themes = ["sea-lion-dark"]
+
+[update.settings."dock.side.shelf"]
+fill = "#3a3a3ab3"

@@ -7,6 +7,7 @@ import QtQuick.Effects
 import Quickshell
 import Quickshell.Wayland
 import "ApplicationName.js" as ApplicationName
+import "DockAxis.js" as DockAxis
 import "StartProgram.js" as StartProgram
 
 Item {
@@ -34,6 +35,8 @@ Item {
     property bool opensFolder: false
     signal folderWanted()
     required property int margin
+    // the dock's edge, the icon is turned back upright on a side dock
+    property string side: "bottom"
     required property var bounce
     // A pressed icon's colours are multiplied by this.
     required property real pressedDarken
@@ -236,6 +239,9 @@ Item {
         height: tile.iconSize
         scale: tile.iconScale
         opacity: tile.shownShare
+        transform: Matrix4x4 {
+            matrix: Qt.matrix4x4(DockAxis.matrix4(DockAxis.uprightMatrix(tile.side, icon.width, icon.height)))
+        }
         fragmentShader: "lanczos.frag.qsb"
         property var source: fullSize
 

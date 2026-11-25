@@ -54,6 +54,8 @@ DOCK_SURFACE = ["#4a4a4ad5", "#333333c7", "#2a2a2ab6"]
 DOCK_FACE = ["#1a1a1acc", "#2e2e2edb"]
 DOCK_LINE = "#ffffff4d"
 DOCK_OUTLINE = "#0000004d"
+# the side glass in a dark grey near the bottom shelf's at the same opacity
+DOCK_SIDE_FILL = "#3a3a3ab3"
 
 DESKTOP_PICTURE = "wallpapers/Galaxy.jpg"
 
@@ -703,6 +705,7 @@ def change_dock(theme):
     theme.set("dock.shelf", "face", "[" + ", ".join(f'"{c}"' for c in DOCK_FACE) + "]", note)
     theme.set("dock.shelf", "line", f'"{DOCK_LINE}"', note)
     theme.set("dock.shelf", "outline", f'"{DOCK_OUTLINE}"', note)
+    theme.set("dock.side.shelf", "fill", f'"{DOCK_SIDE_FILL}"', note)
 
 
 def change_controls(theme, prokit):

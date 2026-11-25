@@ -44,6 +44,9 @@ PanelWindow {
     // on the bottom edge, in screen coordinates (negative: none).
     property var looks: settings.theme.menu
     property real pointerScreenX: -1
+    // a pointer on the left or right edge instead, at this height on the screen
+    property string pointerEdge: "bottom"
+    property real pointerScreenY: -1
     // The most height the menu may take (0: no limit; a longer one scrolls),
     // and whether a menu that scrolls opens at its end.
     property real mostMenuHeight: 0
@@ -255,7 +258,9 @@ PanelWindow {
             visible: overlay.popover === null
             settings: overlay.settings
             looks: overlay.looks
-            pointerX: overlay.pointerScreenX >= 0 ? overlay.pointerScreenX - x : -1
+            pointerX: overlay.pointerEdge !== "bottom" ? (overlay.pointerScreenY >= 0 ? overlay.pointerScreenY - y : -1)
+                : overlay.pointerScreenX >= 0 ? overlay.pointerScreenX - x : -1
+            pointerEdge: overlay.pointerEdge
             items: overlay.shownItems
             x: Math.max(0, Math.min(overlay.menuX, overlay.width - width))
             y: overlay.menuY

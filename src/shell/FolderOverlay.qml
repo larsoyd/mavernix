@@ -25,11 +25,15 @@ PanelWindow {
     property bool previews: false
     property var previewWords: ({})
 
-    // The middle of the folder tile's top edge, on the screen.
+    // the middle of the folder tile's inner edge on the screen
     property real anchorX: 0
     property real anchorY: 0
+    // the dock's edge: bottom, left or right
+    property string side: "bottom"
+    readonly property bool sideways: side === "left" || side === "right"
     // where a grid that comes from its tile starts and ends, the tile's middle
     property real tileMiddleY: anchorY
+    property real tileMiddleX: anchorX
     // How much of the screen's height the dock takes while resting.
     property real dockThickness: 0
 
@@ -156,13 +160,20 @@ PanelWindow {
         readonly property real pointerLength: boxLooks.pointer_height ?? boxLooks.pointer?.height ?? 0
         // Centred on the tip but kept off the screen's sides.
         readonly property real sideRoom: looks.screen_margin ?? 16
-        readonly property real tipY: overlay.anchorY - (boxLooks.tile_gap ?? overlay.plainBoxLooks.tile_gap ?? 4)
-        x: Math.round(Math.max(sideRoom, Math.min(overlay.width - sideRoom - width,
-                                                  overlay.anchorX - width / 2)))
-        y: Math.round(tipY - pointerLength - height)
-        freeWidth: overlay.width
-        freeHeight: overlay.height - overlay.dockThickness - (overlay.settings.theme.panel?.height ?? 0)
-        pointerX: overlay.anchorX - x
+        readonly property real tileGap: boxLooks.tile_gap ?? overlay.plainBoxLooks.tile_gap ?? 4
+        readonly property real tipY: overlay.anchorY - tileGap
+        readonly property real panelHeight: overlay.settings.theme.panel?.height ?? 0
+        // beside a side dock it is centred on the tip and kept below the panel
+        x: Math.round(overlay.side === "left" ? overlay.anchorX + tileGap + pointerLength
+            : overlay.side === "right" ? overlay.anchorX - tileGap - pointerLength - width
+            : Math.max(sideRoom, Math.min(overlay.width - sideRoom - width, overlay.anchorX - width / 2)))
+        y: Math.round(overlay.sideways
+            ? Math.max(panelHeight + sideRoom, Math.min(overlay.height - sideRoom - height, overlay.anchorY - height / 2))
+            : tipY - pointerLength - height)
+        freeWidth: overlay.width - (overlay.sideways ? overlay.dockThickness : 0)
+        freeHeight: overlay.height - (overlay.sideways ? 0 : overlay.dockThickness) - panelHeight
+        pointerEdge: overlay.sideways ? overlay.side : "bottom"
+        pointerX: overlay.sideways ? overlay.anchorY - y : overlay.anchorX - x
 
         // from_tile grows the box about its middle while that middle travels
         // out of the tile, and it shrinks back fading only part way
@@ -172,13 +183,16 @@ PanelWindow {
                           : overlay.shown
         transform: [
             Scale {
-                origin.x: grid.fromTile ? grid.width / 2 : grid.pointerX
-                origin.y: grid.fromTile ? grid.height / 2 : grid.height + grid.pointerLength
+                origin.x: grid.fromTile ? grid.width / 2
+                    : overlay.side === "left" ? -grid.pointerLength
+                    : overlay.side === "right" ? grid.width + grid.pointerLength : grid.pointerX
+                origin.y: grid.fromTile ? grid.height / 2
+                    : overlay.sideways ? grid.pointerX : grid.height + grid.pointerLength
                 xScale: overlay.motion.kind === "grow" || grid.fromTile ? Math.max(0.00001, overlay.shown) : 1
                 yScale: xScale
             },
             Translate {
-                x: grid.fromTile ? (overlay.anchorX - grid.x - grid.width / 2) * (1 - overlay.shown) : 0
+                x: grid.fromTile ? (overlay.tileMiddleX - grid.x - grid.width / 2) * (1 - overlay.shown) : 0
                 y: grid.fromTile ? (overlay.tileMiddleY - grid.y - grid.height / 2) * (1 - overlay.shown) : 0
             }
         ]
@@ -201,7 +215,8 @@ PanelWindow {
         mostWidth: Math.min(380, beside ? Math.max(leftRoom, rightRoom) : overlay.width - 2 * gap)
         mostHeight: lowest - highest
         readonly property real highest: (overlay.settings.theme.panel?.height ?? 0) + gap
-        readonly property real lowest: Math.min(grid.y + grid.height, overlay.height - overlay.dockThickness - gap)
+        readonly property real lowest: Math.min(grid.y + grid.height,
+                                                overlay.height - (overlay.sideways ? 0 : overlay.dockThickness) - gap)
         x: Math.round(!beside ? Math.max(gap, Math.min(overlay.width - gap - width, grid.x + (grid.width - width) / 2))
                               : rightRoom >= leftRoom ? grid.x + grid.width + gap : grid.x - gap - width)
         y: Math.round(Math.max(highest, Math.min(lowest - height, grid.y + grid.previewedTop)))

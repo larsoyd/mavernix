@@ -18,6 +18,10 @@ QtObject {
     // What some entries say: whether magnification is on, whether the trash
     // is empty.
     property bool magnificationWanted: false
+    property bool hidesItself: false
+    // where the dock is: left, bottom or right
+    property string side: "bottom"
+    readonly property var sides: ["left", "bottom", "right"]
     property bool trashIsEmpty: true
     // the desktop shows its files, so a program can get a launcher there
     property bool shortcutsOffered: false
@@ -42,6 +46,8 @@ QtObject {
     readonly property int clipboardClearId: 12
     readonly property int clipboardSettingsId: 13
     readonly property int shortcutId: 14
+    readonly property int hidingId: 15
+    readonly property int positionBaseId: 700
     // Ranges of ids, kept in ascending order: the dock tests them from the
     // highest down. A program's windows, a folder's orders and views, a
     // program's own entries (its desktop entry's actions), a listed folder's
@@ -101,9 +107,14 @@ QtObject {
 
     // The dock's own menu, from a separator.
     function forDock() {
-        const items = [entry(magnificationId, magnificationWanted
-            ? (words.magnification_off ?? "Turn magnification off")
-            : (words.magnification_on ?? "Turn magnification on"))]
+        const sideWords = [words.position_left ?? "Left", words.position_bottom ?? "Bottom", words.position_right ?? "Right"]
+        const items = [
+            entry(hidingId, hidesItself ? (words.hiding_off ?? "Turn hiding off") : (words.hiding_on ?? "Turn hiding on")),
+            entry(magnificationId, magnificationWanted
+                ? (words.magnification_off ?? "Turn magnification off")
+                : (words.magnification_on ?? "Turn magnification on")),
+            entry(-1, words.position ?? "Position on screen", true,
+                  sides.map((name, number) => ticked(positionBaseId + number, sideWords[number], name === side)))]
         if (resizedByUser) {
             items.push(entry(originalSizeId, words.original_size ?? "Reset to Original Size"))
         }

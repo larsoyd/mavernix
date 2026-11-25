@@ -567,10 +567,18 @@ DOCK_PICTURES = {
     "stackbackground-bm": "dock-folder-box-bm",
     "stackbackground-br": "dock-folder-box-br",
     "stackbackground-bt": "dock-folder-box-bt",
+    "stackbackground-lt": "dock-folder-box-lt",
+    "stackbackground-rt": "dock-folder-box-rt",
     "openinfinder": "dock-folder-open",
     # The puff of smoke where a tile is dropped: five frames, stacked.
     "poof": "dock-poof",
     "pileArrow": "dock-folder-tile-open",
+    "pileLeftArrow": "dock-folder-tile-open-left",
+    "pileRightArrow": "dock-folder-tile-open-right",
+    # a dock on the left or right, its lights and its line between groups
+    "indicator_side_medium": "dock-indicator-side",
+    "indicator_side_small": "dock-indicator-side-small",
+    "separatorstraight-horizontal": "dock-separator-side",
     # Back to the folder before, in a folder opened inside a grid.
     "back-button": "dock-folder-back",
     "back-button-pressed": "dock-folder-back-pressed",
@@ -603,6 +611,53 @@ DOCK_BOUNCE_LONGEST_MS = 120000
 DOCK_TILE_SLIDE_MS = 270
 DOCK_TILE_APPEAR_MS = 350
 DOCK_TILE_LEAVE_MS = 500
+# a side dock as Mavericks draws its flat glass, icons 8 from the edge and from the glass's inner side
+# grey 0.86 at 0.7 in a black rim at 0.15, its corners 5/96 of the depth past 33 plus 3
+DOCK_SIDE_TABLES = f"""[dock.side]
+base = [0.0, 8]
+headroom = 8
+end_padding = [0.4, 0]
+end_padding_most = 8
+row_shift = 0
+end_trim = 0
+
+[dock.side.shelf]
+shape = "side_glass"
+height_above_base = [1.0, 8]
+corner_radius = [0.0520833, 1.28125]
+fill = "#dbdbdbb3"
+outline = "#00000026"
+inner_line = "#ffffff20"
+highlight = "#ffffff66"
+highlight_width = 1.25
+
+[dock.side.indicator]
+fill = {{ image = "images/dock-indicator-side.png" }}
+width = 6
+height = 16
+small_fill = {{ image = "images/dock-indicator-side-small.png" }}
+small_height = 12
+small_below_tile_size = {DOCK_INDICATOR_SMALL_BELOW_TILE_SIZE}
+center_height = 3
+along_offset = 1.5
+
+[dock.side.separator]
+image = "images/dock-separator-side.png"
+unscaled = true
+width = {DOCK_SEPARATOR_WIDTH}
+bottom = 4
+top_gap = 4
+
+[dock.side.label]
+background = "#1e1e1e99"
+text_color = "#ffffff"
+height = 20
+padding = 11
+pointer_width = 0
+pointer_height = 0
+gap = 7
+fade_out_ms = 167
+"""
 
 # --- Controls inside windows (buttons, checkboxes...) ------------------------
 # Theme picture name -> the tags of the original control picture.
@@ -1945,6 +2000,8 @@ frame_ms = 50
 
 [dock.folder]
 open_image = "images/dock-folder-tile-open.png"
+open_image_left = "images/dock-folder-tile-open-left.png"
+open_image_right = "images/dock-folder-tile-open-right.png"
 
 [dock.folder.grid]
 side_padding = 16
@@ -2078,6 +2135,7 @@ half_period_ms = {DOCK_BOUNCE_HALF_PERIOD_MS}
 height = {DOCK_BOUNCE_HEIGHT}
 longest_ms = {DOCK_BOUNCE_LONGEST_MS}
 
+{DOCK_SIDE_TABLES}
 [icons]
 theme = "SeaLion"
 

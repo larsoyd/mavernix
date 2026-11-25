@@ -1,12 +1,5 @@
-// A box drawn from nine theme pictures (corners, stretched edges, middle),
-// optionally with a pointer on the bottom edge. It fills its parent; the
-// pictures reach beyond it by the given margins, for rim and shadow.
-//
-//   pieces         file prefix: PIECES-tl.png, -tm, -tr, -l, -c, -r, -bl,
-//                  -bm, -br, and -bt for the bottom edge with the pointer
-//   piece_size     width and height of a corner picture
-//   margins        left, top, right, bottom
-//   pointer_width  width of the -bt picture
+// a box of nine theme pictures that reach past it by their margins, with a pointer piece on one edge
+// the keys and pieces are in the theme docs under folders in the dock
 
 import QtQuick
 
@@ -16,8 +9,9 @@ Item {
     required property var looks
     required property string themeDirectory
 
-    // The pointer tip's x from the box's left edge; negative for no pointer.
+    // the pointer tip's x from the box's left edge, or its y on a side edge, negative for none
     property real pointerX: -1
+    property string pointerEdge: "bottom"
 
     anchors.fill: parent
 
@@ -33,9 +27,16 @@ Item {
     readonly property real innerBottom: outerBottom - pieceSize
 
     readonly property bool hasPointer: pointerX >= 0 && looks.pointer_width !== undefined
+    readonly property bool below: hasPointer && pointerEdge === "bottom"
     readonly property real pointerLeft:
-        hasPointer ? Math.round(pointerX - looks.pointer_width / 2) : innerRight
-    readonly property real pointerRight: hasPointer ? pointerLeft + looks.pointer_width : innerRight
+        below ? Math.round(pointerX - looks.pointer_width / 2) : innerRight
+    readonly property real pointerRight: below ? pointerLeft + looks.pointer_width : innerRight
+    // the same along a side edge, clear of its corners
+    readonly property bool beside: hasPointer && pointerEdge !== "bottom"
+    readonly property real pointerTop: beside
+        ? Math.max(innerTop, Math.min(innerBottom - looks.pointer_width, Math.round(pointerX - looks.pointer_width / 2)))
+        : innerBottom
+    readonly property real pointerBottom: beside ? pointerTop + looks.pointer_width : innerBottom
 
     component Piece: Image {
         required property string piece
@@ -47,13 +48,38 @@ Item {
     Piece { piece: "tm"; x: box.innerLeft; y: box.outerTop; width: box.innerRight - box.innerLeft; height: box.pieceSize }
     Piece { piece: "tr"; x: box.innerRight; y: box.outerTop; width: box.pieceSize; height: box.pieceSize }
 
-    Piece { piece: "l"; x: box.outerLeft; y: box.innerTop; width: box.pieceSize; height: box.innerBottom - box.innerTop }
+    component SideEdge: Item {
+        id: column
+        required property string piece
+        readonly property bool pointed: box.beside && box.pointerEdge === (piece === "l" ? "left" : "right")
+        x: piece === "l" ? box.outerLeft : box.innerRight
+        y: box.innerTop
+        width: box.pieceSize
+        height: box.innerBottom - box.innerTop
+        readonly property real pointerFrom: pointed ? box.pointerTop - box.innerTop : height
+        Piece { piece: column.piece; width: parent.width; height: column.pointerFrom }
+        Piece {
+            piece: column.piece + "t"
+            visible: column.pointed
+            y: column.pointerFrom
+            width: parent.width
+            height: box.looks.pointer_width
+        }
+        Piece {
+            piece: column.piece
+            visible: column.pointed
+            y: column.pointerFrom + box.looks.pointer_width
+            width: parent.width
+            height: column.height - y
+        }
+    }
+    SideEdge { piece: "l" }
     Piece { piece: "c"; x: box.innerLeft; y: box.innerTop; width: box.innerRight - box.innerLeft; height: box.innerBottom - box.innerTop }
-    Piece { piece: "r"; x: box.innerRight; y: box.innerTop; width: box.pieceSize; height: box.innerBottom - box.innerTop }
+    SideEdge { piece: "r" }
 
     Piece { piece: "bl"; x: box.outerLeft; y: box.innerBottom; width: box.pieceSize; height: box.pieceSize }
     Piece { piece: "bm"; x: box.innerLeft; y: box.innerBottom; width: box.pointerLeft - box.innerLeft; height: box.pieceSize }
-    Piece { piece: "bt"; visible: box.hasPointer; x: box.pointerLeft; y: box.innerBottom; width: box.pointerRight - box.pointerLeft; height: box.pieceSize }
-    Piece { piece: "bm"; visible: box.hasPointer; x: box.pointerRight; y: box.innerBottom; width: box.innerRight - box.pointerRight; height: box.pieceSize }
+    Piece { piece: "bt"; visible: box.below; x: box.pointerLeft; y: box.innerBottom; width: box.pointerRight - box.pointerLeft; height: box.pieceSize }
+    Piece { piece: "bm"; visible: box.below; x: box.pointerRight; y: box.innerBottom; width: box.innerRight - box.pointerRight; height: box.pieceSize }
     Piece { piece: "br"; x: box.innerRight; y: box.innerBottom; width: box.pieceSize; height: box.pieceSize }
 }

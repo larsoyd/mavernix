@@ -13,6 +13,8 @@ Item {
 
     property string text: ""
     property bool wanted: false
+    // a longer name is cut short at its end
+    property real mostWidth: 320
 
     width: bubble.width
     height: bubble.height + looks.pointer_height
@@ -28,7 +30,7 @@ Item {
 
     Rectangle {
         id: bubble
-        width: name.implicitWidth + 2 * label.looks.padding
+        width: name.width + 2 * label.looks.padding
         height: label.looks.height
         radius: height / 2
         color: ThemeValues.color(label.looks.background)
@@ -36,6 +38,8 @@ Item {
         Text {
             id: name
             anchors.centerIn: parent
+            width: Math.min(implicitWidth, label.mostWidth - 2 * label.looks.padding)
+            elide: Text.ElideRight
             text: label.text
             color: ThemeValues.color(label.looks.text_color)
             font.family: label.font.family
