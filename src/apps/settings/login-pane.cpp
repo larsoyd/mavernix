@@ -251,6 +251,19 @@ LoginPane::LoginPane(Choices& choices, QWidget* parent) : QWidget(parent), choic
     }
 }
 
+LoginPane::~LoginPane()
+{
+    if (status_proc != nullptr)
+    {
+        status_proc->disconnect(this);
+        if (status_proc->state() != QProcess::NotRunning)
+        {
+            status_proc->kill();
+            status_proc->waitForFinished(500);
+        }
+    }
+}
+
 void LoginPane::updateCustomPictureLabel()
 {
     const QString path = choices.value(greeter_table, QStringLiteral("background_picture")).toString();
@@ -280,7 +293,18 @@ void LoginPane::refreshSystemStatus()
     {
         return;
     }
+    if (status_proc != nullptr)
+    {
+        status_proc->disconnect(this);
+        if (status_proc->state() != QProcess::NotRunning)
+        {
+            status_proc->kill();
+            status_proc->waitForFinished(500);
+        }
+        status_proc->deleteLater();
+    }
     auto* proc = new QProcess(this);
+    status_proc = proc;
     const QString user = qEnvironmentVariable("USER");
     QStringList args = {QStringLiteral("status")};
     if (!user.isEmpty())
@@ -290,6 +314,10 @@ void LoginPane::refreshSystemStatus()
     connect(proc, QOverload<int, QProcess::ExitStatus>::of(&QProcess::finished), this,
         [this, proc](int exitCode, QProcess::ExitStatus) {
         const QByteArray raw = proc->readAllStandardOutput();
+        if (status_proc == proc)
+        {
+            status_proc = nullptr;
+        }
         proc->deleteLater();
         if (exitCode != 0)
         {

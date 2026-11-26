@@ -2,12 +2,14 @@
 
 #pragma once
 
+#include <QPointer>
 #include <QWidget>
 
 class Choices;
 class QCheckBox;
 class QComboBox;
 class QLabel;
+class QProcess;
 class QPushButton;
 class QSlider;
 
@@ -17,6 +19,7 @@ class LoginPane : public QWidget
 
   public:
     explicit LoginPane(Choices& choices, QWidget* parent = nullptr);
+    ~LoginPane() override;
 
   private:
     void refreshSystemStatus();
@@ -43,6 +46,7 @@ class LoginPane : public QWidget
     QPushButton* apply_system_button = nullptr;
     QPushButton* reset_system_button = nullptr;
     QLabel* system_note = nullptr;
+    QPointer<QProcess> status_proc;
     bool loaded_sync_enabled = false;
     bool admin_available = false;
 };
