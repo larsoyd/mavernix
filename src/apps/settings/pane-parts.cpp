@@ -15,9 +15,29 @@
 // height of a control's first line, its label sits level with that
 static int first_line_height(QWidget* control)
 {
-    QLayout* rows = control->layout();
-    const int natural =
-        rows != nullptr && rows->count() > 0 ? rows->itemAt(0)->sizeHint().height() : control->sizeHint().height();
+    QLayout* layout = control->layout();
+    int natural = control->sizeHint().height();
+    if (auto* rows = qobject_cast<QVBoxLayout*>(layout); rows != nullptr && rows->count() > 0)
+    {
+        QLayoutItem* first = rows->itemAt(0);
+        natural = first->widget() != nullptr ? first_line_height(first->widget()) : first->sizeHint().height();
+    }
+    else if (auto* grid = qobject_cast<QGridLayout*>(layout); grid != nullptr && grid->rowCount() > 0)
+    {
+        int top = 0;
+        for (int col = 0; col < grid->columnCount(); col++)
+        {
+            if (QLayoutItem* item = grid->itemAtPosition(0, col); item != nullptr)
+            {
+                const int h = item->widget() != nullptr ? first_line_height(item->widget()) : item->sizeHint().height();
+                top = qMax(top, h);
+            }
+        }
+        if (top > 0)
+        {
+            natural = top;
+        }
+    }
     return qBound(control->minimumHeight(), natural, control->maximumHeight());
 }
 
@@ -58,6 +78,7 @@ void PaneForm::addRow(QWidget* label, QWidget* control)
     addWidget(label, next_row, 0, Qt::AlignRight | Qt::AlignTop);
     addWidget(control, next_row++, 1, Qt::AlignLeft | Qt::AlignTop);
     rows.insert(control, {label, next_row, row_gap_px});
+    labeled_rows.emplaceBack(label, control);
     leaveRoom(row_gap_px);
 }
 

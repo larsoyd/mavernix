@@ -42,7 +42,6 @@ LoginPane::LoginPane(Choices& choices, QWidget* parent) : QWidget(parent), choic
 
     auto* form = new PaneForm(this);
 
-    // --- Status & Live Preview ------------------------------------------------
     sync_status = new QLabel(greeter_installed ? word("login_checking", "Checking login screen status…")
                                                : word("login_not_installed", "mavernix-greeter is not installed."));
     sync_status->setEnabled(greeter_installed);
@@ -55,28 +54,25 @@ LoginPane::LoginPane(Choices& choices, QWidget* parent) : QWidget(parent), choic
     auto* header_row = new QWidget;
     auto* header_box = new QHBoxLayout(header_row);
     header_box->setContentsMargins(0, 0, 0, 0);
-    header_box->setSpacing(10);
-    header_box->addWidget(sync_status);
-    header_box->addStretch();
-    header_box->addWidget(preview_button);
+    header_box->setSpacing(12);
+    header_box->addWidget(sync_status, 0, Qt::AlignVCenter);
+    header_box->addWidget(preview_button, 0, Qt::AlignVCenter);
     form->addRow(word("login_status", "Login screen:"), header_row);
     form->addDivider();
 
-    // --- Appearance (User Choices -> inbox sync) ------------------------------
     bg_mode = new QComboBox;
-    bg_mode->addItem(word("login_bg_desktop", "Same as Desktop"), QStringLiteral("desktop"));
-    bg_mode->addItem(word("login_bg_blurred", "Blurred Desktop"), QStringLiteral("desktop_blurred"));
-    bg_mode->addItem(word("login_bg_custom", "Custom Picture"), QStringLiteral("custom"));
-    bg_mode->addItem(word("login_bg_gradient", "Classic Gradient"), QStringLiteral("gradient"));
+    bg_mode->addItem(word("login_bg_desktop", "Same as desktop"), QStringLiteral("desktop"));
+    bg_mode->addItem(word("login_bg_blurred", "Blurred desktop"), QStringLiteral("desktop_blurred"));
+    bg_mode->addItem(word("login_bg_custom", "Custom picture"), QStringLiteral("custom"));
+    bg_mode->addItem(word("login_bg_gradient", "Classic gradient"), QStringLiteral("gradient"));
     const QString current_mode = greeter_val("background_mode", QStringLiteral("desktop")).toString();
     bg_mode->setCurrentIndex(qMax(0, bg_mode->findData(current_mode)));
-    bg_mode->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);
     form->addRow(word("login_background", "Background:"), bg_mode);
 
     custom_row = new QWidget;
     auto* custom_box = new QHBoxLayout(custom_row);
     custom_box->setContentsMargins(0, 0, 0, 0);
-    custom_box->setSpacing(8);
+    custom_box->setSpacing(10);
     custom_label = new QLabel;
     custom_label->setEnabled(false);
     auto* choose_pic = new QPushButton(word("login_choose_picture", "Choose…"));
@@ -91,9 +87,8 @@ LoginPane::LoginPane(Choices& choices, QWidget* parent) : QWidget(parent), choic
             updateCustomPictureLabel();
         }
     });
-    custom_box->addWidget(choose_pic);
-    custom_box->addWidget(custom_label);
-    custom_box->addStretch();
+    custom_box->addWidget(choose_pic, 0, Qt::AlignVCenter);
+    custom_box->addWidget(custom_label, 0, Qt::AlignVCenter);
     updateCustomPictureLabel();
     form->addRow(word("login_custom_picture", "Picture:"), custom_row);
 
@@ -138,26 +133,23 @@ LoginPane::LoginPane(Choices& choices, QWidget* parent) : QWidget(parent), choic
 
     form->addDivider();
 
-    // --- Transition, Lock Screen & Display Sleep ------------------------------
-    auto* handoff = new QComboBox;
-    handoff->addItem(word("login_handoff_choreographed", "Smooth & Animated"), QStringLiteral("choreographed"));
-    handoff->addItem(word("login_handoff_simple", "Fade Only"), QStringLiteral("simple"));
-    handoff->addItem(word("login_handoff_instant", "Instant"), QStringLiteral("instant"));
-    const QString cur_handoff = greeter_val("handoff_style", QStringLiteral("choreographed")).toString();
-    handoff->setCurrentIndex(qMax(0, handoff->findData(cur_handoff)));
-    handoff->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);
-    connect(handoff, &QComboBox::activated, this, [&choices, handoff](int index) {
-        choices.set(greeter_table, QStringLiteral("handoff_style"), handoff->itemData(index));
+    auto* transition = new QComboBox;
+    transition->addItem(word("login_handoff_choreographed", "Smooth and animated"), QStringLiteral("choreographed"));
+    transition->addItem(word("login_handoff_simple", "Fade only"), QStringLiteral("simple"));
+    transition->addItem(word("login_handoff_instant", "Instant"), QStringLiteral("instant"));
+    const QString cur_transition = greeter_val("handoff_style", QStringLiteral("choreographed")).toString();
+    transition->setCurrentIndex(qMax(0, transition->findData(cur_transition)));
+    connect(transition, &QComboBox::activated, this, [&choices, transition](int index) {
+        choices.set(greeter_table, QStringLiteral("handoff_style"), transition->itemData(index));
     });
-    form->addRow(word("login_handoff", "Login transition:"), handoff);
+    form->addRow(word("login_handoff", "Login transition:"), transition);
 
     auto* lock_style = new QComboBox;
-    lock_style->addItem(word("login_lock_greeter", "Floating (match login screen)"), QStringLiteral("greeter"));
-    lock_style->addItem(word("login_lock_card", "Classic Card"), QStringLiteral("card"));
+    lock_style->addItem(word("login_lock_greeter", "Floating (matches login screen)"), QStringLiteral("greeter"));
+    lock_style->addItem(word("login_lock_card", "Classic card"), QStringLiteral("card"));
     const QVariant stored_lock = choices.value(lock_table, QStringLiteral("style"));
     const QString cur_lock = stored_lock.isValid() ? stored_lock.toString() : QStringLiteral("greeter");
     lock_style->setCurrentIndex(qMax(0, lock_style->findData(cur_lock)));
-    lock_style->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);
     connect(lock_style, &QComboBox::activated, this, [&choices, lock_style](int index) {
         choices.set(lock_table, QStringLiteral("style"), lock_style->itemData(index));
     });
@@ -174,7 +166,6 @@ LoginPane::LoginPane(Choices& choices, QWidget* parent) : QWidget(parent), choic
     const QVariant dpms_sec = choices.value(greeter_table, QStringLiteral("screen_off_after_seconds"));
     const int cur_dpms = dpms_sec.isValid() ? dpms_sec.toInt() : -1;
     dpms->setCurrentIndex(qMax(0, dpms->findData(cur_dpms)));
-    dpms->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);
     connect(dpms, &QComboBox::activated, this, [&choices, dpms](int index) {
         const int secs = dpms->itemData(index).toInt();
         if (secs < 0)
@@ -190,7 +181,6 @@ LoginPane::LoginPane(Choices& choices, QWidget* parent) : QWidget(parent), choic
     });
     form->addRow(word("login_dpms", "Display sleep at login:"), dpms);
 
-    // --- System-Wide Options (Polkit) -----------------------------------------
     if (admin_available)
     {
         form->addDivider();
@@ -201,11 +191,10 @@ LoginPane::LoginPane(Choices& choices, QWidget* parent) : QWidget(parent), choic
         user_list_box = new QComboBox;
         user_list_box->addItem(word("login_users_list", "List of users"), true);
         user_list_box->addItem(word("login_users_name", "Name and password"), false);
-        user_list_box->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);
         form->addRow(word("login_display_as", "Display login as:"), user_list_box);
 
         default_session_box = new QComboBox;
-        default_session_box->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);
+        default_session_box->addItem(QStringLiteral("Mavernix"), QStringLiteral("mavernix"));
         form->addRow(word("login_default_session", "Default session:"), default_session_box);
 
         power_buttons_box = new QCheckBox(word("login_show_power", "Show Sleep, Restart and Shut Down buttons"));
@@ -226,19 +215,10 @@ LoginPane::LoginPane(Choices& choices, QWidget* parent) : QWidget(parent), choic
         admin_box->setSpacing(8);
         admin_box->addWidget(apply_system_button);
         admin_box->addWidget(reset_system_button);
-        admin_box->addStretch();
 
-        system_note = new QLabel(word("login_admin_note", "System options ask for your administrator password."));
-        system_note->setFont(scaled_font(system_note->font(), small_words_scale));
-        system_note->setEnabled(false);
-
-        auto* admin_col = new QWidget;
-        auto* admin_v = new QVBoxLayout(admin_col);
-        admin_v->setContentsMargins(0, 0, 0, 0);
-        admin_v->setSpacing(4);
-        admin_v->addWidget(admin_row);
-        admin_v->addWidget(system_note);
-        form->addRow(QString(), admin_col);
+        form->addRow(QString(),
+            with_note_under(admin_row,
+                word("login_admin_note", "System options ask for your administrator password."), 0));
 
         refreshSystemStatus();
     }

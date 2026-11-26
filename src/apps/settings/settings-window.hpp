@@ -33,6 +33,8 @@ class SettingsWindow : public QMainWindow
     // a line for each pane whose controls need more room than the fixed window gives
     // it shows every pane in turn to lay it out
     QStringList tooWide();
+    // misaligned row labels or broken mnemonic/double-space text in any pane
+    QStringList layoutIssues();
     void showOverview();
 
   protected:

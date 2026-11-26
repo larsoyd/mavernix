@@ -37,12 +37,18 @@ int main(int argc, char** argv)
     {
         window.show();
         const QStringList too_wide = window.tooWide();
+        const QStringList issues = window.layoutIssues();
         for (const QString& line : too_wide)
         {
             std::fprintf(stderr, "[settings] too_wide %s\n", qPrintable(line));
         }
-        std::fprintf(stderr, "[settings] check_fit panes_too_wide=%lld\n", static_cast<long long>(too_wide.size()));
-        return too_wide.isEmpty() ? 0 : 1;
+        for (const QString& line : issues)
+        {
+            std::fprintf(stderr, "[settings] layout_issue %s\n", qPrintable(line));
+        }
+        std::fprintf(stderr, "[settings] check_fit panes_too_wide=%lld layout_issues=%lld\n",
+            static_cast<long long>(too_wide.size()), static_cast<long long>(issues.size()));
+        return too_wide.isEmpty() && issues.isEmpty() ? 0 : 1;
     }
     if (arguments.size() > 1)
     {

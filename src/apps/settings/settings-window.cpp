@@ -3,6 +3,7 @@
 #include <QAbstractButton>
 #include <QActionGroup>
 #include <QApplication>
+#include <QComboBox>
 #include <QHBoxLayout>
 #include <QIcon>
 #include <QLineEdit>
@@ -44,6 +45,7 @@
 #include "display-pane.hpp"
 #include "energy-pane.hpp"
 #include "overview.hpp"
+#include "pane-parts.hpp"
 #include "pane-resets.hpp"
 #include "extensions-pane.hpp"
 #include "general-pane.hpp"
@@ -369,6 +371,134 @@ QStringList SettingsWindow::tooWide()
                      .arg(need)
                      .arg(minimumWidth())
                      .arg(clipped.join(QLatin1Char(',')));
+    }
+    return found;
+}
+
+static QWidget* first_line_widget(QWidget* control)
+{
+    while (control != nullptr)
+    {
+        if (auto* rows = qobject_cast<QVBoxLayout*>(control->layout()); rows != nullptr && rows->count() > 0)
+        {
+            QWidget* top = rows->itemAt(0)->widget();
+            if (top != nullptr)
+            {
+                control = top;
+                continue;
+            }
+        }
+        break;
+    }
+    return control;
+}
+
+static int center_y_in(const QWidget* widget, const QWidget* ancestor)
+{
+    return widget->mapTo(ancestor, widget->contentsRect().center()).y();
+}
+
+QStringList SettingsWindow::layoutIssues()
+{
+    QStringList found;
+    const QRegularExpression single_ampersand(QStringLiteral("(?<!&)&(?!&)"));
+    const auto has_space_glitch = [](const QString& text) {
+        return text.contains(QLatin1String(" & ")) || text.contains(QLatin1String("  "));
+    };
+
+    for (auto at = pane_pages.cbegin(); at != pane_pages.cend(); ++at)
+    {
+        QWidget* page = pages->widget(at.value());
+        pages->setCurrentWidget(page);
+        for (int index = 0; index < pages->count(); index++)
+        {
+            const bool shown = index == at.value();
+            pages->widget(index)->setSizePolicy(
+                QSizePolicy::Preferred, shown ? QSizePolicy::Preferred : QSizePolicy::Ignored);
+        }
+        pages->updateGeometry();
+        setFixedHeight(sizeHint().height());
+        QApplication::processEvents();
+
+        for (const QComboBox* box : page->findChildren<QComboBox*>())
+        {
+            for (int i = 0; i < box->count(); i++)
+            {
+                const QString text = box->itemText(i);
+                if (text.contains(single_ampersand) || text.contains(QLatin1String("  ")))
+                {
+                    found << QStringLiteral("pane=%1 kind=bad_text control=combo text=\"%2\"").arg(at.key(), text);
+                }
+            }
+        }
+        for (const QAbstractButton* button : page->findChildren<QAbstractButton*>())
+        {
+            if (has_space_glitch(button->text()))
+            {
+                found << QStringLiteral("pane=%1 kind=bad_text control=button text=\"%2\"").arg(at.key(), button->text());
+            }
+        }
+        for (const QLabel* label : page->findChildren<QLabel*>())
+        {
+            if (has_space_glitch(label->text()))
+            {
+                found << QStringLiteral("pane=%1 kind=bad_text control=label text=\"%2\"").arg(at.key(), label->text());
+            }
+        }
+
+        for (QGridLayout* grid : page->findChildren<QGridLayout*>())
+        {
+            auto* form = dynamic_cast<PaneForm*>(grid);
+            if (form == nullptr)
+            {
+                continue;
+            }
+            for (const auto& pair : form->labeledRows())
+            {
+                auto* label = qobject_cast<QLabel*>(pair.first);
+                QWidget* control = pair.second;
+                if (label == nullptr || control == nullptr || !label->isVisible() || !control->isVisible())
+                {
+                    continue;
+                }
+                if (label->text().isEmpty() || label->text().contains(QLatin1Char('\n')))
+                {
+                    continue;
+                }
+                const int label_cy = center_y_in(label, page);
+                QWidget* target = first_line_widget(control);
+                if (auto* hbox = qobject_cast<QHBoxLayout*>(target->layout()); hbox != nullptr)
+                {
+                    for (int i = 0; i < hbox->count(); i++)
+                    {
+                        QWidget* child = hbox->itemAt(i)->widget();
+                        if (child == nullptr || !child->isVisible())
+                        {
+                            continue;
+                        }
+                        const int child_cy = center_y_in(child, page);
+                        const int delta = child_cy - label_cy;
+                        if (qAbs(delta) > 2)
+                        {
+                            found << QStringLiteral("pane=%1 kind=misaligned label=\"%2\" delta=%3")
+                                         .arg(at.key(), label->text())
+                                         .arg(delta);
+                            break;
+                        }
+                    }
+                }
+                else if (qobject_cast<QGridLayout*>(target->layout()) == nullptr)
+                {
+                    const int delta = center_y_in(target, page) - label_cy;
+                    if (qAbs(delta) > 2)
+                    {
+                        found << QStringLiteral("pane=%1 kind=misaligned label=\"%2\" delta=%3")
+                                     .arg(at.key(), label->text())
+                                     .arg(delta);
+                    }
+                }
+            }
+        }
     }
     return found;
 }

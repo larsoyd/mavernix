@@ -101,6 +101,56 @@ class TestPaneLayout : public QObject
             qPrintable(QStringLiteral("label=%1 control=%2").arg(label_middle).arg(tall->geometry().center().y())));
     }
 
+    void aLabelSitsLevelWithAHorizontalRow()
+    {
+        Page page;
+        QWidget& pane = *page.pane;
+        auto* form = new PaneForm(&pane);
+        auto* row = new QWidget;
+        auto* across = new QHBoxLayout(row);
+        across->setContentsMargins(0, 0, 0, 0);
+        across->setSpacing(12);
+        auto* status = new QLabel(QStringLiteral("Synced (Sea Lion)"));
+        auto* button = new QPushButton(QStringLiteral("Preview…"));
+        button->setFixedHeight(36);
+        across->addWidget(status, 0, Qt::AlignVCenter);
+        across->addWidget(button, 0, Qt::AlignVCenter);
+        form->addRow(QStringLiteral("Login screen:"), row);
+        page.settle();
+
+        const QLabel* label = label_with(pane, QStringLiteral("Login screen:"));
+        const int label_middle = label->mapTo(&pane, label->contentsRect().center()).y();
+        const int status_middle = status->mapTo(&pane, status->contentsRect().center()).y();
+        const int button_middle = button->mapTo(&pane, button->contentsRect().center()).y();
+        QVERIFY2(qAbs(label_middle - status_middle) <= 1,
+            qPrintable(QStringLiteral("label=%1 status=%2").arg(label_middle).arg(status_middle)));
+        QVERIFY2(qAbs(label_middle - button_middle) <= 1,
+            qPrintable(QStringLiteral("label=%1 button=%2").arg(label_middle).arg(button_middle)));
+    }
+
+    void aLabelSitsLevelWithANotedHorizontalRow()
+    {
+        Page page;
+        QWidget& pane = *page.pane;
+        auto* form = new PaneForm(&pane);
+        auto* row = new QWidget;
+        auto* across = new QHBoxLayout(row);
+        across->setContentsMargins(0, 0, 0, 0);
+        auto* status = new QLabel(QStringLiteral("Active"));
+        auto* button = new QPushButton(QStringLiteral("Open…"));
+        button->setFixedHeight(34);
+        across->addWidget(status, 0, Qt::AlignVCenter);
+        across->addWidget(button, 0, Qt::AlignVCenter);
+        form->addRow(QStringLiteral("Row:"), with_note_under(row, QStringLiteral("Extra detail"), 0));
+        page.settle();
+
+        const QLabel* label = label_with(pane, QStringLiteral("Row:"));
+        const int label_middle = label->mapTo(&pane, label->contentsRect().center()).y();
+        const int status_middle = status->mapTo(&pane, status->contentsRect().center()).y();
+        QVERIFY2(qAbs(label_middle - status_middle) <= 1,
+            qPrintable(QStringLiteral("label=%1 status=%2").arg(label_middle).arg(status_middle)));
+    }
+
     void tickBoxesStandTwentyApartAtTheAxis()
     {
         Page page;

@@ -45,7 +45,6 @@ class LoginPane : public QWidget
     QCheckBox* power_buttons_box = nullptr;
     QPushButton* apply_system_button = nullptr;
     QPushButton* reset_system_button = nullptr;
-    QLabel* system_note = nullptr;
     QPointer<QProcess> status_proc;
     bool loaded_sync_enabled = false;
     bool admin_available = false;
