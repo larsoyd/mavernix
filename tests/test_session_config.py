@@ -105,6 +105,7 @@ class TestWrittenSettings(SessionTestCase):
                 settings = configparser.ConfigParser(interpolation=None, strict=False)
                 settings.read(written)
                 self.assertIn("themed-decoration", settings["core"]["plugins"].split())
+                self.assertIn("entry-cursor", settings["core"]["plugins"].split())
                 self.assertEqual(Path(settings["themed-decoration"]["theme"]).name, desktop)
 
     def test_a_program_asked_to_open_what_it_has_open_can_bring_its_window_back(self):

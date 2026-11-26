@@ -18,6 +18,7 @@
 #include "desktops.hpp"
 #include "dock-dig.hpp"
 #include "emoji-set.hpp"
+#include "entry-cursor.hpp"
 #include "file-kind.hpp"
 #include "folder-contents.hpp"
 #include "folder-watch.hpp"
@@ -77,6 +78,7 @@ void ShellNativePlugin::registerTypes(const char* uri)
     qmlRegisterType<Desktops>(uri, major_version, minor_version, "Desktops");
     qmlRegisterType<DockDig>(uri, major_version, minor_version, "DockDig");
     qmlRegisterType<EmojiSet>(uri, major_version, minor_version, "EmojiSet");
+    qmlRegisterType<EntryCursor>(uri, major_version, minor_version, "EntryCursor");
     qmlRegisterType<FileKind>(uri, major_version, minor_version, "FileKind");
     qmlRegisterType<FolderContents>(uri, major_version, minor_version, "FolderContents");
     qmlRegisterType<FolderWatch>(uri, major_version, minor_version, "FolderWatch");

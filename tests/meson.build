@@ -97,6 +97,16 @@ tests = {
         'include': test_sources / 'shell/native',
         'dependencies': [qt_native],
     },
+    'entry-cursor': {
+        'sources': [
+            test_sources / 'shell/native/entry-cursor.cpp',
+            test_sources / 'shell/native/compositor-socket.cpp',
+            qt.compile_moc(headers: [test_sources / 'shell/native/entry-cursor.hpp',
+                                    test_sources / 'shell/native/compositor-socket.hpp'], dependencies: qt_native),
+        ],
+        'include': test_sources / 'shell/native',
+        'dependencies': [qt_native],
+    },
     'icon-fit': {
         'sources': [test_sources / 'shell/native/icon-fit.cpp'],
         'include': test_sources / 'shell/native',

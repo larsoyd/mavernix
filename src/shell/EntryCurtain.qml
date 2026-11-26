@@ -5,6 +5,7 @@ import QtQuick
 import Quickshell
 import Quickshell.Io
 import Quickshell.Wayland
+import Shell.Native
 
 Scope {
     id: entry
@@ -46,6 +47,10 @@ Scope {
 
     property var exitCallback: null
 
+    EntryCursor {
+        id: entryCursor
+    }
+
     FileView {
         id: note
         path: Quickshell.env("XDG_RUNTIME_DIR") + "/mavernix-entered"
@@ -56,10 +61,13 @@ Scope {
     Component.onCompleted: {
         // names the login, the runtime folder can outlive a logout
         const mark = "entered " + (Quickshell.env("XDG_SESSION_ID") ?? "") + "\n"
-        if (note.text() === mark)
+        if (note.text() === mark) {
+            entryCursor.show()
             return
+        }
         note.setText(mark)
         coveredAt = Date.now()
+        console.log("[entry] covered at_ms=" + coveredAt + " style=" + handoffStyle)
         if (choreographed) {
             backdropScale = 1.028
             panelProgress = 0.0
@@ -81,6 +89,7 @@ Scope {
             return
         console.log("[entry] lift reason=" + reason + " style=" + handoffStyle + " waited_ms=" + (Date.now() - coveredAt))
         lifting = true
+        entryCursor.show()
         revealed()
         if (instant) {
             instantLift.restart()
@@ -100,6 +109,7 @@ Scope {
         simpleLift.stop()
         instantLift.stop()
         exiting = true
+        entryCursor.hide(3000)
         shade = 0.0
         covering = true
         exitFade.restart()

@@ -1,0 +1,20 @@
+<?xml version="1.0"?>
+<wayfire>
+	<plugin name="entry-cursor">
+		<_short>Entry Cursor</_short>
+		<_long>Hides the pointer at compositor start until the shell's entry curtain lifts, with a failsafe timeout so the pointer cannot stay hidden.</_long>
+		<category>Utility</category>
+		<option name="hide_at_start" type="bool">
+			<_short>Hide at start</_short>
+			<_long>Hides the pointer as soon as the compositor initializes.</_long>
+			<default>true</default>
+		</option>
+		<option name="timeout_ms" type="int">
+			<_short>Failsafe timeout (ms)</_short>
+			<_long>Restores the pointer automatically if the shell does not reveal it within this many milliseconds.</_long>
+			<default>6000</default>
+			<min>500</min>
+			<max>30000</max>
+		</option>
+	</plugin>
+</wayfire>

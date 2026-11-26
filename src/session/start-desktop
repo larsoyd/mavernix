@@ -15,6 +15,8 @@
 #   DESKTOP_EXTRA_PLUGINS  further compositor plugins to load, space-separated
 set -euo pipefail
 
+start_epoch_ms=$(date +%s%3N 2>/dev/null || echo 0)
+
 # shellcheck source=paths.sh.in
 source "$(dirname "$(readlink -f "$0")")/paths.sh"
 
@@ -113,6 +115,10 @@ at_a_terminal() {
 
 # From a login screen, keep messages in a file and show them on failure.
 if ! at_a_terminal; then
+    # hide the VT cursor if launched directly on a tty without session-wrap
+    if [[ -t 1 && $(readlink -f /proc/self/fd/1 2>/dev/null || true) == /dev/tty[0-9]* ]]; then
+        printf '\033[?25l\033[?1c\033[2J\033[H' 2>/dev/null || true
+    fi
     start_messages="$state_dir/start-messages.log"
     : > "$start_messages"
     exec 2>> "$start_messages"
@@ -138,7 +144,7 @@ for log in session login; do
 done
 
 # The helpers' log, since the compositor discards its children's output.
-: > "$state_dir/login.log"
+printf '[start-desktop] enter epoch_ms=%s\n' "$start_epoch_ms" > "$state_dir/login.log"
 
 # A dconf database of our own, so GTK and the portal follow the theme without
 # touching Plasma's "user" database (write_interface_settings.py). No hyphen:
@@ -239,6 +245,9 @@ export XDG_CURRENT_DESKTOP=wayfire
 
 # The compositor replaces this process (exec below); stopping this PID logs out.
 export DESKTOP_SESSION_PID=$$
+
+exec_epoch_ms=$(date +%s%3N 2>/dev/null || echo 0)
+printf '[start-desktop] exec_wayfire epoch_ms=%s prep_ms=%s\n' "$exec_epoch_ms" "$((exec_epoch_ms - start_epoch_ms))" >> "$state_dir/login.log"
 
 session_log=$("$session_dir/new-session-log" "$state_dir")
 exec wayfire -c "$state_dir/session.ini" > "$session_log" 2>&1
