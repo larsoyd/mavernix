@@ -139,7 +139,8 @@ void overhang_node_t::gen_render_instances(std::vector<wf::scene::render_instanc
 static std::set<wf::output_t*> reached(wayfire_toplevel_view view)
 {
     auto home = view->get_output();
-    if (!home || !view->is_mapped() || view->minimized)
+    if (!home || !view->is_mapped() || view->minimized ||
+        !view->get_transformed_node()->is_enabled())
     {
         return {};
     }
@@ -279,11 +280,13 @@ class plugin_t : public wf::plugin_interface_t
     wf::signal::connection_t<wf::view_unmapped_signal> on_unmapped = [=](auto) { later(); };
     wf::signal::connection_t<wf::view_set_output_signal> on_set_output = [=](auto) { later(); };
     wf::signal::connection_t<wf::view_minimized_signal> on_minimized = [=](auto) { later(); };
+    wf::signal::connection_t<wf::output_plugin_activated_changed_signal> on_plugin = [=](auto) { later(); };
     wf::signal::connection_t<wf::keyboard_focus_changed_signal> on_focus = [=](auto) { later(); };
     wf::signal::connection_t<wf::output_layout_configuration_changed_signal> on_layout = [=](auto) { later(); };
     wf::signal::connection_t<wf::output_added_signal> on_added = [=](wf::output_added_signal* event)
     {
         event->output->connect(&on_minimized);
+        event->output->connect(&on_plugin);
         later();
     };
     wf::signal::connection_t<wf::output_pre_remove_signal> on_removing = [=](wf::output_pre_remove_signal* event)
@@ -306,6 +309,7 @@ class plugin_t : public wf::plugin_interface_t
         for (auto output : core.output_layout->get_outputs())
         {
             output->connect(&on_minimized);
+            output->connect(&on_plugin);
         }
 
         refresh();

@@ -224,7 +224,7 @@ class corner_clip_render_instance_t :
         {
             self->program.use(wf::TEXTURE_TYPE_RGBA);
             self->program.uniformMatrix4f("matrix",
-                wf::gles::render_target_orthographic_projection(data.target));
+                wf::gles::render_target_aligned_orthographic_projection(data.target));
             self->program.uniform1f("radius", self->radius_of(corner));
             self->program.uniform1f("device_pixels_per_point", data.target.scale);
             self->program.uniform1f("cut", cut ? 1.0f : 0.0f);

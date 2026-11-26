@@ -5,6 +5,7 @@
 #include "wayfire/scene.hpp"
 #include "wayfire/signal-provider.hpp"
 #include "wayfire/toplevel.hpp"
+#include <cmath>
 #include <memory>
 #define GLM_FORCE_RADIANS
 #include <glm/gtc/matrix_transform.hpp>
@@ -106,8 +107,8 @@ class simple_decoration_node_t : public wf::scene::node_t, public wf::pointer_in
     void update_titlebar(int width, int height, double scale, bool active, const title_place_t& title)
     {
         wf::dimensions_t target_size = {
-            static_cast<int32_t>(width * scale),
-            static_cast<int32_t>(height * scale)
+            static_cast<int32_t>(std::lround(width * scale)),
+            static_cast<int32_t>(std::lround(height * scale))
         };
 
         const bool unchanged =
@@ -361,8 +362,8 @@ class simple_decoration_node_t : public wf::scene::node_t, public wf::pointer_in
     {
         rim_picture_t& picture = (end == rim_end_t::TOP) ? rim_top_texture : rim_bottom_texture;
         wf::dimensions_t target_size = {
-            static_cast<int32_t>(width * scale),
-            static_cast<int32_t>(height * scale)
+            static_cast<int32_t>(std::lround(width * scale)),
+            static_cast<int32_t>(std::lround(height * scale))
         };
 
         const bool unchanged =
