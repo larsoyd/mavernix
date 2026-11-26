@@ -167,6 +167,75 @@ class Export(unittest.TestCase):
         self.run_export()
         self.assertEqual(sorted(p.name for p in self.inbox.iterdir()), ["ready", "snapshot", "stamp"])
 
+    def test_background_modes_and_greeter_choices(self):
+        choices = self.root / "choices.json"
+        custom = self.root / "custom.jpg"
+        custom.write_bytes(JPG)
+        data = json.loads(self.settings.read_text())
+        data["user_choices_file"] = str(choices)
+        self.settings.write_text(json.dumps(data))
+
+        choices.write_text(json.dumps({
+            "greeter": {
+                "background_mode": "desktop_blurred",
+                "background_blur": 32,
+                "handoff_style": "instant",
+                "screen_off_after_seconds": 300,
+                "show_clock": True,
+                "match_clock_format": True,
+                "show_keyboard": False,
+                "show_battery": True,
+            },
+            "panel": {"clock_format": "ddd HH:mm", "clock_shows_date": True},
+        }))
+        r = self.run_export()
+        self.assertEqual(r.returncode, 0, r.stderr)
+        t = self.snapshot()
+        self.assertEqual(t["background"]["blur"], 32)
+        self.assertEqual(t["handoff"]["style"], "instant")
+        self.assertEqual(t["animation"]["fade_in_ms"], 0)
+        self.assertEqual(t["display"]["idle_dpms_seconds"], 300)
+        self.assertEqual(t["clock"]["format"], "ddd HH:mm")
+        self.assertTrue(t["clock"]["show_date"])
+        self.assertEqual(t["status"]["keyboard"], False)
+        self.assertEqual(t["status"]["battery"], True)
+
+        choices.write_text(json.dumps({"greeter": {"background_mode": "custom", "background_picture": str(custom)}}))
+        self.run_export()
+        self.assertEqual(self.snapshot()["background"]["image"], "background.jpg")
+        self.assertEqual((self.inbox / "snapshot" / "background.jpg").read_bytes(), JPG)
+
+        choices.write_text(json.dumps({"greeter": {"background_mode": "gradient"}}))
+        self.run_export()
+        t = self.snapshot()
+        self.assertNotIn("image", t["background"])
+        self.assertEqual(t["background"]["color"], "#51535bff")
+        self.assertEqual(t["background"]["color2"], "#2d2d32ff")
+
+    def test_input_and_switch_option_exported(self):
+        self.ini.write_text(SESSION_INI.replace(
+            "xkb_layout = no",
+            "xkb_layout = no,us\nxkb_options = grp:ctrl_space_toggle\nmouse_cursor_speed = 0.25\ntap_to_click = true\nkb_repeat_delay = 350",
+        ))
+        self.run_export()
+        t = self.snapshot()
+        self.assertEqual(t["keyboard"]["switch_option"], "grp:ctrl_space_toggle")
+        self.assertEqual(t["input"]["mouse_cursor_speed"], 0.25)
+        self.assertEqual(t["input"]["tap_to_click"], True)
+        self.assertEqual(t["input"]["kb_repeat_delay"], 350)
+
+    def test_dark_theme_gets_dark_menu_palette(self):
+        dark_dir = self.root / "themes" / "sea-lion-dark"
+        dark_dir.mkdir(parents=True)
+        data = json.loads(self.settings.read_text())
+        data["theme_directory"] = str(dark_dir)
+        self.settings.write_text(json.dumps(data))
+        self.run_export()
+        t = self.snapshot()
+        self.assertEqual(t["appearance"], "dark")
+        self.assertEqual(t["colors"]["menu_bg"], "#2c2c2ef0")
+        self.assertEqual(t["colors"]["menu_text"], "#f2f2f2ff")
+
 
 if __name__ == "__main__":
     unittest.main()

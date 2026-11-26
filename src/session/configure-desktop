@@ -107,18 +107,57 @@ write_compositor_settings() {
 
 # Toolkit themes from the desktop theme (none without [controls]). Failing
 # here must not stop the desktop; applications then keep their own look.
+# Warm logins reuse a stamped cache so Wayfire starts without waiting on Pillow.
 write_application_themes() {
-    local theme_directory icon_theme
+    local theme_directory icon_theme cursor_size cache_root cache_key cache_dir
     theme_directory=$(setting theme_directory "")
     # The icon theme picked for programs in Settings, General; empty for the theme's.
     icon_theme=$(setting config icons programs "")
+    cursor_size=$(setting config pointer size "")
     rm -rf "$app_theme"
+
+    cache_root="${XDG_CACHE_HOME:-$HOME/.cache}/mavernix/app-theme"
+    cache_key=""
+    if [[ -z "${DESKTOP_NESTED:-}" && -f "$theme_directory/theme.toml" ]]; then
+        cache_key=$(printf '%s\0%s\0%s\0%s\0%s\n' \
+            "$theme_directory" "$icon_theme" "$cursor_size" \
+            "$(stat -c '%Y:%s' "$theme_directory/theme.toml" "$session_dir/make_app_theme.py" 2>/dev/null || true)" \
+            "$(stat -c '%Y:%s' "$session_dir/write_interface_settings.py" 2>/dev/null || true)" \
+            | sha256sum | cut -d' ' -f1)
+        cache_dir="$cache_root/$cache_key"
+        if [[ -d "$cache_dir/share" || -d "$cache_dir/xdg" ]]; then
+            mkdir -p "$app_theme"
+            if cp -a "$cache_dir/." "$app_theme/"; then
+                link_kvantum_theme
+                link_qt6ct_settings
+                link_mozilla_style
+                link_gimp_style
+                link_libreoffice_style
+                return 0
+            fi
+            rm -rf "$app_theme"
+        fi
+    fi
+
     if ! python3 "$session_dir/make_app_theme.py" "$theme_directory" "$app_theme" --icon-theme "$icon_theme" \
-        --cursor-size "$(setting config pointer size "")"; then
+        --cursor-size "$cursor_size"; then
         echo "configure-desktop: could not write the themes for applications (message above)." >&2
         echo "configure-desktop: the desktop starts anyway; applications keep their own look." >&2
         rm -rf "$app_theme"
         return 0
+    fi
+    if [[ -n "$cache_key" && -d "$app_theme" ]]; then
+        (
+            mkdir -p "$cache_root"
+            tmp="$cache_root/.tmp.$$"
+            rm -rf "$tmp"
+            if cp -a "$app_theme" "$tmp" 2>/dev/null; then
+                rm -rf "$cache_root/$cache_key"
+                mv "$tmp" "$cache_root/$cache_key" 2>/dev/null || rm -rf "$tmp"
+                # Keep the 4 most recent cached themes (e.g. day + night looks).
+                ls -1dt "$cache_root"/*/ 2>/dev/null | tail -n +5 | xargs -r rm -rf 2>/dev/null || true
+            fi
+        ) || true
     fi
     link_kvantum_theme
     link_qt6ct_settings
@@ -475,16 +514,32 @@ export_greeter_look() {
 }
 
 configure_everything() {
-    write_shell_settings
-    write_compositor_settings
-    write_application_themes
-    write_libreoffice_launchers
-    link_reaper_menu
-    enable_rom_previews
-    write_interface_settings
-    write_default_programs
-    write_program_entries
-    link_theme_files
+    write_shell_settings &
+    local pid_shell=$!
+    write_compositor_settings &
+    local pid_comp=$!
+    wait "$pid_shell"
+    wait "$pid_comp"
+
+    # Independent steps that all read shell.json run concurrently before Wayfire starts.
+    write_application_themes &
+    local pid_app=$!
+    write_libreoffice_launchers &
+    local pid_lo=$!
+    link_reaper_menu &
+    local pid_reaper=$!
+    enable_rom_previews &
+    local pid_rom=$!
+    write_interface_settings &
+    local pid_iface=$!
+    write_default_programs &
+    local pid_def=$!
+    write_program_entries &
+    local pid_ent=$!
+    link_theme_files &
+    local pid_link=$!
+    wait "$pid_app" "$pid_lo" "$pid_reaper" "$pid_rom" "$pid_iface" "$pid_def" "$pid_ent" "$pid_link"
+
     write_environment
     export_greeter_look
 }

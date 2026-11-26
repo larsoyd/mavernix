@@ -40,15 +40,22 @@ PanelWindow {
         secondsLeft = newRequest.seconds ?? 0
     }
 
-    // Runs a config entry's command ({ command, confirm }), asking first if it
-    // has a `confirm` table.
-    function run(entry) {
+    // runs a config entry's command or action, asking first when it has a confirm table
+    function run(entry, onAgreed) {
         if (entry.confirm === undefined) {
-            Quickshell.execDetached(entry.command)
+            if (onAgreed !== undefined) {
+                onAgreed()
+            } else {
+                Quickshell.execDetached(entry.command)
+            }
             return
         }
         const question = Object.assign({}, entry.confirm)
-        question.command = entry.command
+        if (onAgreed !== undefined) {
+            question.agreed = onAgreed
+        } else {
+            question.command = entry.command
+        }
         ask(question)
     }
 

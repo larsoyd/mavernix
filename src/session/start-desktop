@@ -20,9 +20,23 @@ source "$(dirname "$(readlink -f "$0")")/paths.sh"
 
 # Desktops a look added are brought up to date with this version, and its
 # themes get this version's new settings; a failure there must not keep the
-# desktop from starting.
-python3 "$session_dir/refresh_desktops.py" || true
-python3 "$session_dir/refresh_themes.py" || true
+# desktop from starting. Skip when installed looks haven't changed since the
+# last run to keep the login handoff fast.
+looks_dir="$library_dir/theme-installer/looks"
+refresh_stamp="${XDG_STATE_HOME:-$HOME/.local/state}/mavernix/refreshed-stamp"
+looks_sig=""
+if [[ -d "$looks_dir" ]]; then
+    looks_sig=$(stat -c '%Y %n' "$looks_dir" "$looks_dir"/* "$looks_dir"/*/*.toml 2>/dev/null | sort || true)
+fi
+if [[ -n "$looks_sig" && -f "$refresh_stamp" && "$(cat "$refresh_stamp" 2>/dev/null || true)" == "$looks_sig" ]]; then
+    :
+else
+    python3 "$session_dir/refresh_desktops.py" || true
+    python3 "$session_dir/refresh_themes.py" || true
+    if [[ -n "$looks_sig" ]]; then
+        mkdir -p "$(dirname "$refresh_stamp")" && printf '%s\n' "$looks_sig" > "$refresh_stamp" || true
+    fi
+fi
 
 name=${1:-}
 if [[ -z "$name" ]]; then

@@ -51,6 +51,7 @@
 #include "calendar-pane.hpp"
 #include "datetime-pane.hpp"
 #include "icons-pane.hpp"
+#include "login-pane.hpp"
 #include "mouse-pane.hpp"
 #include "network-pane.hpp"
 #include "trackpad-pane.hpp"
@@ -116,6 +117,8 @@ static const KnownPane known_panes[] = {
     {"keyboard", "input-keyboard", "Keyboard", "shortcuts keys hotkeys layout language input sources typing repeat"},
     {"defaults", "applications-other", "Default Apps", "default programs browser mail open with"},
     {"startup", "preferences-system-startup", "Startup", "login autostart start programs items"},
+    {"login", "preferences-desktop-user", "Login Screen",
+        "login greeter welcome lock background wallpaper blur transition handoff sync users sessions"},
     {"datetime", "preferences-system-time", "Date & Time", "clock time date 24 hour seconds menu bar"},
     {"calendar", "almanac", "Calendar",
         "almanac events week days hours holidays year default calendar clock dock icon date"},
@@ -604,6 +607,10 @@ QWidget* SettingsWindow::makePane(const QString& name)
     if (name == QLatin1String("startup"))
     {
         return new StartupPane(choices);
+    }
+    if (name == QLatin1String("login"))
+    {
+        return new LoginPane(choices);
     }
 
     return nullptr;

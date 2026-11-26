@@ -27,7 +27,9 @@
 #include <chrono>
 #include <cmath>
 
+#include <wayfire/compositor-view.hpp>
 #include <wayfire/core.hpp>
+#include <wayfire/option-wrapper.hpp>
 #include <wayfire/output-layout.hpp>
 #include <wayfire/output.hpp>
 #include <wayfire/per-output-plugin.hpp>
@@ -96,6 +98,9 @@ class screen_t : public wf::per_output_plugin_instance_t
 {
     // One for each of DESKTOP_LAYERS while the desktop is aside; none at home.
     std::vector<std::shared_ptr<wf::scene::translation_node_t>> shifts;
+    // painted behind the shifted desktop when the theme asks for a colour there
+    wf::option_wrapper_t<wf::color_t> backdrop_color{"desktop-aside/background_color"};
+    std::shared_ptr<wf::color_rect_view_t> backdrop;
 
     // The slide: from where, to where, how, and where it is now.
     double start_offset = 0;
@@ -112,6 +117,15 @@ class screen_t : public wf::per_output_plugin_instance_t
 
     void take_aside()
     {
+        const wf::color_t fill = backdrop_color;
+        if (fill.a > 0.0)
+        {
+            backdrop = wf::color_rect_view_t::create(wf::VIEW_ROLE_DESKTOP_ENVIRONMENT, output);
+            backdrop->set_color(fill);
+            backdrop->set_border(0);
+            backdrop->set_geometry(output->get_relative_geometry());
+        }
+
         for (auto layer : DESKTOP_LAYERS)
         {
             auto layer_node = output->node_for_layer(layer);
@@ -123,6 +137,19 @@ class screen_t : public wf::per_output_plugin_instance_t
             }
             // Once the layer's node is out of its parent, it can go in here.
             shift->set_children_list({layer_node});
+            if (backdrop && layer == wf::scene::layer::BACKGROUND)
+            {
+                if (auto* inner = dynamic_cast<wf::scene::floating_inner_node_t*>(parent.get()))
+                {
+                    auto children = inner->get_children();
+                    auto pos = std::find(children.begin(), children.end(), shift);
+                    if (pos != children.end())
+                    {
+                        children.insert(pos, backdrop->get_root_node());
+                        inner->set_children_list(children);
+                    }
+                }
+            }
             wf::scene::update(parent, wf::scene::update_flag::CHILDREN_LIST);
             shifts.push_back(shift);
         }
@@ -130,6 +157,11 @@ class screen_t : public wf::per_output_plugin_instance_t
 
     void come_home()
     {
+        if (backdrop)
+        {
+            backdrop->close();
+            backdrop.reset();
+        }
         for (auto& shift : shifts)
         {
             // Wayfire may have taken the layer's node out meanwhile, as it

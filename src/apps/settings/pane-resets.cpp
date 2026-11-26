@@ -79,6 +79,15 @@ QList<Choices::Key> pane_choices(const QString& pane)
                 {QStringLiteral("input"), {QStringLiteral("keyboard_layout"), QStringLiteral("keyboard_variant"),
                                               QStringLiteral("keyboard_switch_key")}}}},
         {QStringLiteral("startup"), {{QStringLiteral("session"), {QStringLiteral("users_autostart")}}}},
+        {QStringLiteral("login"),
+            {{QStringLiteral("greeter"),
+                 {QStringLiteral("background_mode"), QStringLiteral("background_picture"),
+                     QStringLiteral("background_blur"), QStringLiteral("background_veil"),
+                     QStringLiteral("follow_schedule"), QStringLiteral("show_clock"),
+                     QStringLiteral("match_clock_format"), QStringLiteral("show_keyboard"),
+                     QStringLiteral("show_battery"), QStringLiteral("handoff_style"),
+                     QStringLiteral("screen_off_after_seconds"), QStringLiteral("follow_idle_screen_off")}},
+                {QStringLiteral("lock"), {QStringLiteral("style")}}}},
     };
 
     QList<Choices::Key> keys;

@@ -91,9 +91,14 @@ PanelWindow {
     // Hides the panel's contents and input but keeps its reserved strip, so
     // windows do not move (for full-screen overlays such as the app grid).
     property bool concealed: false
+    // login glide from EntryCurtain (0 = off-edge, 1 = at rest)
+    property real entryProgress: 1.0
     // a screen that is not the active one has its bar faded, as a Mac's
     readonly property bool faded: ownMenus && (menuWindow?.held ?? false) && !(menuWindow?.activeOutput ?? true)
-    contentItem.opacity: concealed ? 0 : faded ? (looks.inactive_opacity ?? 0.6) : 1
+    contentItem.opacity: (concealed ? 0 : faded ? (looks.inactive_opacity ?? 0.6) : 1) * entryProgress
+    contentItem.transform: Translate {
+        y: (panel.atBottom ? panel.height : -panel.height) * (1 - panel.entryProgress)
+    }
     Region {
         id: nothing
     }
@@ -265,11 +270,14 @@ PanelWindow {
         }
     }
 
-    // Runs a config menu entry: one of the shell's actions (`action`, such as
-    // "lock"), or its command, asking first if it has a `confirm` table.
+    // runs a config menu entry action or command, asking first when it has a confirm table
     function runEntry(entry) {
         if (entry.action !== undefined) {
-            panel.shell?.run(entry.action)
+            if (entry.confirm !== undefined && confirmDialog !== null) {
+                confirmDialog.run(entry, () => panel.shell?.run(entry.action))
+            } else {
+                panel.shell?.run(entry.action)
+            }
         } else if (confirmDialog !== null) {
             confirmDialog.run(entry)
         } else {

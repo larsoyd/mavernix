@@ -295,9 +295,9 @@ menu = [
     { label = "Lock Screen", action = "lock" },
     { label = "Suspend", command = ["systemctl", "suspend"] },
     { separator = true },
-    { label = "Restart…", command = ["systemctl", "reboot"], confirm = { title = "Restart the computer?", text = "Programs are closed without asking.", button = "Restart", cancel = "Cancel", icon = "system-reboot" } },
-    { label = "Switch off…", command = ["systemctl", "poweroff"], confirm = { title = "Switch the computer off?", text = "It switches off by itself in %1 seconds.", button = "Switch off", cancel = "Cancel", icon = "system-shutdown", seconds = 30 } },
-    { label = "Log out…", command = ["sh", "-c", "kill \"$DESKTOP_SESSION_PID\""], confirm = { title = "Log out?", text = "Programs are closed without asking.", button = "Log out", cancel = "Cancel", icon = "system-log-out" } },
+    { label = "Restart…", action = "power_reboot", confirm = { title = "Restart the computer?", text = "Programs are closed without asking.", button = "Restart", cancel = "Cancel", icon = "system-reboot" } },
+    { label = "Switch off…", action = "power_shutdown", confirm = { title = "Switch the computer off?", text = "It switches off by itself in %1 seconds.", button = "Switch off", cancel = "Cancel", icon = "system-shutdown", seconds = 30 } },
+    { label = "Log out…", action = "log_out", confirm = { title = "Log out?", text = "Programs are closed without asking.", button = "Log out", cancel = "Cancel", icon = "system-log-out" } },
 ]
 
 # A custom item showing what a command prints.
@@ -703,7 +703,7 @@ groups = [
     ["general", "desktop", "dock", "clipboard", "desktops", "windows"],
     ["display", "energy", "keyboard", "mouse", "trackpad", "sound"],
     ["network", "bluetooth"],
-    ["datetime", "calendar", "startup", "defaults", "icons"],
+    ["datetime", "calendar", "login", "startup", "defaults", "icons"],
     ["extensions"],
 ]
 
@@ -1163,7 +1163,7 @@ note_session_ends = true
 # Keys that run a command, bound in the compositor so they work even when
 # the shell does not. end_session ends it without asking.
 terminal = { key = "<super> KEY_ENTER", run = ["foot"] }
-end_session = { key = "<ctrl> <alt> KEY_BACKSPACE", run = ["sh", "-c", "kill \"$DESKTOP_SESSION_PID\""] }
+end_session = { key = "<ctrl> <alt> KEY_BACKSPACE", run = ["mavernix-logout"] }
 # Brightness (needs `brightnessctl`) and media keys (needs `playerctl`).
 brightness_up = { key = "KEY_BRIGHTNESSUP", run = ["brightnessctl", "set", "+5%"], repeat = true }
 brightness_down = { key = "KEY_BRIGHTNESSDOWN", run = ["brightnessctl", "set", "5%-"], repeat = true }

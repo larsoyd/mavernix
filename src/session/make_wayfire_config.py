@@ -268,7 +268,8 @@ def resize_animation_section(animations):
 
 
 # Actions of the shell's run() (shell.qml).
-SHELL_ACTIONS = ["app_grid", "volume_up", "volume_down", "volume_mute", "lock", "notification_list", "search",
+SHELL_ACTIONS = ["app_grid", "volume_up", "volume_down", "volume_mute", "lock", "log_out", "power_reboot",
+                 "power_shutdown", "notification_list", "search",
                  "switch_program", "switch_program_back", "quit_app", "clipboard_history", "emoji"]
 # Repeated while the key is held.
 REPEATING_ACTIONS = ["volume_up", "volume_down"]
@@ -1403,7 +1404,12 @@ def main():
     compositor_keys = compositor_key_sections(config)
     desktop_core, desktop_parts, desktop_plugins = desktop_sections(
         config, theme, compositor_keys.pop("vswitch", []))
-    compositor_keys.setdefault("core", []).extend(desktop_core + uncovered_color_lines(theme) + [xwayland_ready_line(), DECORATION_MODE_LINE])
+    compositor_keys.setdefault("core", []).extend(
+        desktop_core + ["background_color = 0.000 0.000 0.000 1.000", xwayland_ready_line(), DECORATION_MODE_LINE]
+    )
+    uncovered = uncovered_color_lines(theme)
+    if uncovered:
+        sections.append(["[desktop-aside]"] + uncovered)
     sections += desktop_parts
     plugins += desktop_plugins
     grid_section = next(section for section in sections if section[0] == "[grid]")

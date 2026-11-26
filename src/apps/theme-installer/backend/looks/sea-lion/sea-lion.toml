@@ -32,11 +32,11 @@ logo_menu = [
     ] },
     { separator = true },
     { label = "Sleep", command = ["systemctl", "suspend"] },
-    { label = "Restart…", command = ["systemctl", "reboot"], confirm = { title = "Are you sure you want to restart your computer now?", text = "If you do nothing, the computer will restart automatically in %1 seconds.", button = "Restart", cancel = "Cancel", icon = "system-reboot", seconds = 60 } },
-    { label = "Shut Down…", command = ["systemctl", "poweroff"], confirm = { title = "Are you sure you want to shut down your computer now?", text = "If you do nothing, the computer will shut down automatically in %1 seconds.", button = "Shut Down", cancel = "Cancel", icon = "system-shutdown", seconds = 60 } },
+    { label = "Restart…", action = "power_reboot", confirm = { title = "Are you sure you want to restart your computer now?", text = "If you do nothing, the computer will restart automatically in %1 seconds.", button = "Restart", cancel = "Cancel", icon = "system-reboot", seconds = 60 } },
+    { label = "Shut Down…", action = "power_shutdown", confirm = { title = "Are you sure you want to shut down your computer now?", text = "If you do nothing, the computer will shut down automatically in %1 seconds.", button = "Shut Down", cancel = "Cancel", icon = "system-shutdown", seconds = 60 } },
     { separator = true },
     { label = "Lock Screen", action = "lock" },
-    { label = "Log Out…", command = ["sh", "-c", "kill \"$DESKTOP_SESSION_PID\""], confirm = { title = "Are you sure you want to quit all applications and log out now?", text = "If you do nothing, you will be logged out automatically in %1 seconds.", button = "Log Out", cancel = "Cancel", icon = "system-log-out", seconds = 60 } },
+    { label = "Log Out…", action = "log_out", confirm = { title = "Are you sure you want to quit all applications and log out now?", text = "If you do nothing, you will be logged out automatically in %1 seconds.", button = "Log Out", cancel = "Cancel", icon = "system-log-out", seconds = 60 } },
 ]
 clock_format = "ddd h:mm AP"
 clock_menu_date_format = "dddd, MMMM d, yyyy"
@@ -345,6 +345,7 @@ display_keep_countdown = "If you don’t respond in %1 seconds, the display retu
 display_keep_button = "Keep"
 display_revert_button = "Revert"
 startup_title = "Login\nItems"
+login_title = "Login\nScreen"
 startup_intro = "These items open automatically when you log in:"
 startup_add_heading = "Add Login Item"
 startup_none = "No Login Items"

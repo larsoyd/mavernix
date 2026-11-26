@@ -18,6 +18,9 @@ PanelWindow {
     // The shell's UserChoices, which keep the order of the desktop's files.
     property var choices: null
     property var soundPlayer: null
+    // subtle login bloom scale and icons entrance opacity from EntryCurtain
+    property real backdropScale: 1.0
+    property real iconsOpacity: 1.0
     // shown with its picture decoded
     readonly property bool drawn: backingWindowVisible && picture.ready
     // the files' icons on the screen that shows them, else null
@@ -40,14 +43,21 @@ PanelWindow {
     // Shown while a picture is still loading, or if a theme gives no fill.
     color: "black"
 
-    Fill {
-        id: picture
+    Item {
         anchors.fill: parent
-        fill: background.fill
-        themeDirectory: background.settings.theme_directory
-        onFailedChanged: {
-            if (failed) {
-                background.pictureFailed()
+        clip: true
+
+        Fill {
+            id: picture
+            anchors.fill: parent
+            scale: background.backdropScale
+            transformOrigin: Item.Center
+            fill: background.fill
+            themeDirectory: background.settings.theme_directory
+            onFailedChanged: {
+                if (failed) {
+                    background.pictureFailed()
+                }
             }
         }
     }
@@ -55,6 +65,7 @@ PanelWindow {
     Loader {
         id: iconsLoader
         anchors.fill: parent
+        opacity: background.iconsOpacity
         active: background.showsFiles && background.choices !== null
         sourceComponent: DesktopIcons {
             dockOnRight: background.dockOnRight

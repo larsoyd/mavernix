@@ -1,0 +1,15 @@
+#!/bin/sh
+# Ends the running Mavernix session smoothly: asks the shell to fade out
+# before terminating the compositor, falling back to a direct signal when the
+# shell is not running.
+if [ -n "${DESKTOP_SHELL_SETTINGS:-}" ]; then
+    shell_dir=$(dirname "$(readlink -f "$0")")/../../../share/mavernix/shell
+    if [ -d "$shell_dir" ] && command -v qs >/dev/null 2>&1; then
+        if qs -p "$shell_dir" ipc call shell run log_out >/dev/null 2>&1; then
+            exit 0
+        fi
+    fi
+fi
+if [ -n "${DESKTOP_SESSION_PID:-}" ]; then
+    kill "$DESKTOP_SESSION_PID"
+fi

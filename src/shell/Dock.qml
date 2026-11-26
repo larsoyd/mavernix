@@ -1352,7 +1352,9 @@ PanelWindow {
     }
     // 0 in view, 1 out of sight.
     property real hidSunk: inView ? 0 : 1
-    readonly property real sunk: Math.max(hidSunk, switchSunk, revealSunk)
+    // 1 while waiting below the edge during login choreography, 0 once up
+    property real entrySunk: 0
+    readonly property real sunk: Math.max(hidSunk, switchSunk, revealSunk, entrySunk)
     Behavior on hidSunk {
         NumberAnimation {
             duration: dock.hideMotion.duration_ms ?? 0

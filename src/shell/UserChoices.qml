@@ -96,10 +96,22 @@ Item {
             tellLoginScreen(readFile())
     }
 
-    // the login screen copies the desktop picture, so a new one is exported to it
+    // the login screen copies the desktop picture, greeter choices, clock format and day/night schedule
     property var givenToLoginScreen: undefined
     function tellLoginScreen(held) {
-        const text = JSON.stringify(held.desktop ?? ({}))
+        const panel = held.panel ?? ({})
+        const clockPart = {}
+        for (const key of ["clock_format", "clock_shows_date", "clock_shows_time",
+                           "clock_region_time", "clock_region_date", "clock_date_style"]) {
+            if (panel[key] !== undefined)
+                clockPart[key] = panel[key]
+        }
+        const text = JSON.stringify({
+            desktop: held.desktop ?? ({}),
+            greeter: held.greeter ?? ({}),
+            theme_schedule: held.theme_schedule ?? ({}),
+            clock: clockPart,
+        })
         if (givenToLoginScreen !== undefined && text !== givenToLoginScreen)
             Quickshell.execDetached(["mavernix-reconfigure", "--greeter-look"])
         givenToLoginScreen = text

@@ -26,8 +26,14 @@ ShellRoot {
 
     // declared first so its windows map ahead of the menu bar and the dock
     EntryCurtain {
+        id: entryCurtain
         settings: shell.settings
-        desktopReady: backgrounds.instances.length > 0 && backgrounds.instances.every(background => background.drawn)
+        choices: userChoices
+        desktopReady: backgrounds.instances.length > 0
+            && backgrounds.instances.every(background => background.drawn)
+            && panels.instances.every(panel => panel.backingWindowVisible)
+            && dock.backingWindowVisible
+        onRevealed: sounds.play("desktop-login")
     }
 
     // panel, dock and overlays go on [display] main_screen, else the leftmost screen
@@ -101,6 +107,8 @@ ShellRoot {
             screen: modelData
             settings: shell.settings
             fill: shell.desktopFill
+            backdropScale: entryCurtain.backdropScale
+            iconsOpacity: entryCurtain.iconsOpacity
             onPictureFailed: shell.unreadablePicture = shell.chosenPicture
             showsFiles: modelData === shell.mainScreen
             dockOnRight: shell.dockOnRightOf(modelData)
@@ -294,6 +302,7 @@ ShellRoot {
     readonly property var panelParts: ({ shell, applicationMenu, confirmDialog, outputVolume, programVolumes, extensions })
 
     Variants {
+        id: panels
         model: shell.panelScreens
         Panel {
             required property var modelData
@@ -308,6 +317,7 @@ ShellRoot {
             shell: panelParts.shell
             extensions: panelParts.extensions
             choices: userChoices
+            entryProgress: entryCurtain.panelProgress
             // out of sight while a full-screen overlay covers the screen
             concealed: modelData === panelParts.shell.mainScreen && (appGrid.open || windowOverview.showing)
         }
@@ -329,6 +339,7 @@ ShellRoot {
     LockScreen {
         id: lockScreen
         settings: shell.settings
+        choices: userChoices
         desktopFill: shell.desktopFill
     }
 
@@ -378,6 +389,12 @@ ShellRoot {
             outputVolume.toggleMute()
         } else if (action === "lock") {
             lockScreen.lock()
+        } else if (action === "log_out") {
+            entryCurtain.beginExit(() => Quickshell.execDetached(["sh", "-c", "kill \"$DESKTOP_SESSION_PID\""]))
+        } else if (action === "power_reboot") {
+            entryCurtain.beginExit(() => Quickshell.execDetached(["systemctl", "reboot"]))
+        } else if (action === "power_shutdown") {
+            entryCurtain.beginExit(() => Quickshell.execDetached(["systemctl", "poweroff"]))
         } else if (action === "notification_list") {
             notificationList.toggle()
         } else if (action === "search") {
@@ -466,8 +483,6 @@ ShellRoot {
         // Off unless [session] reload_shell_on_change: an update changes these
         // files under a running desktop, which should keep going until next login.
         Quickshell.watchFiles = (settings.config.session ?? ({})).reload_shell_on_change ?? false
-
-        sounds.play("desktop-login")
     }
 
     Dock {
@@ -478,6 +493,7 @@ ShellRoot {
         choices: userChoices
         sounds: sounds
         confirmDialog: confirmDialog
+        entrySunk: entryCurtain.dockSunk
         // In front of overlays that reach down behind it.
         raised: appGrid.open || notificationList.showing || windowOverview.showing
     }

@@ -1,32 +1,50 @@
-// a login fades in from the compositor's empty colour once the desktop is drawn, not a restart
+// login reveal and logout fade curtain across all screens
+// waits for wallpapers, panel and dock, then drives the entrance choreography
 
 import QtQuick
 import Quickshell
 import Quickshell.Io
 import Quickshell.Wayland
-import "ThemeValues.js" as ThemeValues
 
 Scope {
     id: entry
 
     required property var settings
-    // every desktop picture is decoded and on screen
+    property var choices: null
+    // desktop pictures, panel and dock are decoded and mapped
     property bool desktopReady: false
 
-    // the same colour make_wayfire_config.py gives the compositor where nothing is drawn
-    readonly property color cover: {
-        const theme = settings.theme
-        const pushed = ((theme.animation ?? ({})).notification_list ?? ({})).kind === "push"
-        const fill = ((theme.notifications ?? ({})).list ?? ({})).background ?? ({})
-        const stops = fill.color ? [fill.color] : (fill.gradient ?? [])
-        return pushed && stops.length ? ThemeValues.color(stops[Math.floor(stops.length / 2)]) : "#1a1a1a"
+    readonly property color cover: "#000000"
+    readonly property string handoffStyle: {
+        const chosen = choices?.value("greeter", "handoff_style")
+        if (typeof chosen === "string" && chosen !== "")
+            return chosen
+        const fromGreeter = Quickshell.env("MAVERNIX_GREETER_HANDOFF")
+        if (typeof fromGreeter === "string" && fromGreeter !== "")
+            return fromGreeter
+        return "choreographed"
     }
+    readonly property bool choreographed: handoffStyle === "choreographed"
+    readonly property bool instant: handoffStyle === "instant"
+
     property bool covering: false
     property bool lifting: false
+    property bool exiting: false
     property real shade: 1
     property real coveredAt: 0
-    // a picture that never loads must not keep the desktop hidden
-    readonly property int deadline: 4000
+
+    // reveal values read by DesktopBackground, Panel, Dock and DesktopIcons
+    property real backdropScale: 1.0
+    property real panelProgress: 1.0
+    property real dockSunk: 0.0
+    property real iconsOpacity: 1.0
+
+    signal revealed()
+
+    // a picture or surface that never loads must not keep the desktop hidden
+    readonly property int deadline: 2500
+
+    property var exitCallback: null
 
     FileView {
         id: note
@@ -42,28 +60,126 @@ Scope {
             return
         note.setText(mark)
         coveredAt = Date.now()
+        if (choreographed) {
+            backdropScale = 1.028
+            panelProgress = 0.0
+            dockSunk = 1.0
+            iconsOpacity = 0.0
+        }
+        shade = 1.0
         covering = true
     }
 
     Timer {
         interval: entry.deadline
-        running: entry.covering
+        running: entry.covering && !entry.lifting && !entry.exiting
         onTriggered: entry.lift("deadline")
     }
 
     function lift(reason) {
-        if (!covering || lifting)
+        if (!covering || lifting || exiting)
             return
-        console.log("[entry] lift reason=" + reason + " waited_ms=" + (Date.now() - coveredAt))
+        console.log("[entry] lift reason=" + reason + " style=" + handoffStyle + " waited_ms=" + (Date.now() - coveredAt))
         lifting = true
+        revealed()
+        if (instant) {
+            instantLift.restart()
+        } else if (choreographed) {
+            choreographedLift.restart()
+        } else {
+            simpleLift.restart()
+        }
+    }
+
+    function beginExit(callback) {
+        if (exiting)
+            return
+        exitCallback = callback
+        lifting = false
+        choreographedLift.stop()
+        simpleLift.stop()
+        instantLift.stop()
+        exiting = true
+        shade = 0.0
+        covering = true
+        exitFade.restart()
+        exitDeadline.restart()
+    }
+
+    function finishExit() {
+        exitDeadline.stop()
+        const cb = exitCallback
+        exitCallback = null
+        if (cb)
+            cb()
     }
 
     onDesktopReadyChanged: if (desktopReady) lift("ready")
 
     SequentialAnimation {
-        running: entry.lifting
-        NumberAnimation { target: entry; property: "shade"; to: 0; duration: 450; easing.type: Easing.InOutQuad }
-        ScriptAction { script: entry.covering = false }
+        id: choreographedLift
+        ParallelAnimation {
+            NumberAnimation { target: entry; property: "shade"; to: 0.0; duration: 420; easing.type: Easing.OutCubic }
+            NumberAnimation { target: entry; property: "backdropScale"; to: 1.0; duration: 520; easing.type: Easing.OutCubic }
+            SequentialAnimation {
+                PauseAnimation { duration: 50 }
+                NumberAnimation { target: entry; property: "panelProgress"; to: 1.0; duration: 380; easing.type: Easing.OutCubic }
+            }
+            SequentialAnimation {
+                PauseAnimation { duration: 90 }
+                NumberAnimation { target: entry; property: "dockSunk"; to: 0.0; duration: 440; easing.type: Easing.OutCubic }
+            }
+            SequentialAnimation {
+                PauseAnimation { duration: 110 }
+                NumberAnimation { target: entry; property: "iconsOpacity"; to: 1.0; duration: 340; easing.type: Easing.OutQuad }
+            }
+        }
+        ScriptAction {
+            script: {
+                entry.covering = false
+                entry.lifting = false
+            }
+        }
+    }
+
+    SequentialAnimation {
+        id: simpleLift
+        NumberAnimation { target: entry; property: "shade"; to: 0.0; duration: 360; easing.type: Easing.InOutQuad }
+        ScriptAction {
+            script: {
+                entry.covering = false
+                entry.lifting = false
+            }
+        }
+    }
+
+    SequentialAnimation {
+        id: instantLift
+        NumberAnimation { target: entry; property: "shade"; to: 0.0; duration: 60; easing.type: Easing.OutQuad }
+        ScriptAction {
+            script: {
+                entry.covering = false
+                entry.lifting = false
+            }
+        }
+    }
+
+    SequentialAnimation {
+        id: exitFade
+        NumberAnimation {
+            target: entry
+            property: "shade"
+            to: 1.0
+            duration: entry.instant ? 60 : 220
+            easing.type: Easing.InOutQuad
+        }
+        ScriptAction { script: entry.finishExit() }
+    }
+
+    Timer {
+        id: exitDeadline
+        interval: 450
+        onTriggered: entry.finishExit()
     }
 
     Variants {

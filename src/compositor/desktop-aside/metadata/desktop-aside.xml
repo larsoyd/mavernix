@@ -4,5 +4,10 @@
 		<_short>Desktop Aside</_short>
 		<_long>Slides a screen's desktop picture, icons and windows sideways when asked through the control socket (method "desktop-aside/move"), uncovering what lies under them, while the menu bar and dock stay put. The shell uses it to open its list of notifications the way OS X 10.9 opens its Notification Center.</_long>
 		<category>Utility</category>
+		<option name="background_color" type="color">
+			<_short>Uncovered colour</_short>
+			<_long>Painted behind the shifted desktop while it is aside, so Wayfire's own background can stay black at login.</_long>
+			<default>0 0 0 0</default>
+		</option>
 	</plugin>
 </wayfire>
