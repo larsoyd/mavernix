@@ -34,5 +34,6 @@ class DockPane : public QWidget
     // left, bottom and right
     QList<QRadioButton*> position_buttons;
     QCheckBox* side_outermost = nullptr;
+    QWidget* side_shadow_row = nullptr;
     QFileSystemWatcher* watcher = nullptr;
 };

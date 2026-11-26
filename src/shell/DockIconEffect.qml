@@ -12,6 +12,7 @@
 import QtQuick
 import QtQuick.Effects
 import "ThemeValues.js" as ThemeValues
+import "DockAxis.js" as DockAxis
 
 Item {
     id: effect
@@ -26,6 +27,8 @@ Item {
     // A theme colour to fill the icon's shape with, or "" for none.
     property string tint: ""
     property bool upsideDown: false
+    // a side dock's strip lies on its side, so the picture is turned back upright
+    property string side: "bottom"
     property real contrast: 1
     property real brightness: 0
 
@@ -54,10 +57,15 @@ Item {
         id: drawn
         width: effect.drawnWidth
         height: effect.drawnWidth * effect.heightShare
-        transform: Scale {
-            xScale: effect.shrink
-            yScale: effect.shrink
-        }
+        transform: [
+            Matrix4x4 {
+                matrix: Qt.matrix4x4(DockAxis.matrix4(DockAxis.uprightMatrix(effect.side, drawn.width, drawn.height)))
+            },
+            Scale {
+                xScale: effect.shrink
+                yScale: effect.shrink
+            }
+        ]
 
         Image {
             id: picture

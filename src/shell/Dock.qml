@@ -325,6 +325,9 @@ PanelWindow {
     // a side dock takes the theme's [dock.side] over its [dock]
     readonly property var looks: sideways
         ? Object.assign({}, settings.theme.dock, settings.theme.dock.side ?? ({})) : settings.theme.dock
+    readonly property real sideIconShadowStrength: choices.value("dock", "side_icon_shadow") ?? 0.22
+    // only a shadow the theme made for the side, the bottom's is too wide for the tight column
+    readonly property bool sideIconShadow: settings.theme.dock.side?.icon_shadow !== undefined
     readonly property var config: settings.config.dock
     readonly property string themeDirectory: settings.theme_directory
 
@@ -1544,8 +1547,8 @@ PanelWindow {
         // --- Layers, from the lowest to the highest -----------------------------------
 
         Repeater {
-            // the flat glass of a side dock casts and mirrors nothing
-            model: dock.windowReflections || dock.sideways ? null : placeModel
+            // a side dock casts only its own shadow, at the strength the user picks
+            model: dock.windowReflections || (dock.sideways && !dock.sideIconShadow) ? null : placeModel
             DockIconEffect {
                 drawnWidth: dock.drawnIconSize
                 required property int index
@@ -1554,12 +1557,14 @@ PanelWindow {
                 readonly property var tile: dock.tileOf(modelData)
 
                 visible: !place.isSeparator && dock.looks.icon_shadow !== undefined
+                side: dock.side
                 iconSource: tile?.iconSource ?? ""
                 tint: dock.looks.icon_shadow?.color ?? "#00000000"
-                opacity: tile?.shownShare ?? 1
+                opacity: (tile?.shownShare ?? 1) * (dock.sideways ? dock.sideIconShadowStrength : 1)
                 blurRadius: dock.looks.icon_shadow?.blur ?? 0
 
-                x: tile?.iconX ?? 0
+                // strip x runs down the screen on either side
+                x: (tile?.iconX ?? 0) + (dock.sideways ? (dock.looks.icon_shadow.drop ?? 0) : 0)
                 iconScale: tile?.iconScale ?? 1
                 iconMiddle: dock.iconMiddle(tile)
                 width: tile?.iconSize ?? 0
@@ -1570,6 +1575,8 @@ PanelWindow {
         Loader {
             id: shelf
             visible: !dock.windowReflections
+            // a side dock's icon shadows lie on its glass, a bottom dock's show through it
+            z: dock.sideways ? -1 : 0
             // The shelf's finish is independent of the menu bar's translucency.
             opacity: (dock.choices.value("blur", "dock_shelf") ?? false)
                      && (dock.choices.value("blur", "dock")

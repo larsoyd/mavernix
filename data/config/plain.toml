@@ -474,6 +474,9 @@ position = "bottom"
 # A left or right dock stands on the main display, or with "outermost" on the
 # outermost display past it on that side, as on OS X 10.9.
 side_screen = "main"
+# How dark the icons' shadow is on a left or right dock, 0 for none, where
+# the theme gives that dock an icon shadow.
+side_icon_shadow = 0.22
 # The dock is on one screen. A push kept up against another screen's bottom
 # edge for a quarter second brings it there. false keeps it where it starts.
 follows_dig = true

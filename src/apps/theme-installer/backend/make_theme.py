@@ -648,6 +648,11 @@ width = {DOCK_SEPARATOR_WIDTH}
 bottom = 4
 top_gap = 4
 
+[dock.side.icon_shadow]
+color = "#000000"
+blur = 3
+drop = 1
+
 [dock.side.label]
 background = "#1e1e1e99"
 text_color = "#ffffff"

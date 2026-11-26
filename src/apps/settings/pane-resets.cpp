@@ -11,7 +11,7 @@ QList<Choices::Key> pane_choices(const QString& pane)
             {{QStringLiteral("dock"),
                  {QStringLiteral("icon_size"), QStringLiteral("largest_icon_size"), QStringLiteral("magnification"),
                      QStringLiteral("autohide"), QStringLiteral("position"), QStringLiteral("side_screen"),
-                     QStringLiteral("click_minimizes"),
+                     QStringLiteral("side_icon_shadow"), QStringLiteral("click_minimizes"),
                      QStringLiteral("window_reflections"), QStringLiteral("window_reflection_opacity")}},
                 {QStringLiteral("blur"),
                     {QStringLiteral("dock_shelf"), QStringLiteral("menu_bar"), QStringLiteral("offset")}},

@@ -786,6 +786,13 @@ class TestSeaLionUpdates(unittest.TestCase):
         self.assertEqual(self.updates[40]["themes"], ["sea-lion-dark"])
         self.assertEqual(self.updates[40]["settings"]["dock.side.shelf"]["fill"], self.make_theme_dark().DOCK_SIDE_FILL)
 
+    def test_older_themes_get_the_imports_side_icon_shadow(self):
+        made = tomllib.loads(self.make_theme.DOCK_SIDE_TABLES)["dock"]["side"]
+        update = self.updates[42]
+        self.assertNotIn("themes", update)
+        self.assertEqual(update["settings"]["dock.side.icon_shadow"], made["icon_shadow"])
+        self.assertEqual(made["icon_shadow"], {"color": "#000000", "blur": 3, "drop": 1})
+
     def make_theme_dark(self):
         import make_dark_theme
         return make_dark_theme

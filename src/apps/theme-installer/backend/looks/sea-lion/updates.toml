@@ -711,3 +711,12 @@ revision = 41
 import_brings = [
     "The password dialog shows Mavericks' padlock.",
 ]
+
+# A tight shadow under each icon of a side dock, its strength the user's.
+[[update]]
+revision = 42
+
+[update.settings."dock.side.icon_shadow"]
+color = "#000000"
+blur = 3
+drop = 1

@@ -4,6 +4,7 @@
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QRadioButton>
+#include <QSlider>
 #include <QTemporaryDir>
 
 #include "choices.hpp"
@@ -19,17 +20,31 @@ class TestDockPane : public QObject
     // a missing control fails the test and hands back a stand-in, so later steps cannot crash
     QRadioButton missing_button;
 
-    void start()
+    void start(bool side_shadow_in_theme = true)
     {
         QFile::remove(folder.filePath(QStringLiteral("choices.json")));
         QJsonObject dock;
         dock[QStringLiteral("position")] = QStringLiteral("bottom");
         dock[QStringLiteral("side_screen")] = QStringLiteral("main");
+        dock[QStringLiteral("side_icon_shadow")] = 0.22;
         QJsonObject config;
         config[QStringLiteral("dock")] = dock;
         QJsonObject settings;
         settings[QStringLiteral("config")] = config;
         settings[QStringLiteral("default_config")] = config;
+        if (side_shadow_in_theme)
+        {
+            QJsonObject shadow;
+            shadow[QStringLiteral("color")] = QStringLiteral("#000000");
+            shadow[QStringLiteral("blur")] = 3;
+            QJsonObject side;
+            side[QStringLiteral("icon_shadow")] = shadow;
+            QJsonObject dock_looks;
+            dock_looks[QStringLiteral("side")] = side;
+            QJsonObject theme;
+            theme[QStringLiteral("dock")] = dock_looks;
+            settings[QStringLiteral("theme")] = theme;
+        }
         settings[QStringLiteral("user_choices_file")] = folder.filePath(QStringLiteral("choices.json"));
         const QString path = folder.filePath(QStringLiteral("settings.json"));
         QFile file(path);
@@ -66,6 +81,19 @@ class TestDockPane : public QObject
         }
         QTest::qFail("no check reads the outermost display words", __FILE__, __LINE__);
         return &missing_check;
+    }
+
+    QSlider missing_slider;
+
+    QSlider* sideShadow(QWidget& pane)
+    {
+        auto* found = pane.findChild<QSlider*>(QStringLiteral("side_icon_shadow"));
+        if (found == nullptr)
+        {
+            QTest::qFail("no side icon shadow slider", __FILE__, __LINE__);
+            return &missing_slider;
+        }
+        return found;
     }
 
   private slots:
@@ -129,6 +157,59 @@ class TestDockPane : public QObject
         QTRY_VERIFY_WITH_TIMEOUT(outermost(pane)->isChecked(), 3000);
     }
 
+    void theSideShadowStartsAtItsDefaultAndOnlyForASide()
+    {
+        start();
+        Choices choices;
+        DockPane pane(choices);
+        QSlider* slider = sideShadow(pane);
+        QCOMPARE(slider->value(), 3);
+        QCOMPARE(slider->isEnabled(), false);
+        button(pane, QStringLiteral("Left"))->click();
+        QCOMPARE(slider->isEnabled(), true);
+        button(pane, QStringLiteral("Bottom"))->click();
+        QCOMPARE(slider->isEnabled(), false);
+    }
+
+    void movingTheSideShadowWritesItsStrength()
+    {
+        start();
+        Choices choices;
+        DockPane pane(choices);
+        button(pane, QStringLiteral("Right"))->click();
+        QSlider* slider = sideShadow(pane);
+        slider->setValue(0);
+        emit slider->sliderReleased();
+        QCOMPARE(choices.value(QStringLiteral("dock"), QStringLiteral("side_icon_shadow")).toDouble(), 0.0);
+        slider->setValue(slider->maximum());
+        emit slider->sliderReleased();
+        QCOMPARE(choices.value(QStringLiteral("dock"), QStringLiteral("side_icon_shadow")).toDouble(), 0.4);
+    }
+
+    void aSideDockChosenElsewhereEnablesTheShadow()
+    {
+        start();
+        Choices choices;
+        DockPane pane(choices);
+        Choices other;
+        other.set(QStringLiteral("dock"), QStringLiteral("position"), QStringLiteral("left"));
+        QTRY_VERIFY_WITH_TIMEOUT(sideShadow(pane)->isEnabled(), 3000);
+    }
+
+    void aThemeWithoutASideShadowHasNoSlider()
+    {
+        start(false);
+        Choices choices;
+        DockPane pane(choices);
+        pane.show();
+        QCOMPARE(sideShadow(pane)->isVisibleTo(&pane), false);
+        start();
+        Choices themed;
+        DockPane themed_pane(themed);
+        themed_pane.show();
+        QCOMPARE(sideShadow(themed_pane)->isVisibleTo(&themed_pane), true);
+    }
+
     void resettingThePaneTakesItBack()
     {
         QStringList reset;
@@ -138,6 +219,7 @@ class TestDockPane : public QObject
         }
         QVERIFY2(reset.contains(QStringLiteral("dock.position")), qPrintable(reset.join(' ')));
         QVERIFY2(reset.contains(QStringLiteral("dock.side_screen")), qPrintable(reset.join(' ')));
+        QVERIFY2(reset.contains(QStringLiteral("dock.side_icon_shadow")), qPrintable(reset.join(' ')));
     }
 };
 

@@ -80,6 +80,7 @@ DockPane::DockPane(Choices& choices, QWidget* parent) : QWidget(parent), choices
         connect(button, &QRadioButton::clicked, this, [this, name = side_names[number]]() {
             this->choices.set(QStringLiteral("dock"), QStringLiteral("position"), name);
             side_outermost->setEnabled(name != QStringLiteral("bottom"));
+            side_shadow_row->setEnabled(name != QStringLiteral("bottom"));
         });
     }
     side_row->addStretch();
@@ -92,6 +93,20 @@ DockPane::DockPane(Choices& choices, QWidget* parent) : QWidget(parent), choices
             on ? QStringLiteral("outermost") : QStringLiteral("main"));
     });
     form->addCheck(side_outermost);
+
+    // our own, the flat side glass leaves icons bare on the original
+    const QVariant chosen_shadow = choices.value(QStringLiteral("dock"), QStringLiteral("side_icon_shadow"));
+    auto* side_shadow = stops_slider({0, 0.1, 0.16, 0.22, 0.28, 0.34, 0.4},
+        chosen_shadow.isValid() ? chosen_shadow.toDouble() : 0.22, [this](double value) {
+        this->choices.set(QStringLiteral("dock"), QStringLiteral("side_icon_shadow"), value);
+    });
+    side_shadow->setObjectName(QStringLiteral("side_icon_shadow"));
+    side_shadow_row =
+        with_end_words(side_shadow, word("dock_side_shadow_none", "None"), word("dock_side_shadow_strong", "Strong"));
+    form->addRow(word("dock_side_shadow", "Side icon shadow:"), side_shadow_row);
+    form->setRowVisible(side_shadow_row,
+        dock_looks.value(QStringLiteral("side")).toMap().contains(QStringLiteral("icon_shadow")));
+
     form->addCheck(hides);
 
     auto* click_minimizes =
@@ -190,6 +205,7 @@ void DockPane::showCurrent()
     const int side = side_names.indexOf(choices.current(QStringLiteral("dock"), QStringLiteral("position")).toString());
     position_buttons.value(side < 0 ? 1 : side)->setChecked(true);
     side_outermost->setEnabled(side == 0 || side == 2);
+    side_shadow_row->setEnabled(side == 0 || side == 2);
     side_outermost->setChecked(
         choices.current(QStringLiteral("dock"), QStringLiteral("side_screen")).toString() == QStringLiteral("outermost"));
 

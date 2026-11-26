@@ -261,7 +261,7 @@ Translucent colours let the desktop show through the shelf.
 
 ## A dock on the left or right
 
-Laid out down the screen's edge, a dock reads `[dock]` as it does at the bottom, with "above the screen's edge" meaning "away from it". `[dock.side]` replaces any of `[dock]`'s keys and tables for it, table for table: a side dock with its own `shelf`, `indicator`, `separator` or `label` table takes that one whole. Reflections, floor shadows and icon shadows are left out on a side, and folders open as grids beside it rather than as fans.
+Laid out down the screen's edge, a dock reads `[dock]` as it does at the bottom, with "above the screen's edge" meaning "away from it". `[dock.side]` replaces any of `[dock]`'s keys and tables for it, table for table: a side dock with its own `shelf`, `indicator`, `separator` or `label` table takes that one whole. Reflections and floor shadows are left out on a side, and folders open as grids beside it rather than as fans. Icons cast a shadow on the side glass only when `[dock.side]` has its own `icon_shadow` table, as the bottom's is too wide for icons this close.
 
 ```toml
 [dock.side]
@@ -308,6 +308,11 @@ pointer_width = 0
 pointer_height = 0
 gap = 7
 fade_out_ms = 167
+
+[dock.side.icon_shadow]   # optional: the icon's shape on the glass, its opacity [dock] side_icon_shadow
+color = "#000000"
+blur = 3                  # radius in pixels, small so neighbours' shadows never meet
+drop = 1                  # moved down the screen by this
 
 [dock.folder]
 open_image_left = "images/dock-folder-tile-open-left.png"    # optional: the open folder's tile on a left dock
