@@ -39,6 +39,28 @@ class TestActivatedStart : public QObject
                 QStringLiteral("printf '%s\\n' \"${XDG_ACTIVATION_TOKEN-none}\" >> %1").arg(folder.filePath(name))};
     }
 
+    QStringList lookWriter(const QString& name) const
+    {
+        return {QStringLiteral("sh"), QStringLiteral("-c"),
+                QStringLiteral("printf %s \"${QT_STYLE_OVERRIDE-none} ${QT_QUICK_CONTROLS_STYLE-none}\" > %1.part && "
+                               "mv %1.part %1")
+                    .arg(folder.filePath(name))};
+    }
+
+    static QByteArray startedWith(const QByteArray& name)
+    {
+        QFile file(QStringLiteral("/proc/self/environ"));
+        if (!file.open(QIODevice::ReadOnly)) {
+            return "unreadable";
+        }
+        for (const QByteArray& entry : file.readAll().split('\0')) {
+            if (entry.startsWith(name + '=')) {
+                return entry.mid(name.size() + 1);
+            }
+        }
+        return "unset";
+    }
+
     static QStringList lines(const QString& path)
     {
         QFile file(path);
@@ -57,6 +79,28 @@ class TestActivatedStart : public QObject
     void cleanup()
     {
         ActivatedStart::tokenSource = [](QWindow*) { return QtFuture::makeReadyValueFuture(QString()); };
+        qputenv("QT_STYLE_OVERRIDE", startedWith("QT_STYLE_OVERRIDE"));
+        qunsetenv("QT_QUICK_CONTROLS_STYLE");
+    }
+
+    // quickshell drops the style for itself, the programs it opens must keep it
+    void theLookTheShellStartedWithReachesTheProgram()
+    {
+        QCOMPARE(startedWith("QT_STYLE_OVERRIDE"), QByteArray("style-at-login"));
+        qunsetenv("QT_STYLE_OVERRIDE");
+        qputenv("QT_QUICK_CONTROLS_STYLE", "Fusion");
+        QVERIFY(ActivatedStart::start(lookWriter(QStringLiteral("look")), QString()));
+        QCOMPARE(seen(folder.filePath(QStringLiteral("look"))), QStringLiteral("style-at-login none"));
+    }
+
+    void theLookReachesAProgramOpenedFromAWindow()
+    {
+        qunsetenv("QT_STYLE_OVERRIDE");
+        qputenv("QT_QUICK_CONTROLS_STYLE", "Fusion");
+        QQuickWindow window;
+        ActivatedStart starter;
+        starter.run(lookWriter(QStringLiteral("look-window")), window.contentItem());
+        QCOMPARE(seen(folder.filePath(QStringLiteral("look-window"))), QStringLiteral("style-at-login none"));
     }
 
     void aTokenFromTheCompositorReachesTheProgram()

@@ -172,6 +172,7 @@ tests = {
         ],
         'include': test_sources / 'shell/native',
         'dependencies': [qt_native, kwindowsystem],
+        'env': {'QT_STYLE_OVERRIDE': 'style-at-login', 'XDG_ACTIVATION_TOKEN': 'spent-at-login'},
     },
     'clipboard-history': {
         'sources': [
@@ -318,7 +319,7 @@ foreach name, test_parts : tests
         # The shipped themes, for the theme file's test.
         cpp_args: ['-DTHEMES_DIR="' + (meson.project_source_root() / 'data' / 'themes') + '"'],
     )
-    test(name, executable_file, env: {'QT_QPA_PLATFORM': 'offscreen'})
+    test(name, executable_file, env: {'QT_QPA_PLATFORM': 'offscreen'} + test_parts.get('env', {}))
 endforeach
 
 quick_style_test = executable(
@@ -505,6 +506,12 @@ test(
     python,
     args: [files('test_emoji_list.py')],
     env: {'EMOJI_SOURCE_DIR': meson.project_source_root() / 'data' / 'emoji'},
+)
+
+test(
+    'shell-start-environment',
+    python,
+    args: [files('test_shell_start_environment.py')],
 )
 
 test(

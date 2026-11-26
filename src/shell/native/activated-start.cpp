@@ -2,6 +2,7 @@
 
 #include <KWaylandExtras>
 #include <QDebug>
+#include <QFile>
 #include <QFutureWatcher>
 #include <QGuiApplication>
 #include <QProcess>
@@ -22,6 +23,24 @@ QFuture<QString> askCompositor(QWindow* window)
         return QtFuture::makeReadyValueFuture(QString());
     }
     return KWaylandExtras::xdgActivationToken(window, QString());
+}
+
+// quickshell drops the qt style for itself once running, programs get the one it was started with
+QProcessEnvironment startedWith()
+{
+    QFile file(QStringLiteral("/proc/self/environ"));
+    if (!file.open(QIODevice::ReadOnly)) {
+        qWarning().noquote() << "[activated-start] environ=unreadable fallback=current";
+        return QProcessEnvironment(QProcessEnvironment::InheritFromParent);
+    }
+    QProcessEnvironment environment;
+    for (const QByteArray& entry : file.readAll().split('\0')) {
+        const qsizetype split = entry.indexOf('=');
+        if (split > 0) {
+            environment.insert(QString::fromLocal8Bit(entry.left(split)), QString::fromLocal8Bit(entry.mid(split + 1)));
+        }
+    }
+    return environment;
 }
 }
 
@@ -69,7 +88,7 @@ bool ActivatedStart::start(const QStringList& command, const QString& token)
     if (command.isEmpty()) {
         return false;
     }
-    QProcessEnvironment environment = QProcessEnvironment::systemEnvironment();
+    QProcessEnvironment environment = startedWith();
     environment.remove(TOKEN);
     if (!token.isEmpty()) {
         environment.insert(TOKEN, token);
