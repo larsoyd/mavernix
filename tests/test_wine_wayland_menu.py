@@ -87,7 +87,7 @@ def run(bridge_path, agents, app_path, wine_path, home):
     runtime = Path(tempfile.mkdtemp(prefix="wl.", dir="/tmp"))
     compositor = start_compositor(environment, runtime)
     ipc = Ipc(environment["_WAYFIRE_SOCKET"])
-    bridge = app = None
+    bridge = app = readier = None
     calls = []
 
     def wait(predicate, what, seconds=10):
@@ -144,17 +144,38 @@ def run(bridge_path, agents, app_path, wine_path, home):
         booted = subprocess.run(["wine", "wineboot", "-i"], env=environment, capture_output=True, text=True,
                                 timeout=120)
         check(booted.returncode == 0, f"wineboot failed: {booted.stderr[-400:]}")
+        server = subprocess.run(["wineserver", "-p"], env=environment, timeout=15)
+        check(server.returncode == 0, f"wineserver -p failed rc={server.returncode}")
         own_registrar(True)
-        bridge = subprocess.Popen([bridge_path, "--agents", agents, "--only-prefix", environment["WINEPREFIX"]],
+        readier = subprocess.Popen([bridge_path, "--agents", agents, "--only-prefix", environment["WINEPREFIX"]],
+                                   env=environment, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, text=True,
+                                   start_new_session=True)
+        readier_lines = Lines("readier", readier.stderr)
+        # the agent readies the prefix once, later programs load the client at start
+        wait(lambda: readier_lines.count("[wine-menu-agent64] programs load the client from their start") and
+             readier_lines.count("[wine-menu-agent32] programs load the client from their start"),
+             "the agents to ready the prefix", 60)
+        stop(readier)
+        subprocess.run(["wineserver", "-k"], env=environment, timeout=15)
+        subprocess.run(["wineserver", "-w"], env=environment, timeout=30)
+        # this bridge starts no agent in the prefix, the program has to find it on its own
+        bridge = subprocess.Popen([bridge_path, "--agents", agents, "--only-prefix", os.path.join(home, "elsewhere")],
                                   env=environment, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, text=True,
                                   start_new_session=True)
         bridge_lines = Lines("bridge", bridge.stderr)
+        wait(lambda: bridge_lines.count("[wine-menu] listening port="), "the bridge to listen")
         app = subprocess.Popen(["wine", app_path], env=environment, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
                                stderr=subprocess.DEVNULL, text=True, start_new_session=True)
         app_lines = Lines("app", app.stdout)
         wait(lambda: app_lines.last(r"\[app\] ready xid=(\S+)"), "the program to show its windows", 60)
         check(app_lines.last(r"\[app\] ready xid=(\S+)").group(1) == "0x0", "the program did not run on Wayland")
         twin_top = int(app_lines.last(r"\[app\] twin client_top=(\d+)").group(1))
+        first = app_lines.last(r"\[app\] first-show client_top=(\d+) address=(\d)")
+        check(first and int(first.group(1)) == twin_top,
+              f"the first frame shows the bar: {first and first.group(0)} twin_top={twin_top}")
+        check(first and first.group(2) == "1", f"the window was shown before it named its menu: {first and first.group(0)}")
+        print(f"[wine-wayland-menu] PASS the first frame has no bar and names its menu, with no agent in the prefix "
+              f"{first.group(0)} twin_top={twin_top}", flush=True)
         wait(lambda: ipc.view(title), "the program's window in the compositor")
 
         wait(lambda: all(ipc.address(title) or ()), "the compositor to learn the window's menu", 40)
@@ -202,6 +223,32 @@ def run(bridge_path, agents, app_path, wine_path, home):
             app.stdin.flush()
             wait(lambda: app_lines.count("[app] done") > done, f"the program to {what}")
 
+        # the client's thread sits waiting on its socket by now, a window made later must be taken at once,
+        # not at the thread's next look around, so each is timed
+        for attempt in range(4):
+            time.sleep(.35)
+            order("another")
+            later = app_lines.last(r"\[app\] another-show client_top=(\d+) address=(\d)")
+            made = int(app_lines.last(r"\[app\] another made_ms=(\d+)").group(1))
+            check(later and int(later.group(1)) == twin_top and later.group(2) == "1",
+                  f"a window made later shows its bar first: {later and later.group(0)} twin_top={twin_top}")
+            check(made < 100, f"a window made later waited for the client attempt={attempt} made_ms={made}")
+        print(f"[wine-wayland-menu] PASS a window made later has no bar from its first frame {later.group(0)}", flush=True)
+
+        # the bridge waits on the program's main thread to fill a menu while that thread makes a window
+        done = app_lines.count("[app] done")
+        app.stdin.write("anotherlate\n")
+        app.stdin.flush()
+        time.sleep(.1)
+        bus.call_sync(service, path, MENU, "AboutToShow", GLib.Variant("(i)", (top[0][0],)), None,
+                      Gio.DBusCallFlags.NONE, 5000, None)
+        wait(lambda: app_lines.count("[app] done") > done, "the program to make a window while asked for a menu")
+        late = app_lines.last(r"\[app\] another-show client_top=(\d+) address=(\d)")
+        check(late and int(late.group(1)) == twin_top and late.group(2) == "1",
+              f"a window made while the bridge waited on its thread shows its bar: {late and late.group(0)}")
+        print(f"[wine-wayland-menu] PASS a window made while the bridge waits on its thread has no bar {late.group(0)}",
+              flush=True)
+
         first_view = ipc.view(title)["id"]
         order("flash")
         wait(lambda: (ipc.view(title) or {}).get("id") not in (None, first_view), "the window to come back as a new view")
@@ -244,6 +291,7 @@ def run(bridge_path, agents, app_path, wine_path, home):
     finally:
         stop(app)
         stop(bridge)
+        stop(readier)
         subprocess.run(["wineserver", "-k"], env=environment, timeout=15)
         stop(compositor)
         shutil.rmtree(runtime, ignore_errors=True)

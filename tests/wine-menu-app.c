@@ -5,7 +5,8 @@
 
 enum { NEW = 101, OPEN = 102, STATUS_BAR = 201, RUN = 301, RENAME = 1001, DROP_MENU = 1002, QUIT = 1003, DISABLE = 1004,
        ENABLE = 1005, BY_POSITION = 1006, KEY_MENU = 1007, CHILD_PROC = 1008, REUSE = 1009, FLASH = 1010,
-       HIDE_MAIN = 1011, SHOW_MAIN = 1012, ADDRESS = 1013, STALL = 1014 };
+       HIDE_MAIN = 1011, SHOW_MAIN = 1012, ADDRESS = 1013, STALL = 1014, ANOTHER = 1015,
+       ANOTHER_LATE = 1016 };
 
 static HWND main_window, twin_window, child_window;
 static LONG_PTR child_proc;
@@ -13,6 +14,8 @@ static HMENU recent;
 static int recent_opened;
 static long reported_top = -1, reused_top = -1;
 static HWND reused_window;
+static BOOL first_shown;
+static HWND another_window;
 static DWORD reused_thread;
 
 static void say(const char *format, ...)
@@ -135,6 +138,18 @@ static LRESULT CALLBACK window_proc(HWND window, UINT message, WPARAM wparam, LP
         if ((HMENU)wparam == recent)
             say("[app] uninitpopup recent\n");
         break;
+    // sent before the window can be drawn, so this is what its first frame shows
+    case WM_SHOWWINDOW:
+        if (wparam && !first_shown && (!main_window || window == main_window) && GetMenu(window))
+        {
+            first_shown = TRUE;
+            say("[app] first-show client_top=%ld address=%d\n", client_top(window),
+                GetPropW(window, L"__wine_appmenu_address") != NULL);
+        }
+        if (wparam && window == another_window)
+            say("[app] another-show client_top=%ld address=%d\n", client_top(window),
+                GetPropW(window, L"__wine_appmenu_address") != NULL);
+        break;
     case WM_WINDOWPOSCHANGED:
         if (window == main_window && client_top(window) != reported_top)
         {
@@ -169,6 +184,19 @@ static LRESULT CALLBACK window_proc(HWND window, UINT message, WPARAM wparam, LP
             say("[app] address=%lu\n", (unsigned long)(ULONG_PTR)GetPropW(main_window, L"__wine_appmenu_address"));
         else if (wparam == STALL)
             CloseHandle(CreateThread(NULL, 0, stalled_thread, NULL, 0, NULL));
+        else if (wparam == ANOTHER || wparam == ANOTHER_LATE)
+        {
+            // late, the test asks for a menu of this thread while it sleeps
+            if (wparam == ANOTHER_LATE)
+                Sleep(300);
+            HMENU bar = CreateMenu();
+            AppendMenuA(bar, MF_STRING, RUN, "&Again");
+            DWORD start = GetTickCount();
+            another_window = CreateWindowW(L"MenuTestApp", L"Menu Test Another", WS_OVERLAPPEDWINDOW, 80, 80, 300, 200,
+                                           0, bar, 0, 0);
+            ShowWindow(another_window, SW_SHOWNOACTIVATE);
+            say("[app] another made_ms=%lu\n", GetTickCount() - start);
+        }
         else if (wparam == REUSE)
             CloseHandle(CreateThread(NULL, 0, reuse_thread_id, NULL, 0, NULL));
         else if (wparam == CHILD_PROC && SendMessageW(child_window, WM_GETTEXTLENGTH, 0, 0) >= 0)
@@ -215,7 +243,8 @@ static DWORD WINAPI read_orders(void *unused)
                        : !strncmp(line, "keymenu", 7) ? KEY_MENU : !strncmp(line, "childproc", 9) ? CHILD_PROC
                        : !strncmp(line, "reuse", 5) ? REUSE : !strncmp(line, "flash", 5) ? FLASH
                        : !strncmp(line, "hidewindow", 10) ? HIDE_MAIN : !strncmp(line, "showwindow", 10) ? SHOW_MAIN
-                       : !strncmp(line, "address", 7) ? ADDRESS : !strncmp(line, "stall", 5) ? STALL : 0;
+                       : !strncmp(line, "address", 7) ? ADDRESS : !strncmp(line, "stall", 5) ? STALL
+                       : !strncmp(line, "anotherlate", 11) ? ANOTHER_LATE : !strncmp(line, "another", 7) ? ANOTHER : 0;
         if (order)
             PostMessageW(main_window, WM_APP, order, 0);
     }

@@ -14,11 +14,18 @@
 #define SCAN_MS 300
 #define ANSWER_MS 2000
 #define RETRY_MS 2000
+// a new window waits this long at most for the bridge before it shows its own bar
+#define READY_MS 250
+#define MOST_ASKED 16
 #define SUBCLASS_ID 0x6d656e75
 #define WATCHED L"MavernixWineMenuWatched"
 #define ADDRESS L"__wine_appmenu_address"
 
 enum { HIDE = 1, SHOW = 2, ATTACH = 3, DETACH = 4 };
+enum { CONNECTING, READY, UNREACHABLE };
+enum { FREE, ASKED, SENT, EXPORTED, FAILED };
+// subclass data, the bar is hidden and the window was offered to the bridge
+enum { BAR_HIDDEN = 1, OFFERED = 2 };
 enum { POPUP = 1, GRAYED = 2, CHECKED = 4, SEPARATOR = 8, RADIO = 16 };
 
 struct text
@@ -35,13 +42,30 @@ static struct
     BOOL settled;
     ATOM address;
     BOOL attached;
+    // offered before it was shown, the scan must not take it for gone
+    BOOL fresh;
 } shown[MOST_WINDOWS];
 static int shown_count;
 static UINT order_message;
 static SOCKET link = INVALID_SOCKET;
 static char token[80];
 static struct text incoming;
-static LONG started;
+
+static int bridge_state = CONNECTING;
+static BOOL panel;
+static char bus_name[128];
+
+// windows offered before they show, shared with their threads under the lock
+static CRITICAL_SECTION lock;
+static struct
+{
+    HWND window;
+    int state;
+    ATOM address;
+    HANDLE answered;
+} asked[MOST_ASKED];
+static SOCKET wake = INVALID_SOCKET;
+static struct sockaddr_in wake_address;
 
 static void add(struct text *text, const char *format, ...)
 {
@@ -94,15 +118,24 @@ static void tell(const char *format, ...)
     send_text(line, length);
 }
 
+static BOOL offer(HWND window);
+
 // runs on the window's own thread, the hidden bar keeps its menu so the program sees no change
-static LRESULT CALLBACK bar_proc(HWND window, UINT message, WPARAM wparam, LPARAM lparam, UINT_PTR id, DWORD_PTR hidden)
+static LRESULT CALLBACK bar_proc(HWND window, UINT message, WPARAM wparam, LPARAM lparam, UINT_PTR id, DWORD_PTR data)
 {
     (void)id;
+    // a menu given after the window was made is offered before the frame that would show it
+    if (message == WM_NCCALCSIZE && !(data & OFFERED) && GetMenu(window))
+    {
+        data |= OFFERED | (offer(window) ? BAR_HIDDEN : 0);
+        SetWindowSubclass(window, bar_proc, SUBCLASS_ID, data);
+    }
+    BOOL hidden = data & BAR_HIDDEN;
     if (message == order_message && (wparam == HIDE || wparam == SHOW))
     {
         if (hidden != (wparam == HIDE))
         {
-            SetWindowSubclass(window, bar_proc, SUBCLASS_ID, wparam == HIDE);
+            SetWindowSubclass(window, bar_proc, SUBCLASS_ID, (data & ~BAR_HIDDEN) | (wparam == HIDE ? BAR_HIDDEN : 0));
             SetWindowPos(window, NULL, 0, 0, 0, 0, SWP_FRAMECHANGED | SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER |
                          SWP_NOACTIVATE | SWP_NOOWNERZORDER);
         }
@@ -222,17 +255,37 @@ static void hang_up(void)
     link = INVALID_SOCKET;
 }
 
-static BOOL connect_bridge(void)
+// the agent publishes the bridge in the prefix, the bridge itself in the session's runtime folder
+static BOOL find_bridge(unsigned *port)
 {
-    unsigned port = 0;
+    char runtime[MAX_PATH], path[MAX_PATH + 32], text[128] = "";
     HANDLE mapping = OpenFileMappingW(FILE_MAP_READ, FALSE, L"Local\\MavernixWineMenu");
     const char *view = mapping ? MapViewOfFile(mapping, FILE_MAP_READ, 0, 0, 256) : NULL;
-    BOOL known = view && sscanf(view, "%u %79s", &port, token) == 2 && port && port < 65536;
+    if (view)
+        snprintf(text, sizeof text, "%s", view);
     if (view)
         UnmapViewOfFile(view);
     if (mapping)
         CloseHandle(mapping);
-    if (!known)
+    DWORD length = GetEnvironmentVariableA("WINE_HOST_XDG_RUNTIME_DIR", runtime, sizeof runtime);
+    if (!text[0] && length && length < sizeof runtime)
+    {
+        snprintf(path, sizeof path, "Z:%s/mavernix-wine-menu", runtime);
+        for (char *slash = path; (slash = strchr(slash, '/'));)
+            *slash = '\\';
+        FILE *file = fopen(path, "r");
+        if (file && !fgets(text, sizeof text, file))
+            text[0] = 0;
+        if (file)
+            fclose(file);
+    }
+    return sscanf(text, "%u %79s", port, token) == 2 && *port && *port < 65536;
+}
+
+static BOOL connect_bridge(void)
+{
+    unsigned port = 0;
+    if (!find_bridge(&port))
         return FALSE;
     struct sockaddr_in address = {0};
     address.sin_family = AF_INET;
@@ -269,6 +322,15 @@ static void forget_address(int at)
 static void drop_bridge(void)
 {
     hang_up();
+    bridge_state = UNREACHABLE;
+    EnterCriticalSection(&lock);
+    for (int at = 0; at < MOST_ASKED; at++)
+        if (asked[at].state == ASKED || asked[at].state == SENT)
+        {
+            asked[at].state = FAILED;
+            SetEvent(asked[at].answered);
+        }
+    LeaveCriticalSection(&lock);
     for (int at = 0; at < shown_count; at++)
     {
         if (shown[at].address && IsWindow(shown[at].window))
@@ -326,7 +388,9 @@ static void report(HWND window, BOOL always)
     ULONG_PTR xid = (ULONG_PTR)GetPropW(window, L"__wine_x11_whole_window");
     struct text items = {0}, message = {0};
     int at = shown_index(window);
-    if ((!xid && !GetPropW(window, L"__wine_appmenu_supported")) || (at < 0 && shown_count == MOST_WINDOWS))
+    // the driver marks a window it can publish only once it shows, an offered one goes out before
+    BOOL early = at >= 0 && shown[at].fresh;
+    if ((!xid && !early && !GetPropW(window, L"__wine_appmenu_supported")) || (at < 0 && shown_count == MOST_WINDOWS))
         return;
     int lines = describe(&items, GetMenu(window), 0, 0);
     if (!items.used)
@@ -340,6 +404,7 @@ static void report(HWND window, BOOL always)
         shown[at].settled = TRUE;
         shown[at].address = 0;
         shown[at].attached = FALSE;
+        shown[at].fresh = FALSE;
     }
     if (always || !shown[at].sent || strcmp(shown[at].sent, items.data))
     {
@@ -389,6 +454,8 @@ static void scan(void)
         for (int seen = 0; seen < MOST_WINDOWS && found[seen]; seen++)
             present |= found[seen] == shown[at].window;
         if (present)
+            shown[at].fresh = FALSE;
+        if (present || (shown[at].fresh && IsWindow(shown[at].window)))
         {
             at++;
             continue;
@@ -465,10 +532,35 @@ static void close_menu(HWND window, const char *route)
         SendMessageTimeoutW(window, WM_UNINITMENUPOPUP, (WPARAM)menu, 0, SMTO_ABORTIFHUNG, ANSWER_MS, NULL);
 }
 
+static void answer(HWND window, int state)
+{
+    EnterCriticalSection(&lock);
+    for (int at = 0; at < MOST_ASKED; at++)
+        if (asked[at].window == window && (asked[at].state == ASKED || asked[at].state == SENT))
+        {
+            asked[at].state = state;
+            SetEvent(asked[at].answered);
+        }
+    LeaveCriticalSection(&lock);
+}
+
 static void obey(char *line)
 {
-    char verb[16], first[80], second[80];
+    char verb[16], first[80], second[80], name[128];
     unsigned long handle;
+    int on;
+    if (sscanf(line, "bridge %127s %d", name, &on) == 2)
+    {
+        strcpy(bus_name, name);
+        panel = on;
+        bridge_state = READY;
+        return;
+    }
+    if (sscanf(line, "panel %d", &on) == 1)
+    {
+        panel = on;
+        return;
+    }
     int fields = sscanf(line, "%15s %lx %79s %79s", verb, &handle, first, second);
     HWND window = (HWND)(ULONG_PTR)handle;
     DWORD process = 0;
@@ -482,7 +574,14 @@ static void obey(char *line)
     }
     else if (!strcmp(verb, "attach") && fields == 4 && at >= 0)
     {
-        WCHAR wide[160];
+        WCHAR wide[160], held[160];
+        // a window offered before it showed already names this menu
+        if (_snwprintf(wide, ARRAYSIZE(wide), L"%hs %hs", first, second) >= 0 && shown[at].address &&
+            GlobalGetAtomNameW(shown[at].address, held, ARRAYSIZE(held)) && !wcscmp(held, wide))
+        {
+            shown[at].attached = TRUE;
+            return;
+        }
         if (shown[at].address)
             order(window, DETACH, 0);
         forget_address(at);
@@ -496,6 +595,8 @@ static void obey(char *line)
         order(window, DETACH, 0);
         forget_address(at);
     }
+    else if (!strcmp(verb, "exported"))
+        answer(window, EXPORTED);
     else if (!strcmp(verb, "activate") && fields == 4)
         activate(window, first, atoi(second));
     else if (!strcmp(verb, "open") && fields == 4)
@@ -504,64 +605,228 @@ static void obey(char *line)
         close_menu(window, first);
 }
 
+// a datagram to ourselves ends the bridge thread's wait when a window is offered
+static void open_wake(void)
+{
+    int size = sizeof wake_address;
+    SOCKET own = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
+    wake_address.sin_family = AF_INET;
+    wake_address.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+    if (own != INVALID_SOCKET && !bind(own, (struct sockaddr *)&wake_address, sizeof wake_address) &&
+        !getsockname(own, (struct sockaddr *)&wake_address, &size))
+        wake = own;
+    else if (own != INVALID_SOCKET)
+        closesocket(own);
+}
+
+static void wait_input(DWORD wait_ms)
+{
+    fd_set readable;
+    FD_ZERO(&readable);
+    if (link != INVALID_SOCKET)
+        FD_SET(link, &readable);
+    if (wake != INVALID_SOCKET)
+        FD_SET(wake, &readable);
+    if (!readable.fd_count)
+        return Sleep(wait_ms);
+    struct timeval timeout = {wait_ms / 1000, (wait_ms % 1000) * 1000};
+    if (select(0, &readable, NULL, NULL, &timeout) <= 0)
+        return;
+    char chunk[4096];
+    if (wake != INVALID_SOCKET && FD_ISSET(wake, &readable))
+        recv(wake, chunk, sizeof chunk, 0);
+    if (link != INVALID_SOCKET && FD_ISSET(link, &readable))
+    {
+        int got = recv(link, chunk, sizeof chunk, 0);
+        if (got <= 0)
+            drop_bridge();
+        else
+            add(&incoming, "%.*s", got, chunk);
+    }
+}
+
+// on the bridge thread, an offered window goes out hidden and named before it shows
+static void take_offers(void)
+{
+    HWND waiting[MOST_ASKED];
+    int count = 0;
+    EnterCriticalSection(&lock);
+    for (int at = 0; at < MOST_ASKED; at++)
+        if (asked[at].state == ASKED)
+            waiting[count++] = asked[at].window;
+    LeaveCriticalSection(&lock);
+    for (int next = 0; next < count && bridge_state != CONNECTING; next++)
+    {
+        HWND window = waiting[next];
+        WCHAR wide[192];
+        int at = shown_index(window);
+        if (bridge_state != READY || !panel || (at < 0 && shown_count == MOST_WINDOWS) ||
+            _snwprintf(wide, ARRAYSIZE(wide), L"%hs /com/canonical/menu/wine/p%lu_%lx", bus_name, GetCurrentProcessId(),
+                       (unsigned long)(ULONG_PTR)window) < 0)
+        {
+            answer(window, FAILED);
+            continue;
+        }
+        if (at < 0)
+        {
+            at = shown_count++;
+            shown[at].window = window;
+            shown[at].sent = NULL;
+        }
+        else
+            forget_address(at);
+        shown[at].hidden = TRUE;
+        shown[at].settled = TRUE;
+        shown[at].fresh = TRUE;
+        shown[at].attached = TRUE;
+        shown[at].address = GlobalAddAtomW(wide);
+        SetPropW(window, ADDRESS, (HANDLE)(ULONG_PTR)shown[at].address);
+        EnterCriticalSection(&lock);
+        for (int slot = 0; slot < MOST_ASKED; slot++)
+            if (asked[slot].window == window && asked[slot].state == ASKED)
+                asked[slot].state = SENT;
+        LeaveCriticalSection(&lock);
+        report(window, TRUE);
+        // an empty bar sends nothing, so nothing would ever be exported
+        if (!shown[at].sent)
+        {
+            RemovePropW(window, ADDRESS);
+            forget_address(at);
+            shown[at] = shown[--shown_count];
+            answer(window, FAILED);
+        }
+    }
+}
+
 static DWORD WINAPI keep_in_touch(void *unused)
 {
     (void)unused;
     WSADATA data;
     if (WSAStartup(MAKEWORD(2, 2), &data))
         return 1;
+    open_wake();
     for (;;)
     {
-        if (link == INVALID_SOCKET && !connect_bridge())
+        if (link == INVALID_SOCKET)
         {
-            Sleep(RETRY_MS);
-            continue;
+            bridge_state = CONNECTING;
+            if (!connect_bridge())
+            {
+                bridge_state = UNREACHABLE;
+                take_offers();
+                wait_input(RETRY_MS);
+                continue;
+            }
         }
         char line[256];
         while (link != INVALID_SOCKET && read_line(line, sizeof line, 0))
             obey(line);
+        take_offers();
         scan();
-        if (!read_line(line, sizeof line, SCAN_MS))
-        {
-            fd_set readable;
-            FD_ZERO(&readable);
-            FD_SET(link, &readable);
-            struct timeval now = {0, 0};
-            char peek;
-            if (select(0, &readable, NULL, NULL, &now) > 0 && recv(link, &peek, 1, MSG_PEEK) <= 0)
-                drop_bridge();
-            continue;
-        }
-        obey(line);
+        wait_input(SCAN_MS);
     }
+}
+
+static BOOL CALLBACK begin_contact(INIT_ONCE *once, void *unused, void **context)
+{
+    (void)once, (void)unused, (void)context;
+    char off[4];
+    HMODULE pinned;
+    if ((GetEnvironmentVariableA("MAVERNIX_GLOBAL_MENU", off, sizeof off) && !strcmp(off, "0")) ||
+        !GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_PIN,
+                            (LPCWSTR)(void *)begin_contact, &pinned))
+        return TRUE;
+    order_message = RegisterWindowMessageW(L"MavernixWineMenuOrder");
+    CloseHandle(CreateThread(NULL, 0, keep_in_touch, NULL, 0, NULL));
+    return TRUE;
+}
+
+static BOOL in_contact(void)
+{
+    static INIT_ONCE once = INIT_ONCE_STATIC_INIT;
+    InitOnceExecuteOnce(&once, begin_contact, NULL, NULL);
+    return order_message != 0;
+}
+
+// the window's thread keeps answering sent messages while it waits, the bridge thread may be asking it
+static BOOL offer(HWND window)
+{
+    HANDLE answered = in_contact() ? CreateEventW(NULL, TRUE, FALSE, NULL) : NULL;
+    int at = -1;
+    if (!answered)
+        return FALSE;
+    EnterCriticalSection(&lock);
+    for (int slot = 0; slot < MOST_ASKED && at < 0; slot++)
+        if (asked[slot].state == FREE)
+        {
+            at = slot;
+            asked[at].window = window;
+            asked[at].state = ASKED;
+            asked[at].answered = answered;
+        }
+    LeaveCriticalSection(&lock);
+    if (at >= 0 && wake != INVALID_SOCKET)
+        sendto(wake, "", 1, 0, (struct sockaddr *)&wake_address, sizeof wake_address);
+    for (DWORD end = GetTickCount() + READY_MS; at >= 0;)
+    {
+        LONG left = (LONG)(end - GetTickCount());
+        DWORD woke = left > 0 ? MsgWaitForMultipleObjects(1, &answered, FALSE, left, QS_SENDMESSAGE) : WAIT_TIMEOUT;
+        MSG message;
+        if (woke != WAIT_OBJECT_0 + 1)
+            break;
+        PeekMessageW(&message, NULL, 0, 0, PM_NOREMOVE | PM_QS_SENDMESSAGE);
+    }
+    EnterCriticalSection(&lock);
+    BOOL exported = at >= 0 && asked[at].state == EXPORTED;
+    if (at >= 0)
+    {
+        asked[at].state = FREE;
+        asked[at].window = NULL;
+    }
+    LeaveCriticalSection(&lock);
+    CloseHandle(answered);
+    return exported;
 }
 
 // wine exports the subclass lookup by number only, so a property marks the windows taken
 static void watch_window(HWND window)
 {
-    if (!(GetWindowLongW(window, GWL_STYLE) & WS_CHILD) && GetMenu(window) && !GetPropW(window, WATCHED) &&
-        SetWindowSubclass(window, bar_proc, SUBCLASS_ID, FALSE))
-        SetPropW(window, WATCHED, (HANDLE)1);
+    if (GetPropW(window, WATCHED) || GetWindowLongW(window, GWL_STYLE) & WS_CHILD || !in_contact())
+        return;
+    DWORD_PTR data = GetMenu(window) ? OFFERED | (offer(window) ? BAR_HIDDEN : 0) : 0;
+    if (!SetWindowSubclass(window, bar_proc, SUBCLASS_ID, data))
+        return;
+    SetPropW(window, WATCHED, (HANDLE)1);
+    if (data & BAR_HIDDEN)
+        SetWindowPos(window, NULL, 0, 0, 0, 0, SWP_FRAMECHANGED | SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER |
+                     SWP_NOACTIVATE | SWP_NOOWNERZORDER);
 }
 
 __declspec(dllexport) LRESULT CALLBACK menu_hook(int code, WPARAM wparam, LPARAM lparam)
 {
     if (code == HC_ACTION)
-    {
-        if (!InterlockedExchange(&started, 1))
-        {
-            char off[4];
-            HMODULE self;
-            order_message = RegisterWindowMessageW(L"MavernixWineMenuOrder");
-            if (!(GetEnvironmentVariableA("MAVERNIX_GLOBAL_MENU", off, sizeof off) && !strcmp(off, "0")) &&
-                GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_PIN,
-                                   (LPCWSTR)(void *)menu_hook, &self))
-                CloseHandle(CreateThread(NULL, 0, keep_in_touch, NULL, 0, NULL));
-            else
-                order_message = 0;
-        }
-        if (order_message)
-            watch_window(((const CWPSTRUCT *)lparam)->hwnd);
-    }
+        watch_window(((const CWPSTRUCT *)lparam)->hwnd);
     return CallNextHookEx(NULL, code, wparam, lparam);
+}
+
+// runs on the thread making the window, after WM_CREATE and before it can be shown
+static void CALLBACK created(HWINEVENTHOOK hook, DWORD event, HWND window, LONG object, LONG child, DWORD thread,
+                             DWORD time)
+{
+    (void)hook, (void)event, (void)thread, (void)time;
+    if (object == OBJID_WINDOW && child == CHILDID_SELF)
+        watch_window(window);
+}
+
+BOOL WINAPI DllMain(HINSTANCE instance, DWORD reason, void *reserved)
+{
+    (void)reserved;
+    if (reason != DLL_PROCESS_ATTACH)
+        return TRUE;
+    InitializeCriticalSection(&lock);
+    DisableThreadLibraryCalls(instance);
+    if (!SetWinEventHook(EVENT_OBJECT_CREATE, EVENT_OBJECT_CREATE, instance, created, GetCurrentProcessId(), 0,
+                         WINEVENT_INCONTEXT))
+        fprintf(stderr, "[wine-menu-client] refused: no window event hook error=%lu\n", GetLastError());
+    return TRUE;
 }

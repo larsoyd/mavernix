@@ -64,6 +64,7 @@ To build it, check out `larsoyd` and follow [docs/building.md](../docs/building.
 ### Menu bar
 
 - Global menus for GTK, GMenu and X11 programs, as well as Firefox, Thunderbird, GIMP, REAPER (on X11 and native Wayland) and Windows programs under Wine and Proton.
+- With a Wine that loads AppInit_DLLs, a Windows program's window opens with its menu already in the menu bar and no menu bar of its own, from its very first frame.
 - A menu bar on every display. Each display can show its own window's menus while the others fade.
 - A clipboard history with pins, search and private storage. It opens with Super+V or as a dock stack, and has its own settings pane.
 - An emoji menu on Super+. that types the chosen emoji into the focused window.

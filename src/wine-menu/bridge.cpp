@@ -8,6 +8,7 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
+#include <cctype>
 #include <cerrno>
 #include <cstdio>
 #include <cstring>
@@ -73,6 +74,7 @@ struct Client
     std::string buffer;
     std::string nonce;
     std::string name;
+    std::string pid;
     bool trusted = false;
     bool closing = false;
     std::map<std::string, Window> windows;
@@ -110,7 +112,6 @@ std::map<unsigned, std::unique_ptr<Client>> clients;
 std::map<int, std::string> servers;
 std::set<std::pair<dev_t, ino_t>> ownDisplays;
 unsigned nextClient = 1;
-unsigned nextExport = 1;
 unsigned nextOpen = 1;
 
 void say(const char* format, ...) G_GNUC_PRINTF(1, 2);
@@ -132,6 +133,17 @@ std::string sign(const std::string& text)
     std::string result = mac;
     g_free(mac);
     return result;
+}
+
+// pid and window go into an object path, letters digits and _ only
+bool madeOf(const std::string& text, int (*kind)(int))
+{
+    if (text.empty() || text.size() > 16)
+        return false;
+    for (unsigned char c : text)
+        if (!kind(c))
+            return false;
+    return true;
 }
 
 bool sameText(const std::string& one, const std::string& other)
@@ -437,7 +449,7 @@ void showMenu(Client& client)
     window.xid = client.menuXid;
     if (!window.server)
     {
-        window.path = "/com/canonical/menu/wine/" + std::to_string(nextExport++);
+        window.path = "/com/canonical/menu/wine/p" + client.pid + "_" + name;
         window.server = dbusmenu_server_new(window.path.c_str());
         window.root = dbusmenu_menuitem_new();
         fill(window.root, bar, client.serial, name, "-");
@@ -447,6 +459,7 @@ void showMenu(Client& client)
     else
         follow(window.root, window.bar, bar, client.serial, name, "-");
     window.bar = std::move(bar);
+    send(client, "exported " + name);
     registerWindow(client, name, window);
 }
 
@@ -479,7 +492,7 @@ void meet(Client& client, const std::string& line)
     std::string verb, proof, nonce, pid, exe;
     fields >> verb >> proof >> nonce >> pid;
     std::getline(fields >> std::ws, exe);
-    if (verb != "hello" || nonce.empty() || !sameText(proof, sign("client " + client.nonce)))
+    if (verb != "hello" || nonce.empty() || !madeOf(pid, isdigit) || !sameText(proof, sign("client " + client.nonce)))
     {
         say("refused a connection that does not hold the token");
         dropLater(client);
@@ -487,7 +500,10 @@ void meet(Client& client, const std::string& line)
     }
     client.trusted = true;
     client.name = exe + "(" + pid + ")";
+    client.pid = pid;
     send(client, "welcome " + sign("bridge " + nonce));
+    // with these a client names a window's menu before the window shows
+    send(client, std::string("bridge ") + g_dbus_connection_get_unique_name(bus) + (registrarUp ? " 1" : " 0"));
     say("client %s", client.name.c_str());
 }
 
@@ -506,8 +522,8 @@ void handleLine(Client& client, const std::string& line)
     std::istringstream fields(line);
     std::string verb, window, extra;
     fields >> verb >> window;
-    if (verb == "menu" && fields >> std::hex >> client.menuXid >> std::dec >> client.menuLines &&
-        client.menuLines > 0 && client.menuLines <= MOST_LINES)
+    if (verb == "menu" && madeOf(window, isxdigit) && fields >> std::hex >> client.menuXid >> std::dec >>
+        client.menuLines && client.menuLines > 0 && client.menuLines <= MOST_LINES)
         client.menuWindow = window;
     else if (verb == "menu")
     {
@@ -613,6 +629,9 @@ void registrarAppeared(GDBusConnection*, const gchar*, const gchar* owner, gpoin
     say("registrar owner=%s", owner);
     registrarUp = true;
     for (auto& [serial, client] : clients)
+        if (client->trusted)
+            send(*client, "panel 1");
+    for (auto& [serial, client] : clients)
         for (auto& [name, window] : client->windows)
             registerWindow(*client, name, window);
 }
@@ -622,6 +641,9 @@ void registrarVanished(GDBusConnection*, const gchar*, gpointer)
     if (registrarUp)
         say("registrar vanished, programs get their bars back");
     registrarUp = false;
+    for (auto& [serial, client] : clients)
+        if (client->trusted)
+            send(*client, "panel 0");
     for (auto& [serial, client] : clients)
         for (auto& [name, window] : client->windows)
         {
@@ -895,6 +917,14 @@ int main(int argc, char** argv)
         registrarAppeared, registrarVanished, nullptr, nullptr);
     g_unix_signal_add(SIGTERM, stopping, nullptr);
     g_unix_signal_add(SIGINT, stopping, nullptr);
+    // a program that starts its prefix finds the bridge here before any agent runs in it
+    const std::string contact = std::string(g_get_user_runtime_dir()) + "/mavernix-wine-menu";
+    const std::string reach = std::to_string(port) + " " + token;
+    if (!g_file_set_contents_full(contact.c_str(), reach.c_str(), -1, G_FILE_SET_CONTENTS_CONSISTENT, 0600, &error))
+    {
+        say("refused: no contact file %s error=%s, programs wait for an agent", contact.c_str(), error->message);
+        g_clear_error(&error);
+    }
     scan(nullptr);
     g_timeout_add_seconds(SCAN_SECONDS, scan, nullptr);
     say("listening port=%u agents=%s%s%s", port, agentsDir.c_str(), onlyPrefix.empty() ? "" : " only=",
@@ -913,6 +943,9 @@ int main(int argc, char** argv)
     g_bus_unown_name(name);
     g_socket_service_stop(service);
     g_object_unref(service);
+    // a bridge that started after this one owns the file now
+    if (readFile(contact) == reach)
+        unlink(contact.c_str());
     say("stopped");
     return 0;
 }

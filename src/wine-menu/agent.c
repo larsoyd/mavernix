@@ -66,6 +66,47 @@ static void ask_qt_for_native_menus(void)
     RegCloseKey(key);
 }
 
+// a patched wine loads these into every program as it starts, before its first window
+static void load_client_at_start(const WCHAR *client_path)
+{
+    WCHAR list[1024] = L"";
+    DWORD size = sizeof list - sizeof(WCHAR), load = 1;
+    HKEY key;
+    if (wcschr(client_path, L' ') || wcslen(client_path) >= ARRAYSIZE(list) / 2)
+        return say("refused: the client path %ls cannot go in a space separated list", client_path);
+    if (RegCreateKeyExW(HKEY_LOCAL_MACHINE, L"Software\\Microsoft\\Windows NT\\CurrentVersion\\Windows", 0, NULL, 0,
+                        KEY_QUERY_VALUE | KEY_SET_VALUE, NULL, &key, NULL))
+        return say("refused: no windows key for AppInit_DLLs error=%lu", GetLastError());
+    if (RegQueryValueExW(key, L"AppInit_DLLs", NULL, NULL, (BYTE *)list, &size))
+        list[0] = 0;
+    list[size / sizeof(WCHAR)] = 0;
+    BOOL listed = FALSE;
+    for (WCHAR *name = list, *end; *name; name = end)
+    {
+        while (*name == L' ' || *name == L',')
+            name++;
+        for (end = name; *end && *end != L' ' && *end != L','; end++)
+            ;
+        listed |= end - name == (ptrdiff_t)wcslen(client_path) && !_wcsnicmp(name, client_path, end - name);
+    }
+    // a library another program put there stays
+    if (!listed)
+    {
+        if (wcslen(list) + 1 + wcslen(client_path) >= ARRAYSIZE(list))
+            return RegCloseKey(key), say("refused: AppInit_DLLs is full");
+        if (list[0])
+            wcscat(list, L" ");
+        wcscat(list, client_path);
+        if (RegSetValueExW(key, L"AppInit_DLLs", 0, REG_SZ, (const BYTE *)list, (wcslen(list) + 1) * sizeof(WCHAR)))
+            return RegCloseKey(key), say("refused: AppInit_DLLs not written");
+    }
+    if (RegSetValueExW(key, L"LoadAppInit_DLLs", 0, REG_DWORD, (const BYTE *)&load, sizeof load))
+        say("refused: LoadAppInit_DLLs not written");
+    else
+        say("programs load the client from their start");
+    RegCloseKey(key);
+}
+
 static BOOL is_hooked(DWORD thread)
 {
     for (int at = 0; at < hooked_count; at++)
@@ -88,7 +129,9 @@ static BOOL CALLBACK visit(HWND window, LPARAM unused)
 {
     (void)unused;
     DWORD process, thread;
-    if (!IsWindowVisible(window) || !GetMenu(window) || hooked_count == MOST_THREADS)
+    // a program that loaded the client at its start watches its own windows
+    if (!IsWindowVisible(window) || !GetMenu(window) || GetPropW(window, L"MavernixWineMenuWatched") ||
+        hooked_count == MOST_THREADS)
         return TRUE;
     thread = GetWindowThreadProcessId(window, &process);
     if (process == GetCurrentProcessId() || is_hooked(thread) || !same_width(process))
@@ -209,6 +252,7 @@ int wmain(int argc, WCHAR **argv)
     if (!GetUserObjectInformationW(GetThreadDesktop(GetCurrentThreadId()), UOI_NAME, desktop_name, sizeof desktop_name, NULL))
         say("refused: no desktop name error=%lu, programs after a desktop restart are missed", GetLastError());
     ask_qt_for_native_menus();
+    load_client_at_start(client_path);
     say("watching");
     while (WaitForSingleObject(ends, 1000) == WAIT_TIMEOUT)
     {
