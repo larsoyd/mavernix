@@ -185,6 +185,32 @@ class GameFactsTest : public QObject
         QCOMPARE(found.programs, QStringList({"env", ".wine", "wine", "FL64.exe", "%U"}));
     }
 
+    void opens_windows_programs_data()
+    {
+        QTest::addColumn<QString>("file");
+        QTest::addColumn<bool>("opener");
+        QTest::newRow("wine loader") << "[Desktop Entry]\nName=Wine TKG Patched\nExec=wine-tkg %f\nMimeType="
+                                        "application/x-ms-dos-executable;application/x-msi;application/x-msdownload;"
+                                        "application/vnd.microsoft.portable-executable;\n" << true;
+        QTest::newRow("only the new type") << "[Desktop Entry]\nMimeType=application/vnd.microsoft.portable-executable\n"
+                                           << true;
+        QTest::newRow("only the dos type") << "[Desktop Entry]\nMimeType=application/x-ms-dos-executable;\n" << true;
+        QTest::newRow("only downloads") << "[Desktop Entry]\nMimeType=text/plain;application/x-msdownload;\n" << true;
+        QTest::newRow("only installers") << "[Desktop Entry]\nMimeType=application/x-msi;\n" << true;
+        QTest::newRow("windows app") << "[Desktop Entry]\nName=FL Studio 2026\nExec=env WINEPREFIX=/h/.wine wine "
+                                        "\"C:\\\\\\\\FL64.exe\"\nStartupWMClass=fl64.exe\n" << false;
+        QTest::newRow("text editor") << "[Desktop Entry]\nExec=kate %U\nMimeType=text/plain;text/x-c++src;\n" << false;
+        QTest::newRow("type in an action") << "[Desktop Entry]\nExec=x\n[Desktop Action a]\n"
+                                              "MimeType=application/x-ms-dos-executable;\n" << false;
+    }
+
+    void opens_windows_programs()
+    {
+        QFETCH(QString, file);
+        QFETCH(bool, opener);
+        QCOMPARE(opensWindowsPrograms(shortcutOf("x.desktop", file)), opener);
+    }
+
     void shortcuts_for_data()
     {
         QTest::addColumn<QString>("appId");

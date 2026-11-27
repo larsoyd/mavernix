@@ -195,7 +195,7 @@ QString launchedShortcut(const QByteArray& environment, qint64 pid, const QStrin
 
 Shortcut shortcutOf(const QString& path, const QString& contents)
 {
-    Shortcut shortcut{path, {}, {}, {}, {}};
+    Shortcut shortcut{path, {}, {}, {}, {}, {}};
     bool inEntry = false;
     for (const QString& line : contents.split('\n'))
     {
@@ -223,6 +223,10 @@ Shortcut shortcutOf(const QString& path, const QString& contents)
         {
             shortcut.windowClass = value;
         }
+        else if (key == "MimeType")
+        {
+            shortcut.types = value.split(';', Qt::SkipEmptyParts);
+        }
         else if (key == "Exec")
         {
             shortcut.programs.clear();
@@ -249,6 +253,15 @@ QList<Shortcut> shortcutsFor(const QString& appId, const QList<Shortcut>& shortc
         }
     }
     return found;
+}
+
+// a loader like wine is never the program it was asked to run
+bool opensWindowsPrograms(const Shortcut& entry)
+{
+    static const QStringList windows{"application/x-ms-dos-executable", "application/x-msdownload",
+                                     "application/vnd.microsoft.portable-executable", "application/x-msi"};
+    return std::any_of(windows.begin(), windows.end(),
+                       [&entry](const QString& type) { return entry.types.contains(type); });
 }
 
 // wine names a window after its exe in lower case and maps that file

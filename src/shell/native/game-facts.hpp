@@ -28,6 +28,7 @@ struct Shortcut
     QString windowClass;
     // the file name of each word of its command
     QStringList programs;
+    QStringList types;
 };
 
 QString launchedShortcut(const QByteArray& environment, qint64 pid, const QStringList& installedFolders);
@@ -35,4 +36,5 @@ Shortcut shortcutOf(const QString& path, const QString& contents);
 QList<Shortcut> shortcutsFor(const QString& appId, const QList<Shortcut>& shortcuts);
 
 QString programOfMaps(const QString& appId, const QByteArray& maps);
+bool opensWindowsPrograms(const Shortcut& entry);
 }

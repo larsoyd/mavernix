@@ -82,7 +82,21 @@ void WindowGames::takeLauncher(const QJsonObject& description)
     {
         return;
     }
-    const QStringList ids = entryIdsOfCgroup(contents(QString("/proc/%1/cgroup").arg(pid)));
+    QStringList ids = entryIdsOfCgroup(contents(QString("/proc/%1/cgroup").arg(pid)));
+    for (const QString& id : ids)
+    {
+        const QString file = QStandardPaths::locate(QStandardPaths::ApplicationsLocation, id + ".desktop");
+        if (file.isEmpty())
+        {
+            continue;
+        }
+        if (opensWindowsPrograms(shortcutOf(file, QString::fromUtf8(contents(file)))))
+        {
+            qDebug().noquote() << "[games] app=" + appId << "launcher=" + id << "skipped=loader";
+            ids.clear();
+        }
+        break;
+    }
     if (ids == launchers.value(appId))
     {
         return;
