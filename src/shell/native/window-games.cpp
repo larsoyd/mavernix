@@ -25,6 +25,7 @@ WindowGames::WindowGames(QObject* parent) : QObject(parent)
         {
             takeWindow(event.value("view").toObject());
             takeLauncher(event.value("view").toObject());
+            takeShortcut(event.value("view").toObject());
         }
     });
     compositor.open();
@@ -44,6 +45,7 @@ void WindowGames::startWatching()
         {
             takeWindow(window.toObject());
             takeLauncher(window.toObject());
+            takeShortcut(window.toObject());
         }
     });
 }
@@ -81,6 +83,46 @@ void WindowGames::takeLauncher(const QJsonObject& description)
     }
     qDebug().noquote() << "[games] app=" + appId << "launcher=" + ids.join(',');
     launchers.insert(appId, ids);
+    changes += 1;
+    emit changed();
+}
+
+// the desktop launcher a window came from when no installed entry names it
+void WindowGames::takeShortcut(const QJsonObject& description)
+{
+    const QString appId = description.value("app-id").toString();
+    const int pid = description.value("pid").toInt(-1);
+    if (pid <= 0)
+    {
+        return;
+    }
+    const QStringList installed = QStandardPaths::standardLocations(QStandardPaths::ApplicationsLocation);
+    const QString launched = launchedShortcut(contents(QString("/proc/%1/environ").arg(pid)), pid, installed);
+    Shortcut found = launched.isEmpty() ? Shortcut{} : shortcutOf(launched, QString::fromUtf8(contents(launched)));
+    QString via = "environ";
+    if (found.name.isEmpty())
+    {
+        QList<Shortcut> desktop;
+        const QDir folder(shortcutFolder);
+        for (const QString& name : folder.entryList({"*.desktop"}, QDir::Files))
+        {
+            desktop << shortcutOf(folder.filePath(name), QString::fromUtf8(contents(folder.filePath(name))));
+        }
+        const QList<Shortcut> claims = shortcutsFor(appId, desktop);
+        if (claims.size() > 1)
+        {
+            qWarning().noquote() << "[games] app=" + appId << "shortcut=none reason=clash count=" +
+                                                                     QString::number(claims.size());
+        }
+        found = claims.size() == 1 ? claims.first() : Shortcut{};
+        via = "desktop";
+    }
+    if (found.path == shortcuts.value(appId).path)
+    {
+        return;
+    }
+    qDebug().noquote() << "[games] app=" + appId << "shortcut=" + found.path << "via=" + via;
+    shortcuts.insert(appId, found);
     changes += 1;
     emit changed();
 }
@@ -139,6 +181,16 @@ QString WindowGames::steamIcon(const QString& id) const
 QString WindowGames::lutrisIcon(const QString& gameName) const
 {
     return game_facts::lutrisIcon(gameName);
+}
+
+QString WindowGames::shortcutName(const QString& appId, int) const
+{
+    return shortcuts.value(appId).name;
+}
+
+QString WindowGames::shortcutIcon(const QString& appId, int) const
+{
+    return shortcuts.value(appId).icon;
 }
 
 QStringList WindowGames::launcherEntries(const QString& appId, int) const

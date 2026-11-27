@@ -17,8 +17,12 @@ Singleton {
     property var steamEntries: ({})
     property var namedEntries: ({})
 
+    // the folder the desktop shows, set by the shell from its settings
+    property string shortcutFolder: ""
+
     WindowGames {
         id: games
+        shortcutFolder: programs.shortcutFolder
     }
 
     IconSource {
@@ -91,13 +95,14 @@ Singleton {
         const id = steamId(appId)
         const title = ToplevelManager.toplevels.values.find(window => window.appId === appId)?.title ?? ""
         return (id !== "" ? games.steamName(id) : "") || gameName(appId) || (known(appId)?.name ?? "")
-            || title || appId
+            || games.shortcutName(appId, games.revision) || title || appId
     }
 
     function icon(appId) {
         const id = steamId(appId)
         const wishes = id !== "" ? ["steam_icon_" + id, games.steamIcon(id)] : []
-        const candidates = wishes.concat(games.lutrisIcon(gameName(appId)), known(appId)?.icon ?? "")
+        const candidates = wishes.concat(games.lutrisIcon(gameName(appId)), known(appId)?.icon ?? "",
+                                         games.shortcutIcon(appId, games.revision))
         return candidates.find(candidate => icons.find(candidate) !== "") ?? appId
     }
 }

@@ -10,6 +10,7 @@ import Quickshell
 import Quickshell.Io
 import Quickshell.Wayland
 import Shell.Native
+import "DesktopShortcut.js" as DesktopShortcut
 import "DockScreen.js" as DockScreen
 
 ShellRoot {
@@ -23,6 +24,13 @@ ShellRoot {
     }
 
     readonly property var settings: JSON.parse(settingsFile.text())
+
+    // a window started from a desktop launcher takes its name and icon
+    Binding {
+        target: WindowPrograms
+        property: "shortcutFolder"
+        value: DesktopShortcut.folder(Quickshell, shell.settings)
+    }
 
     // declared first so its windows map ahead of the menu bar and the dock
     EntryCurtain {

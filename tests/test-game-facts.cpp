@@ -128,6 +128,93 @@ class GameFactsTest : public QObject
         QFETCH(QStringList, ids);
         QCOMPARE(entryIdsOfCgroup(cgroup), ids);
     }
+
+    void launched_shortcut_data()
+    {
+        QTest::addColumn<QByteArray>("environment");
+        QTest::addColumn<QString>("path");
+        const QByteArray own = QByteArray("HOME=/h\0GIO_LAUNCHED_DESKTOP_FILE=/h/Desktop/Notepad++.desktop\0", 63);
+        QTest::newRow("its own launch") << own + QByteArray("GIO_LAUNCHED_DESKTOP_FILE_PID=4242\0", 35)
+                                        << "/h/Desktop/Notepad++.desktop";
+        QTest::newRow("pid before file") << QByteArray("GIO_LAUNCHED_DESKTOP_FILE_PID=4242\0", 35) + own.mid(8)
+                                         << "/h/Desktop/Notepad++.desktop";
+        QTest::newRow("a parent's launch") << own + QByteArray("GIO_LAUNCHED_DESKTOP_FILE_PID=424\0", 34) << "";
+        QTest::newRow("no pid") << own << "";
+        QTest::newRow("installed handler")
+            << QByteArray("GIO_LAUNCHED_DESKTOP_FILE=/h/.local/share/applications/wine.desktop\0"
+                          "GIO_LAUNCHED_DESKTOP_FILE_PID=4242\0", 103)
+            << "";
+        QTest::newRow("installed system wide")
+            << QByteArray("GIO_LAUNCHED_DESKTOP_FILE=/usr/share/applications/wine.desktop\0"
+                          "GIO_LAUNCHED_DESKTOP_FILE_PID=4242\0", 98)
+            << "";
+        QTest::newRow("folder named like one")
+            << QByteArray("GIO_LAUNCHED_DESKTOP_FILE=/usr/share/applications-old/x.desktop\0"
+                          "GIO_LAUNCHED_DESKTOP_FILE_PID=4242\0", 99)
+            << "/usr/share/applications-old/x.desktop";
+        QTest::newRow("nothing") << QByteArray("HOME=/h\0", 8) << "";
+    }
+
+    void launched_shortcut()
+    {
+        QFETCH(QByteArray, environment);
+        QFETCH(QString, path);
+        const QStringList installed{"/h/.local/share/applications", "/usr/share/applications"};
+        QCOMPARE(launchedShortcut(environment, 4242, installed), path);
+    }
+
+    void shortcut_of()
+    {
+        const QString file = "[Desktop Entry]\n"
+                             "Name=FL Studio 2026\n"
+                             "Name[nb]=FL Studio norsk\n"
+                             "Exec=env \"WINEPREFIX=/h/.wine\" /opt/wine/bin/wine "
+                             "\"C:\\\\\\\\Program Files\\\\\\\\Image-Line\\\\\\\\FL64.exe\" %U\n"
+                             "Icon=1010_FL64.0\n"
+                             "StartupWMClass=fl64.exe\n"
+                             "\n"
+                             "[Desktop Action new]\n"
+                             "Name=New Project\n"
+                             "Exec=other.exe\n"
+                             "Icon=document-new\n";
+        const Shortcut found = shortcutOf("/h/Desktop/FL.desktop", file);
+        QCOMPARE(found.path, QString("/h/Desktop/FL.desktop"));
+        QCOMPARE(found.name, QString("FL Studio 2026"));
+        QCOMPARE(found.icon, QString("1010_FL64.0"));
+        QCOMPARE(found.windowClass, QString("fl64.exe"));
+        QCOMPARE(found.programs, QStringList({"env", ".wine", "wine", "FL64.exe", "%U"}));
+    }
+
+    void shortcuts_for_data()
+    {
+        QTest::addColumn<QString>("appId");
+        QTest::addColumn<QStringList>("paths");
+        QTest::newRow("window class") << "notepad++.exe" << QStringList{"notepad"};
+        QTest::newRow("class in other case") << "ModOrganizer.exe" << QStringList{"mo2"};
+        QTest::newRow("exe opened by path") << "innyume_ver1.00.exe" << QStringList{"innyume"};
+        QTest::newRow("two claim it") << "game.exe" << QStringList{"game", "game copy"};
+        QTest::newRow("none") << "firefox" << QStringList{};
+        QTest::newRow("only part of a name") << "pad++.exe" << QStringList{};
+    }
+
+    void shortcuts_for()
+    {
+        QFETCH(QString, appId);
+        QFETCH(QStringList, paths);
+        const QList<Shortcut> desktop{
+            shortcutOf("notepad", "[Desktop Entry]\nExec=notepad++-open %f\nStartupWMClass=notepad++.exe\n"),
+            shortcutOf("mo2", "[Desktop Entry]\nExec=mo2-fnv %u\nStartupWMClass=modorganizer.exe\n"),
+            shortcutOf("innyume", "[Desktop Entry]\nExec=gio open \"/h/Games/Innyume/innyume_ver1.00.exe\"\n"),
+            shortcutOf("game", "[Desktop Entry]\nExec=wine /h/a/Game.exe\n"),
+            shortcutOf("game copy", "[Desktop Entry]\nExec=wine /h/b/game.exe\n"),
+        };
+        QStringList found;
+        for (const Shortcut& shortcut : shortcutsFor(appId, desktop))
+        {
+            found << shortcut.path;
+        }
+        QCOMPARE(found, paths);
+    }
 };
 
 QTEST_APPLESS_MAIN(GameFactsTest)

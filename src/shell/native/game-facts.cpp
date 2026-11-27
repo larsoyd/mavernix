@@ -120,3 +120,134 @@ QStringList entryIdsOfCgroup(const QByteArray& cgroup)
     return {};
 }
 }
+
+namespace game_facts
+{
+namespace
+{
+// words of an exec line, a quoted one kept whole
+QStringList execWords(const QString& line)
+{
+    QStringList words;
+    QString word;
+    bool quoted = false;
+    bool started = false;
+    for (qsizetype at = 0; at < line.size(); ++at)
+    {
+        const QChar c = line.at(at);
+        if (quoted && c == '\\' && at + 1 < line.size())
+        {
+            word += line.at(++at);
+        }
+        else if (c == '"')
+        {
+            quoted = !quoted;
+            started = true;
+        }
+        else if (!quoted && c.isSpace())
+        {
+            if (started)
+            {
+                words << word;
+            }
+            word.clear();
+            started = false;
+        }
+        else
+        {
+            word += c;
+            started = true;
+        }
+    }
+    if (started)
+    {
+        words << word;
+    }
+    return words;
+}
+
+QString fileName(const QString& word)
+{
+    return word.mid(qMax(word.lastIndexOf('/'), word.lastIndexOf('\\')) + 1);
+}
+}
+
+// the launcher gio started this very process from, unless an installed one
+QString launchedShortcut(const QByteArray& environment, qint64 pid, const QStringList& installedFolders)
+{
+    QString path;
+    bool own = false;
+    for (const QByteArray& line : environment.split('\0'))
+    {
+        if (line.startsWith("GIO_LAUNCHED_DESKTOP_FILE="))
+        {
+            path = QString::fromUtf8(line.mid(26));
+        }
+        else if (line.startsWith("GIO_LAUNCHED_DESKTOP_FILE_PID="))
+        {
+            own = line.mid(30) == QByteArray::number(pid);
+        }
+    }
+    const bool installed = std::any_of(installedFolders.begin(), installedFolders.end(),
+                                       [&path](const QString& folder) { return path.startsWith(folder + '/'); });
+    return own && !installed ? path : QString();
+}
+
+Shortcut shortcutOf(const QString& path, const QString& contents)
+{
+    Shortcut shortcut{path, {}, {}, {}, {}};
+    bool inEntry = false;
+    for (const QString& line : contents.split('\n'))
+    {
+        if (line.startsWith('['))
+        {
+            inEntry = line.trimmed() == "[Desktop Entry]";
+            continue;
+        }
+        const qsizetype equals = line.indexOf('=');
+        if (!inEntry || equals < 0)
+        {
+            continue;
+        }
+        const QString key = line.left(equals).trimmed();
+        const QString value = line.mid(equals + 1).trimmed();
+        if (key == "Name")
+        {
+            shortcut.name = value;
+        }
+        else if (key == "Icon")
+        {
+            shortcut.icon = value;
+        }
+        else if (key == "StartupWMClass")
+        {
+            shortcut.windowClass = value;
+        }
+        else if (key == "Exec")
+        {
+            shortcut.programs.clear();
+            for (const QString& word : execWords(value))
+            {
+                shortcut.programs << fileName(word);
+            }
+        }
+    }
+    return shortcut;
+}
+
+// wine names a window after its exe, so a shortcut that runs or opens that file claims it
+QList<Shortcut> shortcutsFor(const QString& appId, const QList<Shortcut>& shortcuts)
+{
+    QList<Shortcut> found;
+    for (const Shortcut& shortcut : shortcuts)
+    {
+        const bool named = shortcut.windowClass.compare(appId, Qt::CaseInsensitive) == 0 ||
+                           shortcut.programs.contains(appId, Qt::CaseInsensitive);
+        if (named)
+        {
+            found << shortcut;
+        }
+    }
+    return found;
+}
+}
