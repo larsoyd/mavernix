@@ -30,6 +30,7 @@ class WindowGames : public QObject
     Q_INVOKABLE QStringList launcherEntries(const QString& appId, int revision) const;
     Q_INVOKABLE QString shortcutName(const QString& appId, int revision) const;
     Q_INVOKABLE QString shortcutIcon(const QString& appId, int revision) const;
+    Q_INVOKABLE QString programIcon(const QString& appId, int revision) const;
 
   signals:
     void changed();
@@ -39,12 +40,16 @@ class WindowGames : public QObject
     void takeWindow(const QJsonObject& description);
     void takeLauncher(const QJsonObject& description);
     void takeShortcut(const QJsonObject& description);
+    void takeProgram(const QJsonObject& description);
     QStringList steamFolders() const;
 
     CompositorSocket compositor;
     QHash<QString, game_facts::ProcessGame> games;
     QHash<QString, QStringList> launchers;
     QHash<QString, game_facts::Shortcut> shortcuts;
+    // the windows program behind an app id, and the preview each program's icon is drawn from
+    QHash<QString, QString> programs;
+    QHash<QString, QString> programIcons;
     QString shortcutFolder;
     int changes = 0;
 };

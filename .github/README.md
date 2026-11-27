@@ -35,6 +35,7 @@ To build it, check out `larsoyd` and follow [docs/building.md](../docs/building.
 - Dock icons are scaled down with Lanczos, and a program's own icon is fitted to the theme's proportions.
 - Steam games, Lutris games and Minecraft show their own names and icons.
 - A program started from a desktop shortcut, such as a Windows program under Wine, shows the shortcut's name and icon in the dock, the app switcher and the menu bar, even when no installed app matches it.
+- A Windows program opened straight from its .exe under Wine shows that file's own icon in the dock, the same one the Finder shows for it.
 - Files dropped on the dock's trash play the trash sound once they are in the trash, as the Mac dock does.
 - The app grid sizes its icons and spacing to the screen, as Launchpad does.
 - The app grid, the dock and Dolphin can make a desktop shortcut for any program or file.

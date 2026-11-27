@@ -215,6 +215,34 @@ class GameFactsTest : public QObject
         }
         QCOMPARE(found, paths);
     }
+
+    void program_of_maps_data()
+    {
+        QTest::addColumn<QString>("appId");
+        QTest::addColumn<QString>("program");
+        QTest::newRow("exe in lower case") << "setup-1.1.0.exe" << "/h/Games/Setup-1.1.0.exe";
+        QTest::newRow("spaces in the path") << "microsoftedgeupdate.exe"
+                                            << "/h/.wine/drive_c/Program Files (x86)/Edge/MicrosoftEdgeUpdate.exe";
+        QTest::newRow("a dll of that name is no program") << "kernel32.exe" << "";
+        QTest::newRow("not a windows program") << "firefox" << "";
+        QTest::newRow("not mapped") << "other.exe" << "";
+        QTest::newRow("no app id") << "" << "";
+    }
+
+    void program_of_maps()
+    {
+        QFETCH(QString, appId);
+        QFETCH(QString, program);
+        const QByteArray maps =
+            "7f0000000000-7f0000001000 r--p 00000000 103:02 11 /opt/wine/lib/wine/x86_64-windows/kernel32.dll\n"
+            "7f0000001000-7f0000002000 r--p 00000000 103:02 12 /usr/lib/firefox/firefox\n"
+            "00400000-00401000 r--p 00000000 103:02 13 /h/Games/Setup-1.1.0.exe\n"
+            "00401000-00402000 r-xp 00001000 103:02 13 /h/Games/Setup-1.1.0.exe\n"
+            "00500000-00501000 r--p 00000000 103:02 14 "
+            "/h/.wine/drive_c/Program Files (x86)/Edge/MicrosoftEdgeUpdate.exe\n"
+            "7ffd00000000-7ffd00021000 rw-p 00000000 00:00 0 [stack]\n";
+        QCOMPARE(programOfMaps(appId, maps), program);
+    }
 };
 
 QTEST_APPLESS_MAIN(GameFactsTest)

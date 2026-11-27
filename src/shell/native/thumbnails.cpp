@@ -34,15 +34,23 @@ static void mark_failed(const QString& mark, const QUrl& url, qint64 mtime)
     nothing.save(mark, "PNG");
 }
 
+static QString cache_name(const QUrl& url)
+{
+    return QString::fromLatin1(QCryptographicHash::hash(url.toEncoded(), QCryptographicHash::Md5).toHex()) + ".png";
+}
+
+QString thumbnail_file(const QString& file)
+{
+    return cache_folder("large/") + cache_name(QUrl::fromLocalFile(QFileInfo(file).absoluteFilePath()));
+}
+
 QImage thumbnail_for(const QString& file, QString* error, int timeout_ms)
 {
     const QFileInfo info(file);
     const QUrl url = QUrl::fromLocalFile(info.absoluteFilePath());
     const qint64 mtime = info.lastModified().toSecsSinceEpoch();
-    const QString name =
-        QString::fromLatin1(QCryptographicHash::hash(url.toEncoded(), QCryptographicHash::Md5).toHex()) + ".png";
-    const QString target = cache_folder("large/") + name;
-    const QString mark = cache_folder("fail/mavernix/") + name;
+    const QString target = thumbnail_file(file);
+    const QString mark = cache_folder("fail/mavernix/") + cache_name(url);
 
     if (QImage found = current(target, mtime); !found.isNull())
     {

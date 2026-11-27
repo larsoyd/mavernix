@@ -250,4 +250,23 @@ QList<Shortcut> shortcutsFor(const QString& appId, const QList<Shortcut>& shortc
     }
     return found;
 }
+
+// wine names a window after its exe in lower case and maps that file
+QString programOfMaps(const QString& appId, const QByteArray& maps)
+{
+    if (!appId.endsWith(".exe", Qt::CaseInsensitive))
+    {
+        return {};
+    }
+    static const QRegularExpression mapped("^(?:\\S+\\s+){5}(/.*)$", QRegularExpression::MultilineOption);
+    for (auto found = mapped.globalMatch(QString::fromUtf8(maps)); found.hasNext();)
+    {
+        const QString path = found.next().captured(1);
+        if (fileName(path).compare(appId, Qt::CaseInsensitive) == 0)
+        {
+            return path;
+        }
+    }
+    return {};
+}
 }

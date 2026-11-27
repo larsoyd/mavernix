@@ -102,7 +102,8 @@ Singleton {
         const id = steamId(appId)
         const wishes = id !== "" ? ["steam_icon_" + id, games.steamIcon(id)] : []
         const candidates = wishes.concat(games.lutrisIcon(gameName(appId)), known(appId)?.icon ?? "",
-                                         games.shortcutIcon(appId, games.revision))
+                                         games.shortcutIcon(appId, games.revision),
+                                         games.programIcon(appId, games.revision))
         return candidates.find(candidate => icons.find(candidate) !== "") ?? appId
     }
 }

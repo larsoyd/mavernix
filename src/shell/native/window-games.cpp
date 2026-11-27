@@ -3,8 +3,12 @@
 #include <QDebug>
 #include <QDir>
 #include <QFile>
+#include <QFutureWatcher>
 #include <QJsonArray>
 #include <QStandardPaths>
+#include <QtConcurrent>
+
+#include "thumbnails.hpp"
 
 using namespace game_facts;
 
@@ -26,6 +30,7 @@ WindowGames::WindowGames(QObject* parent) : QObject(parent)
             takeWindow(event.value("view").toObject());
             takeLauncher(event.value("view").toObject());
             takeShortcut(event.value("view").toObject());
+            takeProgram(event.value("view").toObject());
         }
     });
     compositor.open();
@@ -46,6 +51,7 @@ void WindowGames::startWatching()
             takeWindow(window.toObject());
             takeLauncher(window.toObject());
             takeShortcut(window.toObject());
+            takeProgram(window.toObject());
         }
     });
 }
@@ -127,6 +133,42 @@ void WindowGames::takeShortcut(const QJsonObject& description)
     emit changed();
 }
 
+// the icon of the exe a wine window runs, as the finder shows it
+void WindowGames::takeProgram(const QJsonObject& description)
+{
+    const QString appId = description.value("app-id").toString();
+    const int pid = description.value("pid").toInt(-1);
+    if (pid <= 0)
+    {
+        return;
+    }
+    const QString program = programOfMaps(appId, contents(QString("/proc/%1/maps").arg(pid)));
+    if (program == programs.value(appId))
+    {
+        return;
+    }
+    programs.insert(appId, program);
+    changes += 1;
+    emit changed();
+    if (program.isEmpty())
+    {
+        return;
+    }
+    // a preview can take seconds to make
+    auto* watcher = new QFutureWatcher<QString>(this);
+    connect(watcher, &QFutureWatcher<QString>::finished, this, [this, watcher, appId, program] {
+        watcher->deleteLater();
+        qDebug().noquote() << "[games] app=" + appId << "program=" + program << "icon=" + watcher->result();
+        programIcons.insert(program, watcher->result());
+        changes += 1;
+        emit changed();
+    });
+    watcher->setFuture(QtConcurrent::run([program] {
+        QString error;
+        return thumbnail_for(program, &error).isNull() ? QString() : thumbnail_file(program);
+    }));
+}
+
 QString WindowGames::steamId(const QString& appId, int) const
 {
     const QString own = steamIdOfAppId(appId);
@@ -191,6 +233,11 @@ QString WindowGames::shortcutName(const QString& appId, int) const
 QString WindowGames::shortcutIcon(const QString& appId, int) const
 {
     return shortcuts.value(appId).icon;
+}
+
+QString WindowGames::programIcon(const QString& appId, int) const
+{
+    return programIcons.value(programs.value(appId));
 }
 
 QStringList WindowGames::launcherEntries(const QString& appId, int) const

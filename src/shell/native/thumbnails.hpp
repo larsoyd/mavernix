@@ -9,6 +9,9 @@
 // a file without one is marked in the fail folder and not asked about until it changes
 QImage thumbnail_for(const QString& file, QString* error, int timeout_ms = 12000);
 
+// where thumbnail_for keeps the preview of file
+QString thumbnail_file(const QString& file);
+
 // image://thumbnail/ENCODED_PATH
 class ThumbnailProvider : public QQuickAsyncImageProvider
 {

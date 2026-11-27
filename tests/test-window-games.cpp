@@ -1,4 +1,6 @@
 #include <QtTest>
+#include <QCryptographicHash>
+#include <QImage>
 #include <QLocalServer>
 #include <QLocalSocket>
 #include <QJsonDocument>
@@ -153,6 +155,94 @@ class TestWindowGames : public QObject
                 return;
             }
         }
+    }
+
+    void windowsProgramIcon()
+    {
+        QTemporaryDir directory;
+        const QByteArray oldPath = qgetenv("PATH");
+        qputenv("XDG_CACHE_HOME", QFile::encodeName(directory.filePath("cache")));
+        QVERIFY(QDir().mkpath(directory.filePath("bin")));
+        auto program = [&directory](const QString& name) {
+            const QString path = directory.filePath(name);
+            QFile file(path);
+            if (file.open(QIODevice::WriteOnly))
+            {
+                file.write(QByteArray(4096, 'M'));
+            }
+            return path;
+        };
+        const QString shown = program("Setup-1.1.0.exe");
+        const QString bare = program("Bare.exe");
+        const QString thumb = directory.filePath("cache/thumbnails/large/") +
+                              QCryptographicHash::hash(QUrl::fromLocalFile(shown).toEncoded(), QCryptographicHash::Md5)
+                                  .toHex() + ".png";
+        QVERIFY(QDir().mkpath(QFileInfo(thumb).path()));
+        QImage picture(32, 32, QImage::Format_ARGB32);
+        picture.fill(Qt::red);
+        picture.setText("Thumb::MTime", QString::number(QFileInfo(shown).lastModified().toSecsSinceEpoch()));
+        QVERIFY(picture.save(thumb, "PNG"));
+
+        QLocalServer server;
+        QVERIFY(server.listen(directory.filePath("ipc")));
+        qputenv("WAYFIRE_SOCKET", server.fullServerName().toUtf8());
+        WindowGames games;
+        QTRY_VERIFY_WITH_TIMEOUT(server.hasPendingConnections(), 1000);
+        auto* socket = server.nextPendingConnection();
+        QVERIFY(socket);
+        // a helper that makes no preview and logs whom it was asked about
+        const QString asked = directory.filePath("asked");
+        QFile helper(directory.filePath("bin/mavernix-thumbnail"));
+        QVERIFY(helper.open(QIODevice::WriteOnly));
+        helper.write(QStringLiteral("#!/bin/sh\necho \"$1\" >> '%1'\nexit 1\n").arg(asked).toUtf8());
+        helper.close();
+        QVERIFY(helper.setPermissions(QFile::ReadOwner | QFile::WriteOwner | QFile::ExeOwner));
+        qputenv("PATH", QFile::encodeName(directory.filePath("bin")) + ":/usr/bin:/bin");
+        auto run = [&](const QString& appId, const QString& file, const QString& expected) {
+            QProcess process;
+            process.start("/usr/bin/python3", {"-I", "-c",
+                "import mmap, sys, time\n"
+                "f = open(sys.argv[1], 'rb')\n"
+                "m = mmap.mmap(f.fileno(), 0, access=mmap.ACCESS_READ)\n"
+                "time.sleep(3)\n", file});
+            QVERIFY(process.waitForStarted(1000));
+            auto mapping = [&process, &file] {
+                QFile maps(QStringLiteral("/proc/%1/maps").arg(process.processId()));
+                return maps.open(QIODevice::ReadOnly) && maps.readAll().contains(QFile::encodeName(file));
+            };
+            QTRY_VERIFY_WITH_TIMEOUT(mapping(), 2000);
+            const QJsonObject view{{"app-id", appId}, {"pid", process.processId()}};
+            const QByteArray body = QJsonDocument(QJsonObject{{"event", "view-mapped"}, {"view", view}})
+                                        .toJson(QJsonDocument::Compact);
+            QByteArray frame(4, '\0');
+            qToLittleEndian<quint32>(body.size(), frame.data());
+            socket->write(frame + body);
+            socket->flush();
+            QTest::qWait(300);
+            const QString actual = games.programIcon(appId, games.revision());
+            process.kill();
+            QVERIFY(process.waitForFinished(3000));
+            QCOMPARE(actual, expected);
+        };
+        const QList<QStringList> cases{
+            {"setup-1.1.0.exe", shown, thumb},
+            {"bare.exe", bare, ""},
+            {"setup-1.1.0", shown, ""},
+            {"setup-1.1.0.exe", bare, ""},
+        };
+        for (const QStringList& one : cases)
+        {
+            run(one[0], one[1], one[2]);
+            if (QTest::currentTestFailed())
+            {
+                qWarning().noquote() << "[test] failed case app=" + one[0] << "file=" + one[1];
+                break;
+            }
+        }
+        qputenv("PATH", oldPath);
+        QFile log(asked);
+        QVERIFY(log.open(QIODevice::ReadOnly));
+        QCOMPARE(QString::fromUtf8(log.readAll()), bare + "\n");
     }
 };
 

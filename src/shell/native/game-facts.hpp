@@ -33,4 +33,6 @@ struct Shortcut
 QString launchedShortcut(const QByteArray& environment, qint64 pid, const QStringList& installedFolders);
 Shortcut shortcutOf(const QString& path, const QString& contents);
 QList<Shortcut> shortcutsFor(const QString& appId, const QList<Shortcut>& shortcuts);
+
+QString programOfMaps(const QString& appId, const QByteArray& maps);
 }
