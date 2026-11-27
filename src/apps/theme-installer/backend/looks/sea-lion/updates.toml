@@ -720,3 +720,9 @@ revision = 42
 color = "#000000"
 blur = 3
 drop = 1
+
+[[update]]
+revision = 43
+import_brings = [
+    "The menu bar's logo is the Mavernix cube.",
+]

@@ -71,6 +71,7 @@ To build it, check out `larsoyd` and follow [docs/building.md](../docs/building.
 - The volume menu has a slider for each program playing sound.
 - The clock can sit on the left or in the middle and show the date in several styles that follow the region.
 - Turning off Translucent menu bar gives an opaque menu bar.
+- The menu bar's logo is the Mavernix cube, drawn in the same glossy black as the Sea Lion menu bar and lit white when its menu opens. Older Sea Lion themes get it with a new import.
 
 ### Look and theme
 

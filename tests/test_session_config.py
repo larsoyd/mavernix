@@ -733,6 +733,43 @@ class TestRefreshDesktops(SessionTestCase):
         self.assertEqual(refresh_desktops.refresh(looks, configs), [])
 
 
+class TestPanelLogo(unittest.TestCase):
+    """The menu bar's logo is Mavernix's own cube, at both densities, lit and plain."""
+
+    def setUp(self):
+        sys.path.insert(0, str(LOOKS_DIR.parent))
+        self.addCleanup(sys.path.remove, str(LOOKS_DIR.parent))
+        import make_theme
+        self.make_theme = make_theme
+        self.images = Path(self.enterContext(tempfile.TemporaryDirectory()))
+
+    def test_an_import_writes_the_cube(self):
+        self.make_theme.copy_panel_logo(self.images)
+        from PIL import Image
+        for name in ("panel-logo", "panel-logo-highlighted"):
+            for suffix, size in (("", 22), ("@2x", 44)):
+                with self.subTest(name=name + suffix):
+                    written = self.images / f"{name}{suffix}.png"
+                    self.assertTrue(written.is_file(), f"{written.name} was not written")
+                    self.assertEqual((LOOKS_DIR.parent / "panel-logo" / written.name).read_bytes(), written.read_bytes())
+                    with Image.open(written) as picture:
+                        self.assertEqual(picture.size, (size, size))
+
+    def test_the_seams_stay_open_for_the_dark_themes_flat_paint(self):
+        # the dark theme keeps only the alpha, so the faces must be parted by clear pixels
+        self.make_theme.copy_panel_logo(self.images)
+        from PIL import Image
+        for suffix, seam, faces, rows in (("", [10], [9, 11], range(11, 18)), ("@2x", [21, 22], [20, 23], range(22, 35))):
+            written = self.images / f"panel-logo{suffix}.png"
+            self.assertTrue(written.is_file(), f"{written.name} was not written")
+            with Image.open(written) as picture:
+                alpha = picture.getchannel("A")
+            for row in rows:
+                with self.subTest(density=suffix or "1x", row=row):
+                    self.assertEqual([alpha.getpixel((x, row)) for x in seam], [0] * len(seam))
+                    self.assertEqual([alpha.getpixel((x, row)) for x in faces], [255] * len(faces))
+
+
 class TestSeaLionUpdates(unittest.TestCase):
     """Sea Lion's updates.toml carries tables to themes imported before they
     existed: the App Store's and the menus' fade. Each is a copy of what an
@@ -809,6 +846,11 @@ class TestSeaLionUpdates(unittest.TestCase):
                         edge = correction["now"]
             with self.subTest(start=start):
                 self.assertEqual(edge, [self.make_theme.PANEL_EDGE])
+
+    def test_older_themes_are_offered_the_cube_logo(self):
+        update = self.updates[43]
+        self.assertNotIn("themes", update)
+        self.assertEqual(update["import_brings"], ["The menu bar's logo is the Mavernix cube."])
 
     def test_older_light_themes_get_an_opaque_menu_bar(self):
         self.assertIn(22, self.updates)

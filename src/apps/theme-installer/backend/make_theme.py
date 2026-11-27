@@ -387,17 +387,15 @@ def copy_noise_picture(artwork_dir, images_dir):
 
 
 # --- Panel (the menu bar) ------------------------------------------------------
-# Shared art entries: the translucent background strip and the logo in black.
+# shared art entry for the translucent background strip
 PANEL_BACKGROUND_ENTRY = 48
-PANEL_LOGO_ENTRY = 11
 # The strip is 21 rows and covers all but one row of the bar.
 PANEL_HEIGHT = 22
 # the bar's last row under the strip, half black so it reads softer than 10.9.5's solid line
 PANEL_EDGE = "#00000080"
 PANEL_FONT_SIZE = 14
-# Shared art: the strip behind an open menu's title, and the logo in white.
+# shared art, the strip behind an open menu's title
 PANEL_TITLE_HIGHLIGHT_ENTRY = 49
-PANEL_LOGO_HIGHLIGHTED_ENTRY = 12
 # shared art, the opaque strip a menu bar gets with translucency off
 # older themes get its ends as a gradient, within 2 of it at 1x
 PANEL_OPAQUE_ENTRY = 109
@@ -928,6 +926,12 @@ def copy_shared_art(artwork_dir, images_dir, entry, name):
         if not source.is_file():
             fail(f"{source} is missing. Decode SArtFile.bin first.")
         shutil.copyfile(source, images_dir / f"{name}{theme_suffix}.png")
+
+
+def copy_panel_logo(images_dir):
+    """Copies the menu bar's cube, plain and lit, at both densities."""
+    for picture in sorted(Path(__file__).with_name("panel-logo").glob("*.png")):
+        shutil.copyfile(picture, images_dir / picture.name)
 
 
 def hex_with_opacity(color):
@@ -2342,9 +2346,8 @@ def main():
     copy_noise_picture(artwork_dir, images_dir)
     copy_shared_art(artwork_dir, images_dir, PANEL_BACKGROUND_ENTRY, "panel-background")
     copy_shared_art(artwork_dir, images_dir, PANEL_OPAQUE_ENTRY, PANEL_OPAQUE_PICTURE)
-    copy_shared_art(artwork_dir, images_dir, PANEL_LOGO_ENTRY, "panel-logo")
+    copy_panel_logo(images_dir)
     copy_shared_art(artwork_dir, images_dir, PANEL_TITLE_HIGHLIGHT_ENTRY, "panel-title-highlight")
-    copy_shared_art(artwork_dir, images_dir, PANEL_LOGO_HIGHLIGHTED_ENTRY, "panel-logo-highlighted")
     copy_shared_art(artwork_dir, images_dir, MENU_HIGHLIGHT_ENTRY, "menu-highlight")
 
     copy_dock_pictures(root / DOCK_RESOURCES, images_dir)
