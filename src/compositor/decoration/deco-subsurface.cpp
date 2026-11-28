@@ -21,6 +21,7 @@
 #include <wayfire/toplevel-view.hpp>
 #include "deco-subsurface.hpp"
 #include "hide-maximized.hpp"
+#include "window-gaps.hpp"
 #include "deco-layout.hpp"
 #include "deco-theme.hpp"
 #include <wayfire/window-manager.hpp>
@@ -38,10 +39,11 @@ const char *const CORNER_CLIP_NAME = "themed-decoration-corner-clip";
 const double SELF_FRAMED_CORNER_RADIUS = 8.0;
 const char *const FRAMELESS_CLIP_NAME = "themed-decoration-frameless-clip";
 
-static bool frame_hidden(const wf::toplevel_state_t& state)
+static bool frame_hidden(wf::object_base_t& view, const wf::toplevel_state_t& state)
 {
-    return state.fullscreen || ((state.tiled_edges == wf::TILED_EDGES_ALL) &&
-        wf::get_core().has_data<wf::hide_maximized_frames_t>());
+    auto hide = wf::get_core().get_data<wf::hide_maximized_frames_t>();
+    return state.fullscreen || ((state.tiled_edges == wf::TILED_EDGES_ALL) && hide &&
+        (hide->with_gaps || !wf::gap_of(view)));
 }
 
 class simple_decoration_node_t : public wf::scene::node_t, public wf::pointer_interaction_t,
@@ -740,7 +742,7 @@ class simple_decoration_node_t : public wf::scene::node_t, public wf::pointer_in
             size = dims;
             layout.set_fixed_size(has_fixed_size(view));
             layout.resize(size.width, size.height);
-            if (!bare && !frame_hidden(view->toplevel()->current()))
+            if (!bare && !frame_hidden(*view, view->toplevel()->current()))
             {
                 this->cached_region = layout.calculate_region();
             }
@@ -760,7 +762,8 @@ class simple_decoration_node_t : public wf::scene::node_t, public wf::pointer_in
 
     void update_decoration_size()
     {
-        if (bare || frame_hidden(_view.lock()->toplevel()->current()))
+        auto view = _view.lock();
+        if (bare || frame_hidden(*view, view->toplevel()->current()))
         {
             current_thickness = 0;
             current_titlebar  = 0;
@@ -845,7 +848,7 @@ void wf::simple_decorator_t::update_corner_clip()
 
     // a window with no frame can use direct scan-out without a transformer
     auto transformed = view->get_transformed_node();
-    const bool wanted = !frame_hidden(view->toplevel()->current());
+    const bool wanted = !frame_hidden(*view, view->toplevel()->current());
     const bool present = (transformed->get_transformer<corner_clip_transformer_t>(CORNER_CLIP_NAME) != nullptr);
     if (wanted && !present)
     {
@@ -860,7 +863,7 @@ void wf::simple_decorator_t::update_corner_clip()
 
 wf::decoration_margins_t wf::simple_decorator_t::get_margins(const wf::toplevel_state_t& state)
 {
-    if (frame_hidden(state))
+    if (frame_hidden(*view, state))
     {
         return {0, 0, 0, 0};
     }
@@ -918,7 +921,8 @@ void wf::frameless_decorator_t::set_allowed(bool allowed)
 void wf::frameless_decorator_t::update()
 {
     const auto& state = view->toplevel()->current();
-    const bool wanted = allowed && !state.fullscreen && (state.tiled_edges == 0);
+    // a tile that keeps a gap floats free of its neighbours, so it keeps its corners and shadow
+    const bool wanted = allowed && !state.fullscreen && ((state.tiled_edges == 0) || wf::gap_of(view));
     if (wanted && !shown)
     {
         show();

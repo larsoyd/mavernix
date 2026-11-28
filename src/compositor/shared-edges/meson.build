@@ -4,7 +4,8 @@
 # name in metadata/shared-edges.xml.
 shared_module(
     'shared-edges',
-    ['shared-edges.cpp', 'seam-math.cpp'],
+    ['shared-edges.cpp', 'seam-math.cpp', '../window-gaps/gap-math.cpp'],
+    include_directories: include_directories('../window-gaps'),
     dependencies: [wayfire],
     cpp_args: wayfire_plugin_args,
     install: true,

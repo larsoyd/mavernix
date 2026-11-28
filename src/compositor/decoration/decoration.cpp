@@ -21,6 +21,7 @@ extern "C"
 #include "deco-subsurface.hpp"
 #include "hide-maximized.hpp"
 #include "rounded-frameless.hpp"
+#include "window-gaps.hpp"
 #include "wayfire/core.hpp"
 #include "wayfire/plugin.hpp"
 #include "wayfire/signal-provider.hpp"
@@ -130,6 +131,14 @@ class wayfire_decoration : public wf::plugin_interface_t
         redecorate_all_views();
     };
 
+    // a maximized window that gained or lost its gap may show or hide its frame, corners and shadow
+    wf::signal::connection_t<wf::window_gaps_changed_signal> on_window_gaps_changed =
+        [=] (wf::window_gaps_changed_signal*)
+    {
+        redecorate_all_views();
+        update_all_frameless();
+    };
+
     wf::signal::connection_t<wf::round_frameless_changed_signal> on_round_frameless_changed =
         [=] (wf::round_frameless_changed_signal*)
     {
@@ -159,6 +168,7 @@ class wayfire_decoration : public wf::plugin_interface_t
         wf::get_core().connect(&on_config_reloaded);
         wf::get_core().connect(&on_hide_maximized_changed);
         wf::get_core().connect(&on_round_frameless_changed);
+        wf::get_core().connect(&on_window_gaps_changed);
         wf::get_core().connect(&on_view_mapped);
         wf::get_core().connect(&on_view_unmapped);
 

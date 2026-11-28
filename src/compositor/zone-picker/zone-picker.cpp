@@ -30,6 +30,8 @@
 #include <wayfire/workspace-set.hpp>
 #include <wlr/util/edges.h>
 
+#include "gap-math.hpp"
+#include "window-gaps.hpp"
 #include "zone-layout.hpp"
 
 namespace zone_picker
@@ -242,6 +244,15 @@ class plugin_t : public wf::plugin_interface_t, public wf::per_output_tracker_mi
         return to_box(output->workarea->get_workarea());
     }
 
+    // the zone less the room the window keeps around itself
+    static box_t zone_box(wayfire_toplevel_view view, const box_t& room, const zone_t& zone)
+    {
+        const box_t plain = target_box(room, zone);
+        const auto box = window_gaps::gapped({plain.x, plain.y, plain.width, plain.height},
+            {room.x, room.y, room.width, room.height}, view ? wf::gap_of(view) : 0);
+        return (box.width > 0 && box.height > 0) ? box_t{box.x, box.y, box.width, box.height} : plain;
+    }
+
     void hide_preview()
     {
         if (preview)
@@ -281,7 +292,7 @@ class plugin_t : public wf::plugin_interface_t, public wf::per_output_tracker_mi
                 {
                     wf::json_t cell = to_json(plate.minis[index].cells[zone]);
                     cell["name"] = layouts[index][zone].name;
-                    cell["ok"] = takes(view, target_box(room, layouts[index][zone]));
+                    cell["ok"] = takes(view, zone_box(view, room, layouts[index][zone]));
                     zones.append(cell);
                 }
 
@@ -333,7 +344,7 @@ class plugin_t : public wf::plugin_interface_t, public wf::per_output_tracker_mi
         const state_t before = shown_on ? state : state_t::HIDDEN;
         const state_t now = next_state(before, plate, metrics(), at.x, at.y);
         pick_t picked = now == state_t::OPEN ? zone_at(plate, layouts, at.x, at.y) : pick_t{};
-        if (picked.any() && !takes(view, target_box(room, layouts[picked.layout][picked.zone])))
+        if (picked.any() && !takes(view, zone_box(view, room, layouts[picked.layout][picked.zone])))
         {
             picked = {};
         }
@@ -362,7 +373,7 @@ class plugin_t : public wf::plugin_interface_t, public wf::per_output_tracker_mi
         }
         else if (new_target)
         {
-            show_preview(output, at, target_box(room, layouts[pick.layout][pick.zone]));
+            show_preview(output, at, zone_box(view, room, layouts[pick.layout][pick.zone]));
         }
     }
 
@@ -392,7 +403,7 @@ class plugin_t : public wf::plugin_interface_t, public wf::per_output_tracker_mi
         wf::output_t* output = view->get_output();
         const auto screen = output->get_relative_geometry();
         const uint32_t edges = tiled_edges(zone);
-        wf::geometry_t box = from_box(target_box(room_on(output), zone));
+        wf::geometry_t box = from_box(zone_box(view, room_on(output), zone));
         box.x += workspaces_away.x * screen.width;
         box.y += workspaces_away.y * screen.height;
         if (auto kept = view->get_data<tiled_zone_t>())
@@ -545,7 +556,7 @@ class plugin_t : public wf::plugin_interface_t, public wf::per_output_tracker_mi
     }
 
     // ahead of the plugins that snap and fit tiles, which must see a drop on a zone as none of theirs
-    int get_order_hint() const override { return -2; }
+    int get_order_hint() const override { return -3; }
 
     void handle_new_output(wf::output_t* output) override
     {

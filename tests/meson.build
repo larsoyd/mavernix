@@ -43,6 +43,11 @@ tests = {
         'include': test_sources / 'compositor/zone-picker',
         'dependencies': [],
     },
+    'window-gaps': {
+        'sources': [test_sources / 'compositor/window-gaps/gap-math.cpp'],
+        'include': test_sources / 'compositor/window-gaps',
+        'dependencies': [],
+    },
     'game-window': {
         'sources': [test_sources / 'compositor/game-window/game-marks.cpp'],
         'include': test_sources / 'compositor/game-window',

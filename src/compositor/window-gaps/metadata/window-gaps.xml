@@ -1,0 +1,80 @@
+<?xml version="1.0"?>
+<wayfire>
+	<plugin name="window-gaps">
+		<_short>Window Gaps</_short>
+		<_long>Puts windows on a half, a quarter or the whole screen, leaving room between them and the screen's edges. Games and listed programs fill their share.</_long>
+		<category>Window Management</category>
+		<option name="gap" type="int">
+			<_short>Gap</_short>
+			<_long>Pixels between tiled windows and between a tiled window and the screen's edge. 0 fills the share as grid does.</_long>
+			<default>0</default>
+			<min>0</min>
+			<max>96</max>
+		</option>
+		<option name="full_size_apps" type="string">
+			<_short>Programs that fill the screen</_short>
+			<_long>App IDs (an X11 program's WM_CLASS) that get no gap, separated by spaces; * matches anything.</_long>
+			<default></default>
+		</option>
+		<option name="games_fill" type="bool">
+			<_short>Games fill the screen</_short>
+			<_long>Games get no gap: listed app IDs and programs started by Steam, umu or Lutris.</_long>
+			<default>true</default>
+		</option>
+		<option name="programs" type="string">
+			<_short>Games</_short>
+			<_long>App IDs of games, separated by spaces; * matches anything.</_long>
+			<default>steam_app_* steam_proton gamescope</default>
+		</option>
+		<option name="not_games" type="string">
+			<_short>Not games</_short>
+			<_long>App IDs that never count as games, even when Steam or Lutris started them.</_long>
+			<default></default>
+		</option>
+		<option name="slot_bl" type="activator">
+			<_short>Lower left quarter</_short>
+			<_long>Puts the window in front on the lower left quarter.</_long>
+			<default>none</default>
+		</option>
+		<option name="slot_b" type="activator">
+			<_short>Lower half</_short>
+			<_long>Puts the window in front on the lower half.</_long>
+			<default>none</default>
+		</option>
+		<option name="slot_br" type="activator">
+			<_short>Lower right quarter</_short>
+			<_long>Puts the window in front on the lower right quarter.</_long>
+			<default>none</default>
+		</option>
+		<option name="slot_l" type="activator">
+			<_short>Left half</_short>
+			<_long>Puts the window in front on the left half.</_long>
+			<default>none</default>
+		</option>
+		<option name="slot_c" type="activator">
+			<_short>Whole screen</_short>
+			<_long>Maximizes the window in front.</_long>
+			<default>none</default>
+		</option>
+		<option name="slot_r" type="activator">
+			<_short>Right half</_short>
+			<_long>Puts the window in front on the right half.</_long>
+			<default>none</default>
+		</option>
+		<option name="slot_tl" type="activator">
+			<_short>Upper left quarter</_short>
+			<_long>Puts the window in front on the upper left quarter.</_long>
+			<default>none</default>
+		</option>
+		<option name="slot_t" type="activator">
+			<_short>Upper half</_short>
+			<_long>Puts the window in front on the upper half.</_long>
+			<default>none</default>
+		</option>
+		<option name="slot_tr" type="activator">
+			<_short>Upper right quarter</_short>
+			<_long>Puts the window in front on the upper right quarter.</_long>
+			<default>none</default>
+		</option>
+	</plugin>
+</wayfire>

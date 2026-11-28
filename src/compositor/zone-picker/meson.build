@@ -4,7 +4,8 @@
 # name in metadata/zone-picker.xml.
 shared_module(
     'zone-picker',
-    ['zone-picker.cpp', 'zone-layout.cpp'],
+    ['zone-picker.cpp', 'zone-layout.cpp', '../window-gaps/gap-math.cpp'],
+    include_directories: include_directories('../window-gaps'),
     dependencies: [wayfire],
     cpp_args: wayfire_plugin_args,
     install: true,

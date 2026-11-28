@@ -5,6 +5,7 @@
 shared_module(
     'themed-decoration',
     ['decoration.cpp', 'deco-subsurface.cpp', 'deco-button.cpp', 'deco-layout.cpp', 'deco-theme.cpp', 'title-text.cpp', 'glyph-raster.cpp', 'theme-file.cpp', 'fill-painter.cpp', 'corner-clip.cpp'],
+    include_directories: include_directories('../window-gaps'),
     dependencies: [wayfire, tomlplusplus, dependency('harfbuzz')],
     cpp_args: wayfire_plugin_args,
     install: true,

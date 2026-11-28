@@ -31,7 +31,9 @@
 #include <wayfire/workspace-set.hpp>
 #include <wlr/util/edges.h>
 
+#include "gap-math.hpp"
 #include "seam-math.hpp"
+#include "window-gaps.hpp"
 
 namespace
 {
@@ -107,6 +109,25 @@ wf::geometry_t from_box(const shared_edges::box_t& box)
     return wf::geometry_t{double(box.x), double(box.y), double(box.width), double(box.height)};
 }
 
+window_gaps::box_t room_of(wf::output_t* output)
+{
+    const auto area = output->workarea->get_workarea();
+    return {int(area.x), int(area.y), int(area.width), int(area.height)};
+}
+
+// seams lie between the boxes tiles would have without the room they keep
+shared_edges::box_t without_gap(const shared_edges::box_t& box, wf::output_t* output, int gap)
+{
+    const auto plain = window_gaps::plain({box.x, box.y, box.width, box.height}, room_of(output), gap);
+    return {plain.x, plain.y, plain.width, plain.height};
+}
+
+shared_edges::box_t with_gap(const shared_edges::box_t& box, wf::output_t* output, int gap)
+{
+    const auto gapped = window_gaps::gapped({box.x, box.y, box.width, box.height}, room_of(output), gap);
+    return {gapped.x, gapped.y, gapped.width, gapped.height};
+}
+
 shared_edges::window_t describe(wayfire_toplevel_view view)
 {
     // Size limits are of the contents; add the frame as the stock plugin does.
@@ -116,13 +137,13 @@ shared_edges::window_t describe(wayfire_toplevel_view view)
     const wf::dimensions_t least = view->toplevel()->get_min_size();
     const wf::dimensions_t largest = view->toplevel()->get_max_size();
 
-    const auto geometry = view->toplevel()->pending().geometry;
+    const int gap = wf::gap_of(view);
     shared_edges::window_t window;
-    window.box = to_box(geometry);
-    window.min_width = std::max(1, least.width) + frame_width;
-    window.min_height = std::max(1, least.height) + frame_height;
-    window.max_width = largest.width > 0 ? largest.width + frame_width : 0;
-    window.max_height = largest.height > 0 ? largest.height + frame_height : 0;
+    window.box = without_gap(to_box(view->toplevel()->pending().geometry), view->get_output(), gap);
+    window.min_width = std::max(1, least.width) + frame_width + gap;
+    window.min_height = std::max(1, least.height) + frame_height + gap;
+    window.max_width = largest.width > 0 ? largest.width + frame_width + gap : 0;
+    window.max_height = largest.height > 0 ? largest.height + frame_height + gap : 0;
     return window;
 }
 
@@ -227,8 +248,8 @@ class shared_edges_t : public wf::plugin_interface_t,
     std::shared_ptr<wf::preview_indication_t> preview;
     std::optional<wf::geometry_t> preview_box;
 
-    // a slot beside other tiles, sized to meet them, or nothing if grid's own slot fits
-    std::optional<wf::geometry_t> fitted_slot(wf::output_t* on, uint32_t slot)
+    // a slot beside other tiles, sized to meet them, or nothing if the plain slot fits
+    std::optional<wf::geometry_t> fitted_slot(wf::output_t* on, uint32_t slot, int gap)
     {
         if (!enabled || (slot == wf::grid::SLOT_NONE) || (slot == wf::grid::SLOT_CENTER))
         {
@@ -239,7 +260,8 @@ class shared_edges_t : public wf::plugin_interface_t,
         const uint32_t which = wf::WSET_MAPPED_ONLY | wf::WSET_EXCLUDE_MINIMIZED | wf::WSET_CURRENT_WORKSPACE;
         for (auto& other : on->wset()->get_views(which))
         {
-            tiles.push_back({to_box(other->toplevel()->pending().geometry), other->pending_tiled_edges()});
+            const auto box = without_gap(to_box(other->toplevel()->pending().geometry), on, wf::gap_of(other));
+            tiles.push_back({box, other->pending_tiled_edges()});
         }
 
         const auto plain = to_box(wf::grid::get_slot_dimensions(on, slot));
@@ -251,7 +273,14 @@ class shared_edges_t : public wf::plugin_interface_t,
             return {};
         }
 
-        return from_box(fitted);
+        return from_box(with_gap(fitted, on, gap));
+    }
+
+    // the window under a drag is not named until the drop, so a preview shows the room most windows keep
+    static int usual_gap()
+    {
+        auto gaps = wf::get_core().get_data<wf::window_gaps_t>();
+        return gaps ? gaps->px : 0;
     }
 
     void hide_preview(wf::point_t at)
@@ -276,7 +305,7 @@ class shared_edges_t : public wf::plugin_interface_t,
             return;
         }
 
-        if (const auto box = fitted_slot(on, wf::grid::get_slot_from_tiled_edges(event->edges)))
+        if (const auto box = fitted_slot(on, wf::grid::get_slot_from_tiled_edges(event->edges), wf::gap_of(view)))
         {
             event->carried_out = true;
             skip_crossfade(view);
@@ -292,7 +321,7 @@ class shared_edges_t : public wf::plugin_interface_t,
                 ? wf::grid::SLOT_NONE
                 : wf::grid::calc_slot(event->output, event->input, snap_threshold, quarter_snap_threshold);
         const bool drop = event->operation == wf::grid::MOVE_OP_DROP;
-        const auto box = fitted_slot(event->output, slot);
+        const auto box = fitted_slot(event->output, slot, drop ? wf::gap_of(event->view) : usual_gap());
         if (!box)
         {
             hide_preview(event->input);
@@ -431,6 +460,24 @@ class shared_edges_t : public wf::plugin_interface_t,
         return take_over(view, edges, pressed.get_button());
     };
 
+    // the tile whose room holds a point that no window covers
+    static wayfire_toplevel_view tile_around(wf::output_t* on, wf::pointf_t local)
+    {
+        const uint32_t which = wf::WSET_MAPPED_ONLY | wf::WSET_EXCLUDE_MINIMIZED | wf::WSET_CURRENT_WORKSPACE;
+        for (auto& view : on->wset()->get_views(which))
+        {
+            const int gap = wf::gap_of(view);
+            const auto box = without_gap(to_box(view->toplevel()->pending().geometry), on, gap);
+            if (gap && is_tiled_and_resizable(view) && (local.x >= box.x) && (local.x < box.x + box.width) &&
+                (local.y >= box.y) && (local.y < box.y + box.height))
+            {
+                return view;
+            }
+        }
+
+        return nullptr;
+    }
+
     // asks the workspace so a popup or window above the seam keeps its clicks
     std::optional<seam_strip_node_t::hit_t> seam_at(wf::output_t* on, wf::pointf_t local)
     {
@@ -441,12 +488,20 @@ class shared_edges_t : public wf::plugin_interface_t,
 
         const auto under = on->wset()->get_node()->find_node_at(local);
         wayfire_toplevel_view view = under ? wf::toplevel_cast(wf::node_to_view(under->node.get())) : nullptr;
+        if (!under)
+        {
+            view = tile_around(on, local);
+        }
+
         if (!view || !is_tiled_and_resizable(view))
         {
             return {};
         }
 
-        const auto box = view->toplevel()->pending().geometry;
+        // the room a tile keeps is part of its grip, so the seam reaches across the gap
+        const int gap = wf::gap_of(view);
+        const auto box = from_box(without_gap(to_box(view->toplevel()->pending().geometry), on, gap));
+        const int grip = grip_px + gap - gap / 2;
         const std::pair<uint32_t, double> distances[] = {
             {WLR_EDGE_RIGHT, box.x + box.width - local.x},
             {WLR_EDGE_LEFT, local.x - box.x},
@@ -463,7 +518,7 @@ class shared_edges_t : public wf::plugin_interface_t,
         {
             const auto side = shared_edges::dragged_sides(edge, 0).front().side;
             // past the box is the window's own resize margin, and a press there drags the seam too
-            if ((distance < grip_px) && shared_edges::find_seam(windows, dragged, side, tolerance_px))
+            if ((distance < grip) && shared_edges::find_seam(windows, dragged, side, tolerance_px))
             {
                 edges |= edge;
             }
@@ -525,7 +580,7 @@ class shared_edges_t : public wf::plugin_interface_t,
             }
 
             auto& pending = members[index]->toplevel()->pending();
-            pending.geometry = from_box(moved.box);
+            pending.geometry = from_box(with_gap(moved.box, output, wf::gap_of(members[index])));
             pending.gravity = gravity;
             transaction->add_object(members[index]->toplevel());
         }
@@ -553,8 +608,8 @@ class shared_edges_t : public wf::plugin_interface_t,
         wf::get_core().default_wm = std::make_unique<wf::window_manager_t>();
     }
 
-    // runs before grid, which has to find the animation on a drop
-    int get_order_hint() const override { return -1; }
+    // runs before window-gaps and grid, which place any tile this leaves unfitted
+    int get_order_hint() const override { return -2; }
 
     void handle_new_output(wf::output_t* new_output) override
     {
