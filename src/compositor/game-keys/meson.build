@@ -4,7 +4,8 @@
 # name in metadata/game-keys.xml.
 shared_module(
     'game-keys',
-    ['game-keys.cpp'],
+    ['game-keys.cpp', '../game-window/game-marks.cpp'],
+    include_directories: include_directories('../game-window'),
     dependencies: [wayfire],
     cpp_args: wayfire_plugin_args,
     install: true,

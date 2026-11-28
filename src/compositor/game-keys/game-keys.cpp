@@ -12,9 +12,6 @@
 // (they are counted, as shortcut-capture's are), so core finds no binding
 // and hands the key to the window, as it would any other.
 
-#include <fnmatch.h>
-#include <fstream>
-#include <regex>
 #include <sstream>
 #include <string>
 
@@ -30,8 +27,14 @@
 #include <wayfire/toplevel-view.hpp>
 #include <wayfire/view.hpp>
 
+#include "game-window.hpp"
+
 namespace game_keys
 {
+using game_window::client_pid;
+using game_window::matches_any;
+using game_window::started_as_game;
+
 // Our wlroots keycodes are the kernel's, as in the config ("KEY_F3").
 static int function_key_code(const std::string& name)
 {
@@ -47,21 +50,6 @@ static int function_key_code(const std::string& name)
     return -1;
 }
 
-// `patterns`, separated by spaces, as the shell matches file names ("steam_app_*").
-static bool matches_any(const std::string& patterns, const std::string& app_id)
-{
-    std::istringstream words(patterns);
-    std::string pattern;
-    while (words >> pattern)
-    {
-        if (fnmatch(pattern.c_str(), app_id.c_str(), FNM_CASEFOLD) == 0)
-        {
-            return true;
-        }
-    }
-    return false;
-}
-
 static bool is_x11(wayfire_view view)
 {
 #if WF_HAS_XWAYLAND
@@ -70,49 +58,6 @@ static bool is_x11(wayfire_view view)
 #else
     return false;
 #endif
-}
-
-static bool is_steam_id(const std::string& text)
-{
-    static const std::regex number{"[1-9][0-9]*"};
-    return std::regex_match(text, number);
-}
-
-// the same marks the dock reads to name a game window
-static bool started_as_game(pid_t pid)
-{
-    std::ifstream environ{"/proc/" + std::to_string(pid) + "/environ", std::ios::binary};
-    std::string entry;
-    while (std::getline(environ, entry, '\0'))
-    {
-        const auto equals = entry.find('=');
-        const std::string name = entry.substr(0, equals);
-        const std::string value = entry.substr(equals + 1);
-        if (((name == "SteamAppId" || name == "SteamGameId") && is_steam_id(value)) ||
-            (name == "GAME_NAME" && !value.empty()))
-        {
-            return true;
-        }
-    }
-    return false;
-}
-
-static pid_t client_pid(wayfire_view view)
-{
-    wlr_surface* surface = view->get_wlr_surface();
-    if (!surface)
-    {
-        return 0;
-    }
-#if WF_HAS_XWAYLAND
-    if (auto* xsurface = wlr_xwayland_surface_try_from_wlr_surface(surface))
-    {
-        return xsurface->pid;
-    }
-#endif
-    pid_t pid = 0;
-    wl_client_get_credentials(wl_resource_get_client(surface->resource), &pid, nullptr, nullptr);
-    return pid;
 }
 
 class plugin_t : public wf::plugin_interface_t

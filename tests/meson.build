@@ -43,6 +43,11 @@ tests = {
         'include': test_sources / 'compositor/zone-picker',
         'dependencies': [],
     },
+    'game-window': {
+        'sources': [test_sources / 'compositor/game-window/game-marks.cpp'],
+        'include': test_sources / 'compositor/game-window',
+        'dependencies': [],
+    },
     'shake-to-find': {
         'sources': [test_sources / 'compositor/shake-to-find/shake-detect.cpp'],
         'include': test_sources / 'compositor/shake-to-find',
