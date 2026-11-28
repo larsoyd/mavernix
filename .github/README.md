@@ -19,6 +19,7 @@ To build it, check out `larsoyd` and follow [docs/building.md](../docs/building.
 - When a window is dragged toward the top, a plate of layouts appears with halves, thirds and quarters. Its look comes from the theme, its layouts from the config, and it has an on/off switch in Settings.
 - Tiled windows share their edges. Holding the resize binding moves a shared edge, and a new tile takes the room its neighbours leave. Seams and resize margins show the split pointer.
 - An extension hides title bars on maximized windows, including plain GTK ones.
+- Tiled windows can have margins, as on macOS 15: switched on in Settings > Windows, halves, quarters, layouts and maximized windows keep a gap from each other and from the screen's edges, with their rounded corners and shadow, and a slider sets its width. Games from Steam, umu or Lutris and programs chosen there still fill their part of the screen. The title bar extension keeps the bars of such maximized windows unless told otherwise.
 - Windows that draw their own frame get the theme's rounded corners and shadow while they float.
 - A window's shadow fades as the window gains or loses focus, and window pictures keep their shadow.
 - A window that reaches onto another screen is drawn there too, where it can be clicked and is stacked by focus.

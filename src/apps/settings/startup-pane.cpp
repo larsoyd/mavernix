@@ -1,14 +1,8 @@
 #include "startup-pane.hpp"
 
-#include <QDialog>
-#include <QCoreApplication>
-#include <QDialogButtonBox>
 #include <QHBoxLayout>
 #include <QHeaderView>
-#include <QKeyEvent>
 #include <QLabel>
-#include <QLineEdit>
-#include <QListWidget>
 #include <QPushButton>
 #include <QStandardPaths>
 #include <QTimer>
@@ -16,45 +10,17 @@
 #include <QVBoxLayout>
 
 #include "choices.hpp"
-#include "installed-programs.hpp"
 #include "pane-parts.hpp"
+#include "program-picker.hpp"
 #include "startup-entries.hpp"
 
 // Short enough that a problem and the note under the buttons fit too.
 static const int list_height_px = 200;
 static const int icon_size_px = 24;
-static const int chooser_width_px = 360;
-static const int chooser_height_px = 420;
 
 // The item's file name.
 static const int FileNameRole = Qt::UserRole;
 static const int UsersOwnRole = Qt::UserRole + 1;
-
-// The arrow keys typed into the search move through the list under it, so
-// a program can be found and chosen without leaving the keys.
-class KeysToList : public QObject
-{
-  public:
-    KeysToList(QListWidget* list, QObject* parent) : QObject(parent), list(list) {}
-
-  protected:
-    bool eventFilter(QObject* watched, QEvent* event) override
-    {
-        if (event->type() == QEvent::KeyPress)
-        {
-            const int key = static_cast<QKeyEvent*>(event)->key();
-            if (key == Qt::Key_Up || key == Qt::Key_Down || key == Qt::Key_PageUp || key == Qt::Key_PageDown)
-            {
-                QCoreApplication::sendEvent(list, event);
-                return true;
-            }
-        }
-        return QObject::eventFilter(watched, event);
-    }
-
-  private:
-    QListWidget* list;
-};
 
 // left and right move between an item's own tick and its Hide tick
 class StartupList : public QTreeWidget
@@ -211,58 +177,12 @@ void StartupPane::fill(const QString& chosen)
 
 void StartupPane::addProgram()
 {
-    QDialog chooser(this);
-    chooser.setWindowTitle(word("startup_add_heading", "Open at Login"));
-    chooser.resize(chooser_width_px, chooser_height_px);
-
-    auto* search = new QLineEdit;
-    search->setPlaceholderText(word("startup_search", "Search"));
-    search->setClearButtonEnabled(true);
-    auto* programs = new QListWidget;
-    programs->setIconSize(QSize(icon_size_px, icon_size_px));
-    for (const InstalledProgram& program : installed_programs())
-    {
-        auto* item = new QListWidgetItem(program.icon, program.name, programs);
-        item->setData(FileNameRole, program.id);
-    }
-    auto* answer = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel);
-    answer->button(QDialogButtonBox::Ok)->setEnabled(false);
-
-    auto* rows = new QVBoxLayout(&chooser);
-    rows->addWidget(search);
-    rows->addWidget(programs);
-    rows->addWidget(answer);
-
-    search->installEventFilter(new KeysToList(programs, &chooser));
-    // The first program found is chosen, so Return takes it; one that the
-    // search hides is not taken.
-    connect(search, &QLineEdit::textChanged, &chooser, [programs](const QString& text) {
-        QListWidgetItem* first_found = nullptr;
-        for (int row = 0; row < programs->count(); row++)
-        {
-            QListWidgetItem* item = programs->item(row);
-            item->setHidden(!item->text().contains(text, Qt::CaseInsensitive));
-            if (first_found == nullptr && !item->isHidden())
-            {
-                first_found = item;
-            }
-        }
-        if (programs->currentItem() == nullptr || programs->currentItem()->isHidden())
-        {
-            programs->setCurrentItem(first_found);
-        }
-    });
-    connect(programs, &QListWidget::currentItemChanged, &chooser,
-        [answer](QListWidgetItem* current) { answer->button(QDialogButtonBox::Ok)->setEnabled(current != nullptr); });
-    connect(programs, &QListWidget::itemActivated, &chooser, &QDialog::accept);
-    connect(answer, &QDialogButtonBox::accepted, &chooser, &QDialog::accept);
-    connect(answer, &QDialogButtonBox::rejected, &chooser, &QDialog::reject);
-
-    if (chooser.exec() != QDialog::Accepted || programs->currentItem() == nullptr)
+    const QString id =
+        choose_program(this, word("startup_add_heading", "Open at Login"), word("startup_search", "Search"));
+    if (id.isEmpty())
     {
         return;
     }
-    const QString id = programs->currentItem()->data(FileNameRole).toString();
     showProblem(add_startup_program(id));
     fill(id);
 }

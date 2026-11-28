@@ -6,7 +6,7 @@ moc_sources = qt.compile_moc(
         'trackpad-pane.hpp', 'mouse-pane.hpp', 'network-pane.hpp', 'picture-chooser.hpp', 'energy-pane.hpp', 'display-pane.hpp',
         'desktops-pane.hpp', 'windows-pane.hpp', 'extensions-pane.hpp', 'source-list-delegate.hpp', 'bluetooth-pane.hpp',
         'icons-pane.hpp', 'keyboard-pane.hpp', 'defaults-pane.hpp', 'shortcut-editor.hpp', 'program-shortcut-dialog.hpp',
-        'shortcut-recorder.hpp', 'compositor-link.hpp', 'input-sources-pane.hpp', 'icon-chooser.hpp', 'startup-pane.hpp', 'login-pane.hpp', 'display-modes.hpp', 'screen-arrangement.hpp'],
+        'shortcut-recorder.hpp', 'compositor-link.hpp', 'input-sources-pane.hpp', 'icon-chooser.hpp', 'startup-pane.hpp', 'program-picker.hpp', 'login-pane.hpp', 'display-modes.hpp', 'screen-arrangement.hpp'],
     dependencies: qt_widgets,
 )
 
@@ -56,6 +56,7 @@ settings_program = executable(
         'input-sources-pane.cpp',
         'keyboard-layouts.cpp',
         'startup-pane.cpp',
+        'program-picker.cpp',
         'startup-entries.cpp',
         'login-pane.cpp',
         'display-modes.cpp',

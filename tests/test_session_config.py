@@ -332,10 +332,13 @@ class TestExtensionPlugins(SessionTestCase):
         }})
         self.assertEqual(dict(settings["focus-follows-mouse"]), {"delay_ms": "250", "raise": "true", "menu_on_click": "true"})
 
-    def test_a_plugin_with_no_settings_loads_with_an_empty_section(self):
+    def test_hidden_title_bars_keep_their_bars_with_gaps_unless_asked(self):
         settings = self.wayfire_settings({"extensions": {"enabled": ["borderless-maximized"]}})
         self.assertIn("borderless-maximized", settings["core"]["plugins"].split())
-        self.assertEqual(dict(settings["borderless-maximized"]), {})
+        self.assertEqual(dict(settings["borderless-maximized"]), {"with_gaps": "false"})
+        asked = self.wayfire_settings({"extensions": {"enabled": ["borderless-maximized"],
+                                                      "borderless-maximized": {"with_gaps": True}}})
+        self.assertEqual(dict(asked["borderless-maximized"]), {"with_gaps": "true"})
 
     def gtk_marker(self, folder, *choices):
         marker = folder / "hide-maximized-titlebars"
@@ -1912,6 +1915,90 @@ class TestGameKeys(SessionTestCase):
         for bad in (["two words"], [""], "com.mojang.minecraft", [3]):
             with self.assertRaises(SystemExit, msg=repr(bad)):
                 self.game_keys({"games": {"programs": bad}})
+
+
+class TestWindowGaps(SessionTestCase):
+    def wayfire_settings(self, choices):
+        (self.home / ".config" / "mavernix").mkdir(parents=True, exist_ok=True)
+        (self.home / ".config" / "mavernix" / "plain.json").write_text(json.dumps(choices))
+        written = self.home / "session.ini"
+        self.run_script("make_wayfire_config.py", str(CONFIG_DIR / "plain.toml"), str(written))
+        settings = configparser.ConfigParser(interpolation=None, strict=False)
+        settings.read(written)
+        return settings
+
+    def refused(self, window):
+        (self.home / ".config" / "mavernix").mkdir(parents=True, exist_ok=True)
+        (self.home / ".config" / "mavernix" / "plain.json").write_text(json.dumps({"window": window}))
+        result = self.run_script("make_wayfire_config.py", str(CONFIG_DIR / "plain.toml"), str(self.home / "s.ini"),
+                                 may_fail=True)
+        self.assertNotEqual(result.returncode, 0, window)
+        return result.stderr
+
+    def entry(self, name, text):
+        path = self.home / ".local" / "share" / "applications" / name
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(text)
+
+    def test_the_plain_desktop_loads_the_plugin_with_no_gap(self):
+        settings = self.wayfire_settings({})
+        self.assertIn("window-gaps", settings["core"]["plugins"].split())
+        plugins = settings["core"]["plugins"].split()
+        self.assertLess(plugins.index("shared-edges"), plugins.index("window-gaps"))
+        self.assertEqual(settings["window-gaps"]["gap"], "0")
+        self.assertEqual(settings["window-gaps"]["games_fill"], "true")
+
+    def test_the_chosen_gap_reaches_the_plugin_only_while_on(self):
+        on = self.wayfire_settings({"window": {"gaps": True, "gap_size": 16}})
+        self.assertEqual(on["window-gaps"]["gap"], "16")
+        off = self.wayfire_settings({"window": {"gaps": False, "gap_size": 16}})
+        self.assertEqual(off["window-gaps"]["gap"], "0")
+        usual = self.wayfire_settings({"window": {"gaps": True}})
+        self.assertEqual(usual["window-gaps"]["gap"], "12")
+
+    def test_a_gap_the_plugin_could_not_use_is_refused(self):
+        for size in (-2, 49, "12", True, 12.5):
+            self.assertIn("gap_size", self.refused({"gaps": True, "gap_size": size}), repr(size))
+        for flag in ("gaps", "games_fill_screen"):
+            self.assertIn(flag, self.refused({flag: "yes"}))
+
+    def test_listed_apps_are_matched_by_their_entry_and_window_class(self):
+        self.entry("org.gimp.GIMP.desktop", "[Desktop Entry]\nType=Application\nName=GIMP\nExec=gimp\n"
+                                            "StartupWMClass=gimp-2.10\n")
+        self.entry("foot.desktop", "[Desktop Entry]\nType=Application\nName=Foot\nExec=foot\n")
+        # an entry in a subfolder has its folder joined to its name by a dash, as GIO names it
+        self.entry("wine/Programs/Notepad++.desktop", "[Desktop Entry]\nType=Application\nName=Notepad++\n"
+                                                      "Exec=wine notepad++.exe\nStartupWMClass=notepad++.exe\n")
+        settings = self.wayfire_settings({"window": {"full_size_apps": [
+            "org.gimp.GIMP.desktop", "foot.desktop", "wine-Programs-Notepad++.desktop", "gone.desktop"]}})
+        self.assertEqual(settings["window-gaps"]["full_size_apps"].split(),
+                         ["org.gimp.GIMP", "gimp-2.10", "foot", "wine-Programs-Notepad++", "notepad++.exe", "gone"])
+
+    def test_a_listed_app_that_cannot_be_matched_is_refused(self):
+        for apps in ("foot.desktop", ["two words.desktop"], [""], [3]):
+            self.assertIn("full_size_apps", self.refused({"full_size_apps": apps}), repr(apps))
+
+    def test_games_come_from_both_lists_and_exceptions(self):
+        settings = self.wayfire_settings({"window": {"games_fill_screen": False},
+                                          "games": {"programs": ["org.example.game"], "not_games": ["steam_app_7"]},
+                                          "game_keys": {"games": ["osu!"]}})
+        programs = settings["window-gaps"]["programs"].split()
+        self.assertEqual(programs[:3], ["steam_app_*", "steam_proton", "gamescope"])
+        for game in ("osu!", "org.example.game"):
+            self.assertIn(game, programs)
+        self.assertEqual(len(programs), len(set(programs)))
+        self.assertEqual(settings["window-gaps"]["not_games"], "steam_app_7")
+        self.assertEqual(settings["window-gaps"]["games_fill"], "false")
+        plain = self.wayfire_settings({})
+        self.assertIn("com.mojang.minecraft", plain["window-gaps"]["programs"].split())
+
+    def test_tile_keys_go_through_the_gaps(self):
+        settings = self.wayfire_settings({"shortcuts": {"tile_top_left": "<ctrl> <alt> KEY_U",
+                                                        "maximize_window": "<super> KEY_PAGEUP"}})
+        self.assertEqual(settings["window-gaps"]["slot_tl"], "<ctrl> <alt> KEY_U")
+        self.assertEqual(settings["window-gaps"]["slot_c"], "<super> KEY_PAGEUP")
+        for slot in ("slot_tl", "slot_c", "slot_l"):
+            self.assertEqual(settings["grid"][slot], "none")
 
 
 class TestShellBlur(SessionTestCase):

@@ -14,6 +14,14 @@ title_double_click = "maximize"
 snap_to_edges = true
 snap_distance = 12
 snap_corner_distance = 60
+# Tiled and maximized windows keep gap_size pixels (0 to 48) from each other
+# and from the screen's edges, with their corners and shadow. Games (as
+# [games] names them, or started by Steam, umu or Lutris) and the desktop
+# entries in full_size_apps fill their share as before.
+gaps = false
+gap_size = 12
+games_fill_screen = true
+full_size_apps = []
 # A window dragged toward the top of the screen is offered a plate of
 # layouts there, and dropped on one of its zones takes that part of the
 # screen. It needs snap_to_edges. The distance is how many pixels below the
@@ -775,6 +783,19 @@ windows_zone_picker_note = "Dropping the window on a part of a layout resizes it
 windows_resize_reach = "Edge to resize by:"
 windows_reach_narrow = "Narrow"
 windows_reach_wide = "Wide"
+windows_gaps = "Tiled windows have margins"
+windows_gaps_note = "Leave some space around each tiled or maximized window."
+windows_gap_size = "Margin:"
+windows_gap_narrow = "Narrow"
+windows_gap_wide = "Wide"
+windows_games_fill = "Games have no margins"
+windows_games_fill_note = "Games started by Steam or Lutris, and programs listed as games, fill their part of the screen."
+windows_full_size_apps = "Programs without margins:"
+windows_full_size_apps_choose = "Choose…"
+windows_full_size_apps_heading = "Programs without Margins"
+windows_full_size_apps_add = "Add a Program without Margins"
+programs_add = "Add…"
+programs_remove = "Remove"
 windows_quit_closes_app = "Quit closes all of a program's windows"
 windows_borderless = "Games fill the screen they ask for"
 windows_borderless_note = "Games open full screen on the screen they chose, so borderless ones fill it too."

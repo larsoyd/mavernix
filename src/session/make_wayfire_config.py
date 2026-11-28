@@ -12,6 +12,7 @@ last: Wayfire takes the last value given for an option, so they win.
 """
 
 import argparse
+import configparser
 import json
 import os
 import re
@@ -48,6 +49,7 @@ BASE_PLUGINS = [
     "window-pictures",
     "snap-keys",
     "shared-edges",
+    "window-gaps",
     "zone-picker",
     "reachable-title-bars",
     "across-screens",
@@ -292,15 +294,16 @@ COMPOSITOR_ACTIONS = {
     "snap_right": ("snap-keys", "right"),
     "snap_up": ("snap-keys", "up"),
     "snap_down": ("snap-keys", "down"),
-    "tile_left": ("grid", "slot_l"),
-    "tile_right": ("grid", "slot_r"),
-    "tile_top": ("grid", "slot_t"),
-    "tile_bottom": ("grid", "slot_b"),
-    "tile_top_left": ("grid", "slot_tl"),
-    "tile_top_right": ("grid", "slot_tr"),
-    "tile_bottom_left": ("grid", "slot_bl"),
-    "tile_bottom_right": ("grid", "slot_br"),
-    "maximize_window": ("grid", "slot_c"),
+    # window-gaps places the slots as grid does, with the room tiles keep
+    "tile_left": ("window-gaps", "slot_l"),
+    "tile_right": ("window-gaps", "slot_r"),
+    "tile_top": ("window-gaps", "slot_t"),
+    "tile_bottom": ("window-gaps", "slot_b"),
+    "tile_top_left": ("window-gaps", "slot_tl"),
+    "tile_top_right": ("window-gaps", "slot_tr"),
+    "tile_bottom_left": ("window-gaps", "slot_bl"),
+    "tile_bottom_right": ("window-gaps", "slot_br"),
+    "maximize_window": ("window-gaps", "slot_c"),
     "restore_window": ("grid", "restore"),
 }
 
@@ -978,6 +981,64 @@ def game_keys_section(config):
             f"all_x11 = {yes_or_no(all_x11)}", f"not_games = {' '.join(app_ids(listed, 'not_games'))}"]
 
 
+def entry_paths(desktop_id):
+    """Where an entry may lie: GIO joins a subfolder to the name with a dash, so each dash may be a folder."""
+    stem, *rest = desktop_id.split("-", 1)
+    if not rest:
+        return [desktop_id]
+    return [stem + "-" + tail for tail in entry_paths(rest[0])] + [os.path.join(stem, tail) for tail in entry_paths(rest[0])]
+
+
+def entry_app_ids(desktop_id):
+    """The ids a program's windows may carry: its entry's name and the window class the entry names."""
+    ids = [desktop_id[:-len(".desktop")]]
+    data_home = os.environ.get("XDG_DATA_HOME") or os.path.expanduser("~/.local/share")
+    data_dirs = (os.environ.get("XDG_DATA_DIRS") or "/usr/local/share:/usr/share").split(":")
+    found = (os.path.join(folder, "applications", path) for folder in [data_home] + data_dirs
+             for path in entry_paths(desktop_id))
+    path = next((path for path in found if os.path.isfile(path)), None)
+    if not path:
+        return ids
+    entry = configparser.ConfigParser(interpolation=None, strict=False)
+    entry.optionxform = str
+    try:
+        entry.read(path, encoding="utf-8")
+        wm_class = entry["Desktop Entry"].get("StartupWMClass", "")
+    except (configparser.Error, UnicodeDecodeError, KeyError):
+        return ids
+    return ids + [wm_class] if re.fullmatch(r"\S+", wm_class) and wm_class not in ids else ids
+
+
+def window_gaps_section(config, key_lines):
+    """Room around tiled and maximized windows, from [window], and who fills their share anyway.
+
+    `key_lines` are the tile keys, which window-gaps takes so its tiles keep the room too.
+    """
+    window = config.get("window", {})
+    gaps, games_fill = window.get("gaps", False), window.get("games_fill_screen", True)
+    for name, value in (("gaps", gaps), ("games_fill_screen", games_fill)):
+        if not isinstance(value, bool):
+            fail(f"window.{name} must be true or false")
+    size = window.get("gap_size", 12)
+    if isinstance(size, bool) or not isinstance(size, int) or not 0 <= size <= 48:
+        fail(f"window.gap_size must be a whole number of pixels from 0 to 48, got {size!r}")
+    apps = window.get("full_size_apps", [])
+    if not isinstance(apps, list) or not all(isinstance(app, str) and re.fullmatch(r"\S+\.desktop", app)
+                                             for app in apps):
+        fail("window.full_size_apps must be a list of desktop entry ids, such as \"org.gimp.GIMP.desktop\"")
+    full_size = []
+    for app in apps:
+        full_size += [app_id for app_id in entry_app_ids(app) if app_id not in full_size]
+    listed = config.get("games", {})
+    games = ["steam_app_*", "steam_proton", "gamescope"]
+    for game in config.get("game_keys", {}).get("games", []) + app_ids(listed, "programs"):
+        if game not in games:
+            games.append(game)
+    return ["[window-gaps]", f"gap = {size if gaps else 0}", f"full_size_apps = {' '.join(full_size)}",
+            f"games_fill = {yes_or_no(games_fill)}", f"programs = {' '.join(games)}",
+            f"not_games = {' '.join(app_ids(listed, 'not_games'))}"] + key_lines
+
+
 def app_ids(games, key):
     ids = games.get(key, [])
     if not isinstance(ids, list) or not all(isinstance(i, str) and re.fullmatch(r"\S+", i) for i in ids):
@@ -1416,6 +1477,7 @@ def main():
     grid_section = next(section for section in sections if section[0] == "[grid]")
     sections += window_handling_sections(config, theme, grid_section, compositor_keys.pop("grid", []))
     sections.append(zone_picker_section(config, theme))
+    sections.append(window_gaps_section(config, compositor_keys.pop("window-gaps", [])))
     for section, lines in compositor_keys.items():
         if section != "core":
             sections.append([f"[{section}]"] + lines)

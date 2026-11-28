@@ -2,11 +2,16 @@
 
 #include <QCheckBox>
 #include <QComboBox>
+#include <QDialog>
+#include <QDialogButtonBox>
 #include <QProcess>
+#include <QPushButton>
 #include <QSlider>
+#include <QVBoxLayout>
 
 #include "choices.hpp"
 #include "pane-parts.hpp"
+#include "program-picker.hpp"
 
 // Rewrites the settings GTK programs follow (src/session/start-desktop puts
 // it on the path); window frames follow the user's file by themselves.
@@ -95,6 +100,45 @@ WindowsPane::WindowsPane(Choices& choices, QWidget* parent) : QWidget(parent), c
     auto* reach_row =
         with_end_words(resize_reach, word("windows_reach_narrow", "Narrow"), word("windows_reach_wide", "Wide"));
 
+    // room around tiled and maximized windows, in macOS 15's own words
+    auto* gaps = new QCheckBox(word("windows_gaps", "Tiled windows have margins"));
+    gaps->setChecked(choices.value(table, QStringLiteral("gaps")).toBool());
+    connect(gaps, &QCheckBox::toggled, this,
+        [this, table](bool on) { this->choices.set(table, QStringLiteral("gaps"), on); });
+    const QVariant chosen_gap = choices.value(table, QStringLiteral("gap_size"));
+    auto* gap_size = stops_slider({4, 6, 8, 10, 12, 16, 20, 24, 32, 48}, chosen_gap.isValid() ? chosen_gap.toDouble() : 12,
+        [this, table](double value) { this->choices.set(table, QStringLiteral("gap_size"), qRound(value)); });
+    gap_size->setObjectName(QStringLiteral("windows_gap_size"));
+    auto* gap_row = with_end_words(gap_size, word("windows_gap_narrow", "Narrow"), word("windows_gap_wide", "Wide"));
+    const QVariant games_chosen = choices.value(table, QStringLiteral("games_fill_screen"));
+    auto* games_fill = new QCheckBox(word("windows_games_fill", "Games have no margins"));
+    games_fill->setChecked(!games_chosen.isValid() || games_chosen.toBool());
+    connect(games_fill, &QCheckBox::toggled, this,
+        [this, table](bool on) { this->choices.set(table, QStringLiteral("games_fill_screen"), on); });
+    auto* full_size = new QPushButton(word("windows_full_size_apps_choose", "Choose…"));
+    full_size->setObjectName(QStringLiteral("windows_full_size_apps"));
+    const QString sheet_title = word("windows_full_size_apps_heading", "Programs without Margins");
+    const QString heading = word("windows_full_size_apps_add", "Add a Program without Margins");
+    const QString search = word("startup_search", "Search");
+    connect(full_size, &QPushButton::clicked, this, [this, table, sheet_title, heading, search] {
+        QDialog sheet(this);
+        sheet.setWindowTitle(sheet_title);
+        auto* list = new ProgramList(this->choices, table, QStringLiteral("full_size_apps"),
+            [heading, search](QWidget* over) { return choose_program(over, heading, search); });
+        auto* done = new QDialogButtonBox(QDialogButtonBox::Close);
+        connect(done, &QDialogButtonBox::rejected, &sheet, &QDialog::accept);
+        auto* rows = new QVBoxLayout(&sheet);
+        rows->addWidget(list);
+        rows->addWidget(done);
+        sheet.exec();
+    });
+    for (QWidget* part : {static_cast<QWidget*>(gap_row), static_cast<QWidget*>(games_fill),
+             static_cast<QWidget*>(full_size)})
+    {
+        part->setEnabled(gaps->isChecked());
+        connect(gaps, &QCheckBox::toggled, part, &QWidget::setEnabled);
+    }
+
     // The key held to move a window by dragging anywhere on it, and to
     // resize it with the secondary button; written as the compositor
     // writes keys.
@@ -179,6 +223,12 @@ WindowsPane::WindowsPane(Choices& choices, QWidget* parent) : QWidget(parent), c
     form->addCheck(with_note(zones, word("windows_zone_picker_note",
         "Dropping the window on a part of a layout resizes it, so it fills that part of the screen.")));
     form->addRow(word("windows_resize_reach", "Edge to resize by:"), reach_row);
+    form->addDivider();
+    form->addCheck(with_note(gaps, word("windows_gaps_note", "Leave some space around each tiled or maximized window.")));
+    form->addRow(word("windows_gap_size", "Margin:"), gap_row);
+    form->addCheck(with_note(games_fill, word("windows_games_fill_note",
+        "Games started by Steam or Lutris, and programs listed as games, fill their part of the screen.")));
+    form->addRow(word("windows_full_size_apps", "Programs without margins:"), full_size);
     form->addDivider();
     form->addCheck(with_note(quit_all, word("windows_quit_closes_app_note",
         "The Close Window shortcut quits the program too, so all of its windows close at once.")));
